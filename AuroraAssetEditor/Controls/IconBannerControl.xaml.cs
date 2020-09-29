@@ -97,14 +97,14 @@ namespace AuroraAssetEditor.Controls {
 
         private void OnDrop(object sender, DragEventArgs e) { _main.DragDrop(this, e); }
 
-        internal void SaveIconToFileOnClick(object sender, RoutedEventArgs e) { MainWindow.SaveToFile(_assetFile.GetIcon(), "Select where to save the Icon", "icon.png"); }
+        internal void SaveIconToFileOnClick(object sender, RoutedEventArgs e) { MainWindow.SaveToFile(_assetFile.GetIcon(), "Choose Location to Save Icon Image", "icon.png"); }
 
-        internal void SaveBannerToFileOnClick(object sender, RoutedEventArgs e) { MainWindow.SaveToFile(_assetFile.GetBanner(), "Select where to save the Banner", "banner.png"); }
+        internal void SaveBannerToFileOnClick(object sender, RoutedEventArgs e) { MainWindow.SaveToFile(_assetFile.GetBanner(), "Choose Location to Save Banner Image", "banner.png"); }
 
         internal void SelectNewIcon(object sender, RoutedEventArgs e) {
             var bw = new BackgroundWorker();
             bw.DoWork += (o, args) => {
-                             var img = _main.LoadImage("Select new icon", "icon.png", new Size(64, 64));
+                             var img = _main.LoadImage("Select Icon Image", "icon.png", new Size(64, 64));
                              if(img != null)
                                  Load(img, true);
                          };
@@ -115,7 +115,7 @@ namespace AuroraAssetEditor.Controls {
         internal void SelectNewBanner(object sender, RoutedEventArgs e) {
             var bw = new BackgroundWorker();
             bw.DoWork += (o, args) => {
-                             var img = _main.LoadImage("Select new banner", "banner.png", new Size(420, 96));
+                             var img = _main.LoadImage("Select Banner Image", "banner.png", new Size(420, 96));
                              if(img != null)
                                  Load(img, false);
                          };

@@ -106,12 +106,12 @@ namespace AuroraAssetEditor.Controls {
             bw.RunWorkerCompleted += (o, args) => {
                                          _main.BusyIndicator.Visibility = Visibility.Collapsed;
                                          if((bool)args.Result)
-                                             Status.Text = "Finished grabbing FTP Assets information successfully...";
+                                             Status.Text = "Finished fetching FTP asset information.";
                                          else
-                                             Status.Text = "There was an error, check error.log for more information...";
+                                             Status.Text = "There was an error. See the log for more details about this error.";
                                      };
             _main.BusyIndicator.Visibility = Visibility.Visible;
-            Status.Text = "Grabbing FTP Assets information...";
+            Status.Text = "Fetching FTP asset information...";
             bw.RunWorkerAsync();
         }
 
@@ -187,9 +187,9 @@ namespace AuroraAssetEditor.Controls {
                                                  }
                                              }
                                              if(shouldHideWhenDone && isGet)
-                                                 Dispatcher.InvokeIfRequired(() => Status.Text = "Finished grabbing assets from FTP", DispatcherPriority.Normal);
+                                                 Dispatcher.InvokeIfRequired(() => Status.Text = "Finished fetching assets over FTP", DispatcherPriority.Normal);
                                              else if(shouldHideWhenDone)
-                                                 Dispatcher.InvokeIfRequired(() => Status.Text = "Finished saving assets to FTP", DispatcherPriority.Normal);
+                                                 Dispatcher.InvokeIfRequired(() => Status.Text = "Finished saving assets over FTP", DispatcherPriority.Normal);
                                          }
                                          else {
                                              switch(task) {
@@ -203,9 +203,9 @@ namespace AuroraAssetEditor.Controls {
                                                      break;
                                              }
                                              if(isGet)
-                                                 Dispatcher.InvokeIfRequired(() => Status.Text = "Failed getting asset data... See error.log for more information...", DispatcherPriority.Normal);
+                                                 Dispatcher.InvokeIfRequired(() => Status.Text = "Failed to fetch asset data... See the log for more details about this error.", DispatcherPriority.Normal);
                                              else
-                                                 Dispatcher.InvokeIfRequired(() => Status.Text = "Failed saving asset data... See error.log for more information...", DispatcherPriority.Normal);
+                                                 Dispatcher.InvokeIfRequired(() => Status.Text = "Failed to save asset data... See the log for more details about this error.", DispatcherPriority.Normal);
                                              _isError = true;
                                          }
                                          _isBusy = false;

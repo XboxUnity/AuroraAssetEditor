@@ -62,10 +62,10 @@
                       IsReadOnly="True" ContextMenuOpening="FtpAssetsBoxContextOpening">
                 <DataGrid.Columns>
                     <DataGridTextColumn Header="Title" Binding="{Binding TitleName}" Width="*"/>
-                    <DataGridTextColumn Header="DatabaseID" Binding="{Binding DatabaseId}" Width="Auto"/>
-                    <DataGridTextColumn Header="TitleID" Binding="{Binding TitleId}" Width="Auto"/>
-                    <DataGridTextColumn Header="MediaID" Binding="{Binding MediaId}" Width="Auto"/>
-                    <DataGridTextColumn Header="Disc#" Binding="{Binding DiscNum}" Width="Auto"/>
+                    <DataGridTextColumn Header="Database ID" Binding="{Binding DatabaseId}" Width="Auto"/>
+                    <DataGridTextColumn Header="Title ID" Binding="{Binding TitleId}" Width="Auto"/>
+                    <DataGridTextColumn Header="Media ID" Binding="{Binding MediaId}" Width="Auto"/>
+                    <DataGridTextColumn Header="Disc" Binding="{Binding DiscNum}" Width="Auto"/>
                 </DataGrid.Columns>
                 <DataGrid.ContextMenu>
                     <ContextMenu>

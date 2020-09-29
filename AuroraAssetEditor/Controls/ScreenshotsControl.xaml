@@ -15,10 +15,10 @@
             <ColumnDefinition Width="Auto" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
-        <TextBlock Grid.Row="0" Grid.Column="0" Text="Select screenshot:" Margin="10" />
+        <TextBlock Grid.Row="0" Grid.Column="0" Text="Screenshot:" Margin="10" />
         <ComboBox x:Name="CBox" Grid.Row="0" Grid.Column="1" Margin="0, 10, 0, 10" HorizontalAlignment="Left"
-                  Width="200" SelectionChanged="CBox_SelectionChanged" />
-        <GroupBox Grid.Row="1" Grid.ColumnSpan="2" Grid.Column="0" Header="Preview" VerticalAlignment="Top"
+                  Width="60" SelectionChanged="CBox_SelectionChanged" MaxDropDownHeight="420" />
+        <GroupBox Grid.Row="1" Grid.ColumnSpan="2" Grid.Column="0" Header="Screenshot Preview" VerticalAlignment="Top"
                   HorizontalAlignment="Left" BorderBrush="Black" Margin="10, 0, 0, 0">
             <Viewbox Stretch="Uniform" HorizontalAlignment="Left" VerticalAlignment="Top" MaxHeight="562"
                      MaxWidth="1000">
@@ -27,10 +27,10 @@
                        Source="Resources/Placeholders/screenshot.png">
                     <Image.ContextMenu>
                         <ContextMenu>
-                            <MenuItem x:Name="SaveContextMenuItem" Header="Save Screenshot To File"
+                            <MenuItem x:Name="SaveContextMenuItem" Header="Save Screenshot to File"
                                       Click="SaveImageToFileOnClick" />
                             <MenuItem Header="Replace Screenshot" Click="SelectNewScreenshot" />
-                            <MenuItem Header="Add new Screenshot(s)" Click="AddNewScreenshot" />
+                            <MenuItem Header="Select Screenshot Image(s)" Click="AddNewScreenshot" />
                             <MenuItem x:Name="RemoveContextMenuItem" Header="Remove Screenshot"
                                       Click="RemoveScreenshot" />
                         </ContextMenu>

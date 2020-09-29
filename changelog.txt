@@ -2,7 +2,7 @@ v1.2
  ~ Fixed a bug with not overwriting the settings JSON file properly with FTP
  ~ Fixed a bug with not saving settings without first doing a connection test
  ~ Fixed a bug causing issues after ~ 10 minutes of doing nothing
- + Added support for keyword search on xbox.com, my observations are that it only searches titles starting with the words you write tho... the search is done on xbox.com, Many thanks to JQE for the support on this!
+ + Added support for keyword search on marketplace.xbox.com, my observations are that it only searches titles starting with the words you write though... the search is done on marketplace.xbox.com, Many thanks to JQE for the support on this!
  ~ Fixed a bug causing the application to crash when there's no internet available
  - Removed advanced mode -> enabling the settings menu options by default as they're now supported fully (as of Aurora 0.6b they'll not cause any problems)
 
@@ -10,7 +10,7 @@ v1.1
  + Added support for reading FSD Assets file(s) and converting to Aurora assets - Thanks for updating the dll to read dds MaesterRowen
          also thanks for helping me with the structure of these files, without you this app wouldn't have existed!
  + Added saving all assets in one go - Thanks for the suggestion felida!
- + Added support for downloading Assets from xbox.com and/or Xboxunity.net
+ + Added support for downloading Assets from marketplace.xbox.com and/or Xboxunity.net
  + Added an icon thanks to RAP7HOR
  + Moved all processing to a background thread and added a busy indicator to make the application not freeze and such...
  + Added FTP Support, you can now load/save your assets directly from your network using FTP (requires that you are actually running Aurora for it to work)

@@ -158,13 +158,13 @@ namespace AuroraAssetEditor.Controls {
             var disp = CBox.SelectedItem as ScreenshotDisplay;
             if(disp == null)
                 return;
-            MainWindow.SaveToFile(_screenshots[disp.Index], "Select where to save the Screenshot", string.Format("screenshot{0}.png", disp.Index + 1));
+            MainWindow.SaveToFile(_screenshots[disp.Index], "Choose Location to Save Screenshot Image", string.Format("screenshot{0}.png", disp.Index + 1));
         }
 
         internal void SelectNewScreenshot(object sender, RoutedEventArgs e) {
             var bw = new BackgroundWorker();
             bw.DoWork += (o, args) => {
-                             var img = _main.LoadImage("Select new screenshot", "screenshot.png", new Size(1000, 562));
+                             var img = _main.LoadImage("Select Screenshot Image(s)", "screenshot.png", new Size(1000, 562));
                              if(img != null)
                                  Load(img, true);
                          };
@@ -175,7 +175,7 @@ namespace AuroraAssetEditor.Controls {
         internal void AddNewScreenshot(object sender, RoutedEventArgs e) {
             var bw = new BackgroundWorker();
             bw.DoWork += (o, args) => {
-                             var imglist = _main.LoadImages("Select new screenshot(s)", "screenshot.png", new Size(1000, 562));
+                             var imglist = _main.LoadImages("Select Screenshot Image(s)", "screenshot.png", new Size(1000, 562));
                              if(imglist == null)
                                  return;
                              foreach(var img in imglist)
@@ -199,7 +199,7 @@ namespace AuroraAssetEditor.Controls {
 
             public int Index { get { return _index; } }
 
-            public override string ToString() { return string.Format("Screenshot {0}", _index + 1); }
+            public override string ToString() { return string.Format("{0}", _index + 1); }
         }
     }
 }

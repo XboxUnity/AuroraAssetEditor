@@ -81,12 +81,12 @@ namespace AuroraAssetEditor.Controls {
 
         private void OnDrop(object sender, DragEventArgs e) { _main.DragDrop(this, e); }
 
-        internal void SaveImageToFileOnClick(object sender, RoutedEventArgs e) { MainWindow.SaveToFile(_assetFile.GetBoxart(), "Select where to save the Cover", "cover.png"); }
+        internal void SaveImageToFileOnClick(object sender, RoutedEventArgs e) { MainWindow.SaveToFile(_assetFile.GetBoxart(), "Choose Location to Save Cover Art Image", "cover.png"); }
 
         internal void SelectNewCover(object sender, RoutedEventArgs e) {
             var bw = new BackgroundWorker();
             bw.DoWork += (o, args) => {
-                             var img = _main.LoadImage("Select new cover", "cover.png", new Size(900, 600));
+                             var img = _main.LoadImage("Select Cover Art Image", "cover.png", new Size(900, 600));
                              if(img != null)
                                  Load(img);
                          };

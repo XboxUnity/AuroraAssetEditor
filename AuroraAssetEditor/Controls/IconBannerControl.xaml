@@ -20,9 +20,9 @@
                        Source="Resources/Placeholders/icon.png">
                     <Image.ContextMenu>
                         <ContextMenu>
-                            <MenuItem x:Name="SaveIconContextMenuItem" Header="Save Icon To File"
+                            <MenuItem x:Name="SaveIconContextMenuItem" Header="Save Icon to File"
                                       Click="SaveIconToFileOnClick" />
-                            <MenuItem Header="Select new Icon" Click="SelectNewIcon" />
+                            <MenuItem Header="Select Icon Image" Click="SelectNewIcon" />
                         </ContextMenu>
                     </Image.ContextMenu>
                 </Image>
@@ -36,9 +36,9 @@
                        Source="Resources/Placeholders/banner.png">
                     <Image.ContextMenu>
                         <ContextMenu>
-                            <MenuItem x:Name="SaveBannerContextMenuItem" Header="Save Banner To File"
+                            <MenuItem x:Name="SaveBannerContextMenuItem" Header="Save Banner to File"
                                       Click="SaveBannerToFileOnClick" />
-                            <MenuItem Header="Select new Banner" Click="SelectNewBanner" />
+                            <MenuItem Header="Select Banner Image" Click="SelectNewBanner" />
                         </ContextMenu>
                     </Image.ContextMenu>
                 </Image>

@@ -7,7 +7,7 @@
     x:Class="AuroraAssetEditor.Controls.BoxartControl"
     x:Name="UserControl" AllowDrop="True" PreviewDragEnter="OnDragEnter" Drop="OnDrop" Background="WhiteSmoke">
     <Grid>
-        <GroupBox Header="Preview" VerticalAlignment="Top" HorizontalAlignment="Left" BorderBrush="Black" Margin="10">
+        <GroupBox Header="Cover Art Preview" VerticalAlignment="Top" HorizontalAlignment="Left" BorderBrush="Black" Margin="10">
             <Viewbox Stretch="Uniform" HorizontalAlignment="Left" VerticalAlignment="Top" MaxWidth="900"
                      MaxHeight="600">
                 <Image x:Name="PreviewImg" ContextMenuService.ShowOnDisabled="True"
@@ -15,9 +15,9 @@
                        Height="600" Source="Resources/Placeholders/cover.png">
                     <Image.ContextMenu>
                         <ContextMenu>
-                            <MenuItem x:Name="SaveContextMenuItem" Header="Save Cover To File"
+                            <MenuItem x:Name="SaveContextMenuItem" Header="Save Cover Art to File"
                                       Click="SaveImageToFileOnClick" />
-                            <MenuItem Header="Select new Cover" Click="SelectNewCover" />
+                            <MenuItem Header="Select Cover Art Image" Click="SelectNewCover" />
                         </ContextMenu>
                     </Image.ContextMenu>
                 </Image>

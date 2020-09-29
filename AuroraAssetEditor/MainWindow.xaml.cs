@@ -28,10 +28,10 @@ namespace AuroraAssetEditor {
     /// </summary>
     public partial class MainWindow {
         private const string AssetFileFilter =
-            "Game Cover/Boxart Asset File(defaultFilename) (GC*.asset)|GC*.asset|Background Asset File(defaultFilename) (BK*.asset)|BK*.asset|Icon/Banner Asset File(defaultFilename) (GL*.asset)|GL*.asset|Screenshot Asset File(defaultFilename) (SS*.asset)|SS*.asset|Aurora Asset Files (*.asset)|*.asset|FSD Assets Files (*.assets)|*.assets|All Files(*)|*";
+            "Cover Art (GC*.asset)|GC*.asset|Background (BK*.asset)|BK*.asset|Icon & Banner (GL*.asset)|GL*.asset|Screenshot(s) (SS*.asset)|SS*.asset|Aurora Asset Files (*.asset)|*.asset|FSD Assets Files (*.assets)|*.assets|All Files|*";
 
         private const string ImageFileFilter =
-            "All Supported Images|*.png;*.bmp;*.jpg;*.jpeg;*.gif;*.tif;*.tiff;|BMP (*.bmp)|*.bmp|JPEG (*.jpg;*.jpeg)|*.jpg;*.jpeg|GIF (*.gif)|*.gif|TIFF (*.tif;*.tiff)|*.tiff;*.tif|PNG (*.png)|*.png|All Files|*";
+            "Supported Image Formats|*.png;*.bmp;*.jpg;*.jpeg;*.gif;*.tif;*.tiff;|BMP (*.bmp)|*.bmp|JPEG (*.jpg;*.jpeg)|*.jpg;*.jpeg|GIF (*.gif)|*.gif|TIFF (*.tif;*.tiff)|*.tiff;*.tif|PNG (*.png)|*.png|All Files|*";
 
         private readonly BackgroundControl _background;
         private readonly MenuItem[] _backgroundMenu;
@@ -45,7 +45,7 @@ namespace AuroraAssetEditor {
         public MainWindow(IEnumerable<string> args) {
             InitializeComponent();
             var ver = Assembly.GetAssembly(typeof(MainWindow)).GetName().Version;
-            Title = string.Format(Title, ver.Major, ver.Minor);
+            Title = string.Format(Title, ver.Major, ver.Minor, ver.Build);
             Icon = App.WpfIcon;
 
             #region Boxart
@@ -54,10 +54,10 @@ namespace AuroraAssetEditor {
             BoxartTab.Content = _boxart;
             _boxartMenu = new[] {
                                     new MenuItem {
-                                                     Header = "Save Cover To File"
+                                                     Header = "Save Cover Art to File"
                                                  },
                                     new MenuItem {
-                                                     Header = "Select new Cover"
+                                                     Header = "Select Cover Art Image"
                                                  }
                                 };
             _boxartMenu[0].Click += _boxart.SaveImageToFileOnClick;
@@ -71,10 +71,10 @@ namespace AuroraAssetEditor {
             BackgroundTab.Content = _background;
             _backgroundMenu = new[] {
                                         new MenuItem {
-                                                         Header = "Save Background To File"
+                                                         Header = "Save Background to File"
                                                      },
                                         new MenuItem {
-                                                         Header = "Select new Background"
+                                                         Header = "Select Background Image"
                                                      }
                                     };
             _backgroundMenu[0].Click += _background.SaveImageToFileOnClick;
@@ -88,17 +88,17 @@ namespace AuroraAssetEditor {
             IconBannerTab.Content = _iconBanner;
             _iconBannerMenu = new UIElement[] {
                                                   new MenuItem {
-                                                                   Header = "Save Icon To File"
+                                                                   Header = "Save Icon to File"
                                                                },
                                                   new MenuItem {
-                                                                   Header = "Select new Icon"
+                                                                   Header = "Select Icon Image"
                                                                },
                                                   new Separator(),
                                                   new MenuItem {
-                                                                   Header = "Save Banner To File"
+                                                                   Header = "Save Banner to File"
                                                                },
                                                   new MenuItem {
-                                                                   Header = "Select new Banner"
+                                                                   Header = "Select Banner Image"
                                                                }
                                               };
             ((MenuItem)_iconBannerMenu[0]).Click += _iconBanner.SaveIconToFileOnClick;
@@ -114,16 +114,16 @@ namespace AuroraAssetEditor {
             ScreenshotsTab.Content = _screenshots;
             _screenshotsMenu = new[] {
                                          new MenuItem {
-                                                          Header = "Save Screenshot To File"
+                                                          Header = "Save Screenshot to File"
                                                       },
                                          new MenuItem {
                                                           Header = "Replace Screenshot"
                                                       },
                                          new MenuItem {
-                                                          Header = "Add new Screenshot(s)"
+                                                          Header = "Select Screenshot Image(s)"
                                                       },
                                          new MenuItem {
-                                                          Header = "Remove screenshot"
+                                                          Header = "Remove Screenshot"
                                                       }
                                      };
             _screenshotsMenu[0].Click += _screenshots.SaveImageToFileOnClick;
@@ -156,7 +156,7 @@ namespace AuroraAssetEditor {
 
         private static void SaveFileError(string file, Exception ex) {
             SaveError(ex);
-            MessageBox.Show(string.Format("ERROR: There was an error while trying to process {0}{1}See Error.log for more information", file, Environment.NewLine), "ERROR", MessageBoxButton.OK,
+            MessageBox.Show(string.Format("Error: There was an error while trying to process {0}{1}. See the log for more details about this error.", file, Environment.NewLine), "Error!", MessageBoxButton.OK,
                             MessageBoxImage.Error);
         }
 
@@ -180,11 +180,11 @@ namespace AuroraAssetEditor {
                     Dispatcher.Invoke(new Action(() => IconBannerTab.IsSelected = true));
                 }
                 else
-                    MessageBox.Show(string.Format("ERROR: {0} Doesn't contain any Assets", filename), "ERROR", MessageBoxButton.OK, MessageBoxImage.Error);
+                    MessageBox.Show(string.Format("Error: {0} doesn't contain any assets...", filename), "Error!", MessageBoxButton.OK, MessageBoxImage.Error);
             }
             catch(Exception ex) {
                 SaveError(ex);
-                MessageBox.Show(string.Format("ERROR: While processing {0}{1}{2}{1}See error.log for more details about this error", filename, Environment.NewLine, ex.Message), "ERROR",
+                MessageBox.Show(string.Format("Error: While processing {0}{1}{2}{1}. See the log for more details about this error.", filename, Environment.NewLine, ex.Message), "Error!",
                                 MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
@@ -218,7 +218,7 @@ namespace AuroraAssetEditor {
                         if(_screenshots.SpaceLeft())
                             _screenshots.Load(ss, false);
                         else {
-                            MessageBox.Show("ERROR: Not enough space to fit all screenshots, please clear current screenshots and load the FSD asset again...", "ERROR", MessageBoxButton.OK,
+                            MessageBox.Show("Error: Not enough space for screenshots, please clear current screenshots and reload the asset.", "Error!", MessageBoxButton.OK,
                                             MessageBoxImage.Error);
                             return;
                         }
@@ -226,18 +226,18 @@ namespace AuroraAssetEditor {
                     Dispatcher.Invoke(new Action(() => ScreenshotsTab.IsSelected = true));
                 }
                 else
-                    MessageBox.Show(string.Format("ERROR: {0} Doesn't contain any Assets", filename), "ERROR", MessageBoxButton.OK, MessageBoxImage.Error);
+                    MessageBox.Show(string.Format("Error: {0} doesn't contain any assets...", filename), "Error!", MessageBoxButton.OK, MessageBoxImage.Error);
             }
             catch(Exception ex) {
                 SaveError(ex);
-                MessageBox.Show(string.Format("ERROR: While processing {0}{1}{2}{1}See error.log for more details about this error", filename, Environment.NewLine, ex.Message), "ERROR",
+                MessageBox.Show(string.Format("Error: While processing {0}{1}{2}{1}. See the log for more details about this error.", filename, Environment.NewLine, ex.Message), "Error!",
                                 MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
         private void LoadAssetOnClick(object sender, RoutedEventArgs e) {
             var ofd = new OpenFileDialog {
-                                             Title = "Select Asset(s) to load",
+                                             Title = "Select Asset(s) to Load",
                                              Filter = AssetFileFilter,
                                              FilterIndex = 5,
                                              Multiselect = true
@@ -376,7 +376,7 @@ namespace AuroraAssetEditor {
                                      _background.Load(GetImage(t, new Size(1280, 720)));
                                  else if(Equals(sender, _screenshots)) {
                                      if(askScreenshot && _screenshots.SelectedExists()) { // Do we have a screenshot selected?
-                                         var res = MessageBox.Show(string.Format("Do you want to replace the current Screenshot with {0}?", t), "Replace screenshot?", MessageBoxButton.YesNoCancel,
+                                         var res = MessageBox.Show(string.Format("Do you want to replace the current screenshot with {0}?", t), "Replace screenshot?", MessageBoxButton.YesNoCancel,
                                                                    MessageBoxImage.Question, MessageBoxResult.Cancel);
                                          if(res == MessageBoxResult.Yes) {
                                              _screenshots.Load(GetImage(t, new Size(1000, 562)), true); // We want to replace it
@@ -390,10 +390,10 @@ namespace AuroraAssetEditor {
                                          _screenshots.Load(GetImage(t, new Size(1000, 562)), true);
                                      }
                                      else
-                                         MessageBox.Show("There is no space left for new screenshots :(", "No space left", MessageBoxButton.OK, MessageBoxImage.Error);
+                                         MessageBox.Show("Not enough space for screenshots :(", "No space left", MessageBoxButton.OK, MessageBoxImage.Error);
                                  }
                                  else if(Equals(sender, _iconBanner)) {
-                                     var res = MessageBox.Show(string.Format("Is {0} an Icon? (If you select no it's assumed it's a banner)", t), "Is this an icon?", MessageBoxButton.YesNoCancel,
+                                     var res = MessageBox.Show(string.Format("Is {0} an icon? (Selecting no assumes it's a banner).", t), "Is this an icon?", MessageBoxButton.YesNoCancel,
                                                                MessageBoxImage.Question, MessageBoxResult.Cancel);
                                      switch(res) {
                                          case MessageBoxResult.Yes:
@@ -503,11 +503,11 @@ namespace AuroraAssetEditor {
         }
 
         private void SaveAllAssetsOnClick(object sender, RoutedEventArgs e) {
-            var ipd = new InputDialog(this, "Please specify TitleID:");
+            var ipd = new InputDialog(this, "Title ID:");
             if(ipd.ShowDialog() != true || string.IsNullOrWhiteSpace(ipd.Value))
                 return;
             var fsd = new VistaFolderBrowserDialog {
-                                                       Description = "Select where to save the asset files"
+                                                       Description = "Select where to save the asset(s)..."
                                                    };
             if(fsd.ShowDialog(this) != true)
                 return;
@@ -539,7 +539,7 @@ namespace AuroraAssetEditor {
 
         private void SaveAllAssetsFtpOnClick(object sender, RoutedEventArgs e) {
             if(!App.FtpOperations.ConnectionEstablished) {
-                MessageBox.Show("ERROR: FTP Connection could not be established", "ERROR", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show("Error: Unable to establish FTP connection.", "Error!", MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
             var dialog = new TitleAndDbIdDialog(this);
@@ -560,7 +560,7 @@ namespace AuroraAssetEditor {
                                      App.FtpOperations.SendAssetData(string.Format("SS{0}.asset", tid), aid, _screenshots.GetData());
                              }
                              catch(Exception ex) {
-                                 MessageBox.Show("There was an error while processing your request, check error.log for more information...");
+                                 MessageBox.Show("There was an error while processing the request. See the log for more details about this error.");
                                  SaveError(ex);
                              }
                          };

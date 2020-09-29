@@ -107,7 +107,7 @@ namespace AuroraAssetEditor.Classes {
         public XboxAsset[] IconAssets {
             get {
                 if(AssetsInfo.Where(info => info.AssetType == XboxAssetType.Icon).Any(info => !info.HaveAsset))
-                    XboxAssetDownloader.SendStatusChanged(string.Format("Downloading icon assets for {0}...", Title));
+                    XboxAssetDownloader.SendStatusChanged(string.Format("Downloading icon for {0}...", Title));
                 var ret = AssetsInfo.Where(info => info.AssetType == XboxAssetType.Icon).Select(info => info.GetAsset()).ToArray();
                 return ret;
             }
@@ -116,7 +116,7 @@ namespace AuroraAssetEditor.Classes {
         public XboxAsset[] BannerAssets {
             get {
                 if(AssetsInfo.Where(info => info.AssetType == XboxAssetType.Banner).Any(info => !info.HaveAsset))
-                    XboxAssetDownloader.SendStatusChanged(string.Format("Downloading banner assets for {0}...", Title));
+                    XboxAssetDownloader.SendStatusChanged(string.Format("Downloading banner for {0}...", Title));
                 var ret = AssetsInfo.Where(info => info.AssetType == XboxAssetType.Banner).Select(info => info.GetAsset()).ToArray();
                 return ret;
             }
@@ -125,7 +125,7 @@ namespace AuroraAssetEditor.Classes {
         public XboxAsset[] BackgroundAssets {
             get {
                 if(AssetsInfo.Where(info => info.AssetType == XboxAssetType.Background).Any(info => !info.HaveAsset))
-                    XboxAssetDownloader.SendStatusChanged(string.Format("Downloading background assets for {0}...", Title));
+                    XboxAssetDownloader.SendStatusChanged(string.Format("Downloading background for {0}...", Title));
                 var ret = AssetsInfo.Where(info => info.AssetType == XboxAssetType.Background).Select(info => info.GetAsset()).ToArray();
                 return ret;
             }
@@ -134,14 +134,14 @@ namespace AuroraAssetEditor.Classes {
         public XboxAsset[] ScreenshotsAssets {
             get {
                 if(AssetsInfo.Where(info => info.AssetType == XboxAssetType.Screenshot).Any(info => !info.HaveAsset))
-                    XboxAssetDownloader.SendStatusChanged(string.Format("Downloading screenshot assets for {0}...", Title));
+                    XboxAssetDownloader.SendStatusChanged(string.Format("Downloading screenshot(s) for {0}...", Title));
                 var ret = AssetsInfo.Where(info => info.AssetType == XboxAssetType.Screenshot).Select(info => info.GetAsset()).ToArray();
                 return ret;
             }
         }
 
         private static void ParseXml(Stream xmlData, XboxTitleInfo titleInfo) {
-            XboxAssetDownloader.SendStatusChanged("Parsing Title/Asset info...");
+            XboxAssetDownloader.SendStatusChanged("Parsing online asset information, please wait...");
             var ret = new List<XboxAssetInfo>();
             using(var xml = XmlReader.Create(xmlData)) {
                 while(xml.Read()) {
@@ -177,12 +177,12 @@ namespace AuroraAssetEditor.Classes {
                 }
             }
             titleInfo.AssetsInfo = ret.ToArray();
-            XboxAssetDownloader.SendStatusChanged("Finished parsing Title/Asset info...");
+            XboxAssetDownloader.SendStatusChanged("Finished fetching assets!");
         }
 
         private static void ParseHtml(string url, XboxTitleInfo titleInfo)
         {
-            XboxAssetDownloader.SendStatusChanged("Parsing Title/Asset info...");
+            XboxAssetDownloader.SendStatusChanged("Fetching online assets, please wait...");
             var ret = new List<XboxAssetInfo>();
 
             try
@@ -267,7 +267,7 @@ namespace AuroraAssetEditor.Classes {
             catch {  }
 
             titleInfo.AssetsInfo = ret.ToArray();
-            XboxAssetDownloader.SendStatusChanged("Finished parsing Title/Asset info...");
+            XboxAssetDownloader.SendStatusChanged("Finished fetching assets!");
         }
 
         public static XboxTitleInfo FromTitleId(uint titleId, XboxLocale locale) {
@@ -281,7 +281,7 @@ namespace AuroraAssetEditor.Classes {
 //                              "http://catalog.xboxlive.com/Catalog/Catalog.asmx/Query?methodName=FindGames&Names=Locale&Values={0}&Names=LegalLocale&Values={0}&Names=Store&Values=1&Names=PageSize&Values=100&Names=PageNum&Values=1&Names=DetailView&Values=5&Names=OfferFilterLevel&Values=1&Names=MediaIds&Values=66acd000-77fe-1000-9115-d802{1:X8}&Names=UserTypes&Values=2&Names=MediaTypes&Values=1&Names=MediaTypes&Values=21&Names=MediaTypes&Values=23&Names=MediaTypes&Values=37&Names=MediaTypes&Values=46",
                                 "http://marketplace.xbox.com/{0}/Product/66acd000-77fe-1000-9115-d802{1:X8}",                
                               locale.Locale, titleId);
-            XboxAssetDownloader.SendStatusChanged("Downloading title/asset information...");
+            XboxAssetDownloader.SendStatusChanged("Fetching online assets, please wait...");
 //            using(var stream = new MemoryStream(wc.DownloadData(url)))
 //                ParseXml(stream, ret);
                   ParseHtml(url, ret);

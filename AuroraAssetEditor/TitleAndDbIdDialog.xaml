@@ -12,11 +12,11 @@
             <ColumnDefinition Width="Auto" />
             <ColumnDefinition Width="Auto" />
         </Grid.ColumnDefinitions>
-        <TextBlock Grid.Row="0" Grid.Column="0" HorizontalAlignment="Right" Text="TitleID:" Margin="0, 0, 5, 0" />
+        <TextBlock Grid.Row="0" Grid.Column="0" HorizontalAlignment="Right" Text="Title ID:" Margin="0, 0, 5, 0" />
         <TextBox Grid.Row="0" Grid.Column="1" MinWidth="100" x:Name="TitleIdBox" x:FieldModifier="private"
                  HorizontalAlignment="Stretch" Margin="0, 0, 5, 0" PreviewTextInput="OnTextInput"
                  TextChanged="OnTextChanged" MaxLength="8" />
-        <TextBlock Grid.Row="1" Grid.Column="0" HorizontalAlignment="Right" Text="DatabaseID:" Margin="0, 10, 5, 0" />
+        <TextBlock Grid.Row="1" Grid.Column="0" HorizontalAlignment="Right" Text="Database ID:" Margin="0, 10, 5, 0" />
         <TextBox Grid.Row="1" Grid.Column="1" MinWidth="100" x:Name="DbIdBox" x:FieldModifier="private"
                  HorizontalAlignment="Stretch" Margin="0, 10, 5, 0" PreviewTextInput="OnTextInput"
                  TextChanged="OnTextChanged" MaxLength="8" />

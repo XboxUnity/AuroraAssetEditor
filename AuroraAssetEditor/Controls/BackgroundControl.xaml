@@ -7,7 +7,7 @@
     x:Class="AuroraAssetEditor.Controls.BackgroundControl"
     x:Name="UserControl" AllowDrop="True" PreviewDragEnter="OnDragEnter" Drop="OnDrop" Background="WhiteSmoke">
     <Grid>
-        <GroupBox Header="Preview" VerticalAlignment="Top" HorizontalAlignment="Left" BorderBrush="Black" Margin="10">
+        <GroupBox Header="Background Preview" VerticalAlignment="Top" HorizontalAlignment="Left" BorderBrush="Black" Margin="10">
             <Viewbox Stretch="Uniform" HorizontalAlignment="Left" VerticalAlignment="Top" MaxHeight="720"
                      MaxWidth="1280">
                 <Image x:Name="PreviewImg" MaxHeight="720" MaxWidth="1280" Height="720" Width="1280"
@@ -15,9 +15,9 @@
                        Source="Resources/Placeholders/background.png">
                     <Image.ContextMenu>
                         <ContextMenu>
-                            <MenuItem x:Name="SaveContextMenuItem" Header="Save Background To File"
+                            <MenuItem x:Name="SaveContextMenuItem" Header="Save Background to File"
                                       Click="SaveImageToFileOnClick" />
-                            <MenuItem Header="Select new Background" Click="SelectNewBackground" />
+                            <MenuItem Header="Select Background Image" Click="SelectNewBackground" />
                         </ContextMenu>
                     </Image.ContextMenu>
                 </Image>

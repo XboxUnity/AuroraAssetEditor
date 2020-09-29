@@ -60,7 +60,7 @@ namespace AuroraAssetEditor.Controls {
             bw.DoWork += LocaleWorkerDoWork;
             bw.RunWorkerCompleted += (sender, args) => {
                                          LocaleBox.ItemsSource = _locales;
-                                         SourceBox.Items.Add("Xbox.com");
+                                         SourceBox.Items.Add("Xbox 360 Marketplace");
                                          var index = 0;
                                          for(var i = 0; i < _locales.Length; i++) {
                                              if(!_locales[i].Locale.Equals("en-us", StringComparison.CurrentCultureIgnoreCase))
@@ -79,7 +79,7 @@ namespace AuroraAssetEditor.Controls {
             _unityWorker.DoWork += (o, args) => {
                                        try {
                                            _unityResult = XboxUnity.GetUnityCoverInfo(args.Argument.ToString());
-                                           Dispatcher.Invoke(new Action(() => StatusMessage.Text = "Finished downloading asset information..."));
+                                           Dispatcher.Invoke(new Action(() => StatusMessage.Text = "Finished fetching assets!"));
                                            args.Result = true;
                                        }
                                        catch(Exception ex) {
@@ -108,12 +108,12 @@ namespace AuroraAssetEditor.Controls {
                                           _xboxResult = _keywords == null
                                                             ? _xboxAssetDownloader.GetTitleInfo(_titleId, args.Argument as XboxLocale)
                                                             : _xboxAssetDownloader.GetTitleInfo(_keywords, args.Argument as XboxLocale);
-                                          Dispatcher.Invoke(new Action(() => StatusMessage.Text = "Finished downloading asset information..."));
+                                          Dispatcher.Invoke(new Action(() => StatusMessage.Text = "Finished fetching assets!"));
                                           args.Result = true;
                                       }
                                       catch(Exception ex) {
                                           MainWindow.SaveError(ex);
-                                          Dispatcher.Invoke(new Action(() => StatusMessage.Text = "An error has occured, check error.log for more information..."));
+                                          Dispatcher.Invoke(new Action(() => StatusMessage.Text = "An error has occured. See the log for more details about this error."));
                                           args.Result = false;
                                       }
                                   };
@@ -137,13 +137,13 @@ namespace AuroraAssetEditor.Controls {
 
             _coverMenu = new UIElement[] {
                                              new MenuItem {
-                                                              Header = "Save cover to file"
+                                                              Header = "Save Cover Art to File"
                                                           },
                                              new MenuItem {
-                                                              Header = "Set as cover"
+                                                              Header = "Set as Cover Art"
                                                           }
                                          };
-            ((MenuItem)_coverMenu[0]).Click += (sender, args) => MainWindow.SaveToFile(_img, "Select where to save the cover", "cover.png");
+            ((MenuItem)_coverMenu[0]).Click += (sender, args) => MainWindow.SaveToFile(_img, "Choose Location to Save Cover Art Image", "cover.png");
             ((MenuItem)_coverMenu[1]).Click += (sender, args) => _boxart.Load(_img);
 
             #endregion
@@ -152,13 +152,13 @@ namespace AuroraAssetEditor.Controls {
 
             _iconMenu = new UIElement[] {
                                             new MenuItem {
-                                                             Header = "Save icon to file"
+                                                             Header = "Save Icon to File"
                                                          },
                                             new MenuItem {
-                                                             Header = "Set as icon"
+                                                             Header = "Set as Icon"
                                                          }
                                         };
-            ((MenuItem)_iconMenu[0]).Click += (sender, args) => MainWindow.SaveToFile(_img, "Select where to save the icon", "icon.png");
+            ((MenuItem)_iconMenu[0]).Click += (sender, args) => MainWindow.SaveToFile(_img, "Choose Location to Save Icon Image", "icon.png");
             ((MenuItem)_iconMenu[1]).Click += (sender, args) => _iconBanner.Load(_img, true);
 
             #endregion
@@ -167,13 +167,13 @@ namespace AuroraAssetEditor.Controls {
 
             _bannerMenu = new UIElement[] {
                                               new MenuItem {
-                                                               Header = "Save banner to file"
+                                                               Header = "Save Banner to File"
                                                            },
                                               new MenuItem {
-                                                               Header = "Set as banner"
+                                                               Header = "Set as Banner"
                                                            }
                                           };
-            ((MenuItem)_bannerMenu[0]).Click += (sender, args) => MainWindow.SaveToFile(_img, "Select where to save the banner", "banner.png");
+            ((MenuItem)_bannerMenu[0]).Click += (sender, args) => MainWindow.SaveToFile(_img, "Choose Location to Save Banner Image", "banner.png");
             ((MenuItem)_bannerMenu[1]).Click += (sender, args) => _iconBanner.Load(_img, false);
 
             #endregion
@@ -182,13 +182,13 @@ namespace AuroraAssetEditor.Controls {
 
             _backgroundMenu = new UIElement[] {
                                                   new MenuItem {
-                                                                   Header = "Save background to file"
+                                                                   Header = "Save Background to File"
                                                                },
                                                   new MenuItem {
-                                                                   Header = "Set as background"
+                                                                   Header = "Set as Background"
                                                                }
                                               };
-            ((MenuItem)_backgroundMenu[0]).Click += (sender, args) => MainWindow.SaveToFile(_img, "Select where to save the background", "background.png");
+            ((MenuItem)_backgroundMenu[0]).Click += (sender, args) => MainWindow.SaveToFile(_img, "Choose Location to Save Background Image", "background.png");
             ((MenuItem)_backgroundMenu[1]).Click += (sender, args) => _background.Load(_img);
 
             #endregion
@@ -197,16 +197,16 @@ namespace AuroraAssetEditor.Controls {
 
             _screenshotsMenu = new UIElement[] {
                                                    new MenuItem {
-                                                                    Header = "Save screenshot to file"
+                                                                    Header = "Save Screenshot to File"
                                                                 },
                                                    new MenuItem {
-                                                                    Header = "Replace current screenshot"
+                                                                    Header = "Replace Current Screenshot"
                                                                 },
                                                    new MenuItem {
-                                                                    Header = "Add new screenshot"
+                                                                    Header = "Add Screenshot"
                                                                 }
                                                };
-            ((MenuItem)_screenshotsMenu[0]).Click += (sender, args) => MainWindow.SaveToFile(_img, "Select where to save the screenshot", "screenshot.png");
+            ((MenuItem)_screenshotsMenu[0]).Click += (sender, args) => MainWindow.SaveToFile(_img, "Choose Location to Save Screenshot Image", "screenshot.png");
             ((MenuItem)_screenshotsMenu[1]).Click += (sender, args) => _screenshots.Load(_img, true);
             ((MenuItem)_screenshotsMenu[2]).Click += (sender, args) => _screenshots.Load(_img, false);
 
@@ -227,7 +227,7 @@ namespace AuroraAssetEditor.Controls {
         private void ByTitleIdClick(object sender, RoutedEventArgs e) {
             uint.TryParse(TitleIdBox.Text, NumberStyles.HexNumber, CultureInfo.CurrentCulture, out _titleId);
             if(_unityWorker.IsBusy || _xboxWorker.IsBusy) {
-                MessageBox.Show("Please wait for previous operation to complete!");
+                MessageBox.Show("Busy with current query, please wait...");
                 return;
             }
             PreviewImg.Source = null;
@@ -235,7 +235,7 @@ namespace AuroraAssetEditor.Controls {
             _main.EditMenu.ItemsSource = null;
             _keywords = null;
             if(SourceBox.SelectedIndex == 0) {
-                StatusMessage.Text = "Downloading asset information...";
+                StatusMessage.Text = "Fetching online assets, please wait...";
                 _unityWorker.RunWorkerAsync(_titleId.ToString("X08"));
             }
             else
@@ -244,13 +244,13 @@ namespace AuroraAssetEditor.Controls {
 
         private void ByKeywordsClick(object sender, RoutedEventArgs e) {
             if(_unityWorker.IsBusy || _xboxWorker.IsBusy) {
-                MessageBox.Show("Please wait for previous operation to complete!");
+                MessageBox.Show("Busy with current query, please wait...");
                 return;
             }
             PreviewImg.Source = null;
             PreviewImg.ContextMenu.ItemsSource = null;
             _main.EditMenu.ItemsSource = null;
-            StatusMessage.Text = "Downloading asset information...";
+            StatusMessage.Text = "Fetching online assets, please wait...";
             if(SourceBox.SelectedIndex == 0)
                 _unityWorker.RunWorkerAsync(KeywordsBox.Text);
             else {
@@ -290,7 +290,7 @@ namespace AuroraAssetEditor.Controls {
                                          asset.GetCover();
                                  };
                     bw.RunWorkerCompleted += (o, args) => {
-                                                 StatusMessage.Text = "Finished downloading asset data...";
+                                                 StatusMessage.Text = "Finished fetching assets!";
                                                  ResultBox_SelectionChanged(null, null);
                                              };
                     bw.RunWorkerAsync(unity);
@@ -319,7 +319,7 @@ namespace AuroraAssetEditor.Controls {
                                          asset.GetAsset();
                                  };
                     bw.RunWorkerCompleted += (o, args) => {
-                                                 StatusMessage.Text = "Finished downloading asset data...";
+                                                 StatusMessage.Text = "Finished fetching assets!";
                                                  ResultBox_SelectionChanged(null, null);
                                              };
                     bw.RunWorkerAsync(xbox);

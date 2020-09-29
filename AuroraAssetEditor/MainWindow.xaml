@@ -2,13 +2,13 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:controls="clr-namespace:AuroraAssetEditor.Controls"
-        Title="Aurora Asset Editor v{0}.{1} by Swizzy thanks to MaesterRowen"
-        Width="550"
-        Height="350"
+        Title="Aurora Asset Editor v{0}.{1}.{2}"
+        Width="975"
+        Height="750"
         MinWidth="550"
         MinHeight="350"
         AllowDrop="True"
-        PreviewDragEnter="OnDragEnter">
+        PreviewDragEnter="OnDragEnter" WindowStartupLocation="CenterScreen">
     <Grid>
         <Grid ZIndex="0">
             <Grid.RowDefinitions>
@@ -20,27 +20,27 @@
                   VerticalAlignment="Top"
                   Background="White">
                 <MenuItem ContextMenuOpening="FileOpening" Header="File">
-                    <MenuItem Click="CreateNewOnClick" Header="Create New Asset File" />
-                    <MenuItem Click="LoadAssetOnClick" Header="Load Asset File" />
+                    <MenuItem Click="CreateNewOnClick" Header="Create New Asset Set" />
+                    <MenuItem Click="LoadAssetOnClick" Header="Load Asset(s)" />
                     <MenuItem Click="SaveAllAssetsOnClick" Header="Save All Assets" />
                     <MenuItem x:Name="FtpUpload"
                               Click="SaveAllAssetsFtpOnClick"
                               Header="Save All Assets to FTP" />
                     <Separator />
-                    <MenuItem Click="SaveBoxartOnClick" Header="Save Boxart/Cover Asset" />
-                    <MenuItem Click="SaveBackgroundOnClick" Header="Save Background Asset" />
-                    <MenuItem Click="SaveScreenshotsOnClick" Header="Save Screenshots Asset" />
-                    <MenuItem Click="SaveIconBannerOnClick" Header="Save Icon/Banner Asset" />
+                    <MenuItem Click="SaveBoxartOnClick" Header="Save Cover Art" />
+                    <MenuItem Click="SaveBackgroundOnClick" Header="Save Background" />
+                    <MenuItem Click="SaveIconBannerOnClick" Header="Save Icon &amp; Banner" />
+                    <MenuItem Click="SaveScreenshotsOnClick" Header="Save Screenshots" />
                     <Separator />
                     <MenuItem Click="ExitOnClick" Header="Exit" />
                 </MenuItem>
                 <MenuItem x:Name="SettingsMenu" Header="Settings">
                     <MenuItem x:Name="AutoResizeImages"
-                              Header="Auto Resize Images"
+                              Header="Automatically Resize Images"
                               IsCheckable="True"
-                              IsChecked="True" />
+                              IsChecked="False" />
                     <MenuItem x:Name="UseCompression"
-                              Header="Use Compression"
+                              Header="Compress Assets"
                               IsCheckable="True"
                               IsChecked="True" />
                 </MenuItem>
@@ -53,15 +53,15 @@
                         HorizontalAlignment="Stretch"
                         VerticalAlignment="Stretch"
                         SelectionChanged="TabChanged">
-                <TabItem x:Name="BoxartTab" Header="Boxart/Cover" />
+                <TabItem x:Name="BoxartTab" Header="Cover Art" />
                 <TabItem x:Name="BackgroundTab" Header="Background" />
-                <TabItem x:Name="IconBannerTab" Header="Icon/Banner" />
+                <TabItem x:Name="IconBannerTab" Header="Icon &amp; Banner" />
                 <TabItem x:Name="ScreenshotsTab" Header="Screenshots" />
                 <TabItem x:Name="OnlineAssetsTab"
                          Header="Online Assets"
                          x:FieldModifier="private" />
                 <TabItem x:Name="FtpAssetsTab"
-                         Header="FTP Assets"
+                         Header="FTP"
                          x:FieldModifier="private" />
             </TabControl>
         </Grid>
@@ -84,7 +84,7 @@
                                HorizontalAlignment="Center"
                                VerticalAlignment="Center"
                                FontWeight="Bold"
-                               Text="Please wait while processing your request..." />
+                               Text="Please wait, processing request..." />
                 </Grid>
             </Grid>
         </Grid>
