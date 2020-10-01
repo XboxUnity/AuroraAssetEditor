@@ -177,7 +177,7 @@ namespace AuroraAssetEditor.Classes {
                 }
             }
             titleInfo.AssetsInfo = ret.ToArray();
-            XboxAssetDownloader.SendStatusChanged("Finished fetching assets!");
+            XboxAssetDownloader.SendStatusChanged("Finished parsing asset information...");
         }
 
         private static void ParseHtml(string url, XboxTitleInfo titleInfo)
@@ -267,7 +267,7 @@ namespace AuroraAssetEditor.Classes {
             catch {  }
 
             titleInfo.AssetsInfo = ret.ToArray();
-            XboxAssetDownloader.SendStatusChanged("Finished fetching assets!");
+            XboxAssetDownloader.SendStatusChanged("Finished parsing asset information...");
         }
 
         public static XboxTitleInfo FromTitleId(uint titleId, XboxLocale locale) {

@@ -38,7 +38,7 @@
                     <MenuItem x:Name="AutoResizeImages"
                               Header="Automatically Resize Images"
                               IsCheckable="True"
-                              IsChecked="False" />
+                              IsChecked="True" />
                     <MenuItem x:Name="UseCompression"
                               Header="Compress Assets"
                               IsCheckable="True"

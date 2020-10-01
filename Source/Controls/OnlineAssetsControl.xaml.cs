@@ -79,7 +79,7 @@ namespace AuroraAssetEditor.Controls {
             _unityWorker.DoWork += (o, args) => {
                                        try {
                                            _unityResult = XboxUnity.GetUnityCoverInfo(args.Argument.ToString());
-                                           Dispatcher.Invoke(new Action(() => StatusMessage.Text = "Finished fetching assets!"));
+                                           Dispatcher.Invoke(new Action(() => StatusMessage.Text = "Finished fetching asset information..."));
                                            args.Result = true;
                                        }
                                        catch(Exception ex) {
@@ -108,7 +108,7 @@ namespace AuroraAssetEditor.Controls {
                                           _xboxResult = _keywords == null
                                                             ? _xboxAssetDownloader.GetTitleInfo(_titleId, args.Argument as XboxLocale)
                                                             : _xboxAssetDownloader.GetTitleInfo(_keywords, args.Argument as XboxLocale);
-                                          Dispatcher.Invoke(new Action(() => StatusMessage.Text = "Finished fetching assets!"));
+                                          Dispatcher.Invoke(new Action(() => StatusMessage.Text = "Finished fetching asset information..."));
                                           args.Result = true;
                                       }
                                       catch(Exception ex) {
@@ -290,7 +290,7 @@ namespace AuroraAssetEditor.Controls {
                                          asset.GetCover();
                                  };
                     bw.RunWorkerCompleted += (o, args) => {
-                                                 StatusMessage.Text = "Finished fetching assets!";
+                                                 StatusMessage.Text = "Finished fetching asset information...";
                                                  ResultBox_SelectionChanged(null, null);
                                              };
                     bw.RunWorkerAsync(unity);
@@ -319,7 +319,7 @@ namespace AuroraAssetEditor.Controls {
                                          asset.GetAsset();
                                  };
                     bw.RunWorkerCompleted += (o, args) => {
-                                                 StatusMessage.Text = "Finished fetching assets!";
+                                                 StatusMessage.Text = "Finished fetching asset information...";
                                                  ResultBox_SelectionChanged(null, null);
                                              };
                     bw.RunWorkerAsync(xbox);
