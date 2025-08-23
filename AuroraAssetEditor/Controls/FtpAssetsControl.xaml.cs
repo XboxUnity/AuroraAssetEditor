@@ -243,11 +243,6 @@ namespace AuroraAssetEditor.Controls {
             bw.RunWorkerAsync();
         }
 
-		private void GuessClick(Object sender, RoutedEventArgs e)
-		{
-
-		}
-
 		private void GetBoxartClick(object sender, RoutedEventArgs e) { ProcessAsset(Task.GetBoxart); }
 
         private void GetBackgroundClick(object sender, RoutedEventArgs e) { ProcessAsset(Task.GetBackground); }
