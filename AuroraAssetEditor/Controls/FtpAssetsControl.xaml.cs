@@ -7,31 +7,31 @@
 
 namespace AuroraAssetEditor.Controls {
     using System;
-	using System.Collections.Generic;
-	using System.ComponentModel;
-	using System.Globalization;
-	using System.IO;
-	using System.Linq;
+    using System.Collections.Generic;
+    using System.ComponentModel;
+    using System.Globalization;
+    using System.IO;
+    using System.Linq;
     using System.Net.NetworkInformation;
     using System.Net.Sockets;
     using System.Threading;
     using System.Windows;
     using System.Windows.Controls;
     using System.Windows.Data;
-	using System.Windows.Threading;
+    using System.Windows.Threading;
     using AuroraAssetEditor.Models;
     using Classes;
     using Helpers;
-	using static AuroraAssetEditor.Classes.XboxTitleInfo;
+    using static AuroraAssetEditor.Classes.XboxTitleInfo;
 
-	/// <summary>
-	///     Interaction logic for FtpAssetsControl.xaml
-	/// </summary>
+    /// <summary>
+    ///     Interaction logic for FtpAssetsControl.xaml
+    /// </summary>
     public partial class FtpAssetsControl {
-		private readonly InternetArchiveDownloader _internetArchiveDownloader = new InternetArchiveDownloader();
-		private readonly XboxAssetDownloader _xboxAssetDownloader = new XboxAssetDownloader();
-		private readonly Random _rand = new Random();
-		private readonly ThreadSafeObservableCollection<AuroraDbManager.ContentItem> _assetsList = new ThreadSafeObservableCollection<AuroraDbManager.ContentItem>();
+        private readonly InternetArchiveDownloader _internetArchiveDownloader = new InternetArchiveDownloader();
+        private readonly XboxAssetDownloader _xboxAssetDownloader = new XboxAssetDownloader();
+        private readonly Random _rand = new Random();
+        private readonly ThreadSafeObservableCollection<AuroraDbManager.ContentItem> _assetsList = new ThreadSafeObservableCollection<AuroraDbManager.ContentItem>();
         private readonly CollectionViewSource _assetsViewSource = new CollectionViewSource();
         private readonly ICollectionView _assetView;
         private readonly BackgroundControl _background;
@@ -243,7 +243,7 @@ namespace AuroraAssetEditor.Controls {
             bw.RunWorkerAsync();
         }
 
-		private void GetBoxartClick(object sender, RoutedEventArgs e) { ProcessAsset(Task.GetBoxart); }
+        private void GetBoxartClick(object sender, RoutedEventArgs e) { ProcessAsset(Task.GetBoxart); }
 
         private void GetBackgroundClick(object sender, RoutedEventArgs e) { ProcessAsset(Task.GetBackground); }
 
@@ -402,211 +402,211 @@ namespace AuroraAssetEditor.Controls {
             };
         }
 
-		private void SetStatusText(string StatusText)
-		{
-			Dispatcher.Invoke(new Action(() => Status.Text = StatusText));
-		}
+        private void SetStatusText(string StatusText)
+        {
+            Dispatcher.Invoke(new Action(() => Status.Text = StatusText));
+        }
 
-		private bool VerifyAsset(AuroraDbManager.ContentItem asset, AuroraAsset.AssetType type)
-		{
-			byte[] buffer;
-			switch (type)
-			{
-				case AuroraAsset.AssetType.Boxart:
-					buffer = asset.GetBoxart();
-					break;
-				case AuroraAsset.AssetType.Icon:
-				case AuroraAsset.AssetType.Banner:
-					buffer = asset.GetIconBanner();
-					break;
-				case AuroraAsset.AssetType.Background:
-					buffer = asset.GetBackground();
-					break;
-				default:
-					buffer = asset.GetScreenshots();
-					break;
-			}
-			AuroraAsset.AssetFile aurora = new AuroraAsset.AssetFile(buffer);
-			switch (type)
-			{
-				case AuroraAsset.AssetType.Boxart:
-					return (aurora.GetBoxart() != null);
-				case AuroraAsset.AssetType.Icon:
-					return (aurora.GetIcon() != null);
-				case AuroraAsset.AssetType.Banner:
-					return (aurora.GetBanner() != null);
-				case AuroraAsset.AssetType.Background:
-					return (aurora.GetBackground() != null);
-				default:
-					return (aurora.GetScreenshots().Length != 0);
-			}
-		}
+        private bool VerifyAsset(AuroraDbManager.ContentItem asset, AuroraAsset.AssetType type)
+        {
+            byte[] buffer;
+            switch (type)
+            {
+                case AuroraAsset.AssetType.Boxart:
+                    buffer = asset.GetBoxart();
+                    break;
+                case AuroraAsset.AssetType.Icon:
+                case AuroraAsset.AssetType.Banner:
+                    buffer = asset.GetIconBanner();
+                    break;
+                case AuroraAsset.AssetType.Background:
+                    buffer = asset.GetBackground();
+                    break;
+                default:
+                    buffer = asset.GetScreenshots();
+                    break;
+            }
+            AuroraAsset.AssetFile aurora = new AuroraAsset.AssetFile(buffer);
+            switch (type)
+            {
+                case AuroraAsset.AssetType.Boxart:
+                    return (aurora.GetBoxart() != null);
+                case AuroraAsset.AssetType.Icon:
+                    return (aurora.GetIcon() != null);
+                case AuroraAsset.AssetType.Banner:
+                    return (aurora.GetBanner() != null);
+                case AuroraAsset.AssetType.Background:
+                    return (aurora.GetBackground() != null);
+                default:
+                    return (aurora.GetScreenshots().Length != 0);
+            }
+        }
 
-		private void BulkDownloadClick(Object sender, RoutedEventArgs e)
-		{
-			var assets = FtpAssetsBox.Items;
-			if (assets.Count == 0)
-			{
-				MessageBox.Show("ERROR: No Assets listed", "ERROR", MessageBoxButton.OK, MessageBoxImage.Error);
-				return;
-			}
-			if (!App.FtpOperations.ConnectionEstablished)
-			{
-				MessageBox.Show("ERROR: FTP Connection could not be established", "ERROR", MessageBoxButton.OK, MessageBoxImage.Error);
-				return;
-			}
-			var dialog = new BulkActionsDialog(_main);
-			if (dialog.ShowDialog() != true)
-				return;
-			bool replaceExisting = dialog.ReplaceExisting;
-			bool coverArtOnly = dialog.CoverArtOnly;
-			var shouldUseCompression = false;
-			Dispatcher.Invoke(new Action(() => shouldUseCompression = _main.UseCompression.IsChecked));
+        private void BulkDownloadClick(Object sender, RoutedEventArgs e)
+        {
+            var assets = FtpAssetsBox.Items;
+            if (assets.Count == 0)
+            {
+                MessageBox.Show("ERROR: No Assets listed", "ERROR", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+            if (!App.FtpOperations.ConnectionEstablished)
+            {
+                MessageBox.Show("ERROR: FTP Connection could not be established", "ERROR", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+            var dialog = new BulkActionsDialog(_main);
+            if (dialog.ShowDialog() != true)
+                return;
+            bool replaceExisting = dialog.ReplaceExisting;
+            bool coverArtOnly = dialog.CoverArtOnly;
+            var shouldUseCompression = false;
+            Dispatcher.Invoke(new Action(() => shouldUseCompression = _main.UseCompression.IsChecked));
 
-			var bw = new BackgroundWorker();
-			bw.DoWork += (o, args) => {
-				int max_ss = 3;
-				try
-				{
-					// forced locale for now :(
-					XboxLocale xboxLocale = XboxAssetDownloader.GetLocales().Where(obj => obj.Locale.Equals("en-US")).First();
-					foreach (AuroraDbManager.ContentItem asset in FtpAssetsBox.Items)
-					{
-						bool boxart = false, background = false, iconBanner = false, screenshots = false;
-						if (!replaceExisting)
-						{
-							if (!App.FtpOperations.ConnectionEstablished)
-							{
-								MessageBox.Show("ERROR: FTP Connection could not be established", "ERROR", MessageBoxButton.OK, MessageBoxImage.Error);
-								return;
-							}
+            var bw = new BackgroundWorker();
+            bw.DoWork += (o, args) => {
+                int max_ss = 3;
+                try
+                {
+                    // forced locale for now :(
+                    XboxLocale xboxLocale = XboxAssetDownloader.GetLocales().Where(obj => obj.Locale.Equals("en-US")).First();
+                    foreach (AuroraDbManager.ContentItem asset in FtpAssetsBox.Items)
+                    {
+                        bool boxart = false, background = false, iconBanner = false, screenshots = false;
+                        if (!replaceExisting)
+                        {
+                            if (!App.FtpOperations.ConnectionEstablished)
+                            {
+                                MessageBox.Show("ERROR: FTP Connection could not be established", "ERROR", MessageBoxButton.OK, MessageBoxImage.Error);
+                                return;
+                            }
 
-							boxart = VerifyAsset(asset, AuroraAsset.AssetType.Boxart);
-							if (!coverArtOnly)
-							{
-								background = VerifyAsset(asset, AuroraAsset.AssetType.Background);
-								iconBanner = (VerifyAsset(asset, AuroraAsset.AssetType.Icon) && VerifyAsset(asset, AuroraAsset.AssetType.Banner));
-								screenshots = VerifyAsset(asset, AuroraAsset.AssetType.ScreenshotStart);
-							}
-						}
+                            boxart = VerifyAsset(asset, AuroraAsset.AssetType.Boxart);
+                            if (!coverArtOnly)
+                            {
+                                background = VerifyAsset(asset, AuroraAsset.AssetType.Background);
+                                iconBanner = (VerifyAsset(asset, AuroraAsset.AssetType.Icon) && VerifyAsset(asset, AuroraAsset.AssetType.Banner));
+                                screenshots = VerifyAsset(asset, AuroraAsset.AssetType.ScreenshotStart);
+                            }
+                        }
 
-						uint titleId;
-						uint.TryParse(asset.TitleId, NumberStyles.HexNumber, CultureInfo.CurrentCulture, out titleId);
+                        uint titleId;
+                        uint.TryParse(asset.TitleId, NumberStyles.HexNumber, CultureInfo.CurrentCulture, out titleId);
 
-						if (!boxart)
-						{
-							SetStatusText(string.Format("Downloading XBOX Assets for {0}", asset.TitleName));
-							InternetArchiveAsset[] archiveResults = _internetArchiveDownloader.GetTitleInfo(titleId);
-							if (archiveResults.Length != 0)
-							{
-								// choose a random result
-								int index = _rand.Next(0, archiveResults.Length);
-								InternetArchiveAsset archive = archiveResults[index];
+                        if (!boxart)
+                        {
+                            SetStatusText(string.Format("Downloading XBOX Assets for {0}", asset.TitleName));
+                            InternetArchiveAsset[] archiveResults = _internetArchiveDownloader.GetTitleInfo(titleId);
+                            if (archiveResults.Length != 0)
+                            {
+                                // choose a random result
+                                int index = _rand.Next(0, archiveResults.Length);
+                                InternetArchiveAsset archive = archiveResults[index];
 
-								AuroraAsset.AssetFile aurora = new AuroraAsset.AssetFile();
-								aurora.SetBoxart(archive.GetCover(), shouldUseCompression);
-								if (aurora.HasBoxArt)
-								{
-									asset.SaveAsBoxart(aurora.FileData);
-									boxart = true;
-								}
-							}
-						}
+                                AuroraAsset.AssetFile aurora = new AuroraAsset.AssetFile();
+                                aurora.SetBoxart(archive.GetCover(), shouldUseCompression);
+                                if (aurora.HasBoxArt)
+                                {
+                                    asset.SaveAsBoxart(aurora.FileData);
+                                    boxart = true;
+                                }
+                            }
+                        }
 
-						if (!coverArtOnly && !(background && iconBanner && screenshots))
-						{
-							int current_ss = 0;
-							List<XboxAssetInfo> screenshots_list = new List<XboxAssetInfo>();
-							XboxAssetInfo icon = null, banner = null;
+                        if (!coverArtOnly && !(background && iconBanner && screenshots))
+                        {
+                            int current_ss = 0;
+                            List<XboxAssetInfo> screenshots_list = new List<XboxAssetInfo>();
+                            XboxAssetInfo icon = null, banner = null;
 
-							SetStatusText(string.Format("Downloading XBOX Assets for {0}", asset.TitleName));
-							XboxTitleInfo xboxResult = _xboxAssetDownloader.GetTitleInfo(titleId, xboxLocale)[0];
-							foreach (XboxAssetInfo info in xboxResult.AssetsInfo)
-							{
-								switch (info.AssetType)
-								{
-									case XboxTitleInfo.XboxAssetType.Icon:
-									case XboxTitleInfo.XboxAssetType.Banner:
-										if (!iconBanner)
-										{
-											AuroraAsset.AssetFile aurora = new AuroraAsset.AssetFile();
-											if (info.AssetType == XboxTitleInfo.XboxAssetType.Icon)
-												icon = info;
-											else
-												banner = info;
-										}
-										break;
-									case XboxTitleInfo.XboxAssetType.Background:
-										if (!background)
-										{
-											AuroraAsset.AssetFile aurora = new AuroraAsset.AssetFile();
-											aurora.SetBackground(info.GetAsset().Image, shouldUseCompression);
-											if (aurora.HasBackground)
-											{
-												asset.SaveAsBackground(aurora.FileData);
-												background = true;
-											}
-										}
-										break;
-									case XboxTitleInfo.XboxAssetType.Screenshot:
-										if (!screenshots && current_ss < max_ss)
-										{
-											current_ss++;
+                            SetStatusText(string.Format("Downloading XBOX Assets for {0}", asset.TitleName));
+                            XboxTitleInfo xboxResult = _xboxAssetDownloader.GetTitleInfo(titleId, xboxLocale)[0];
+                            foreach (XboxAssetInfo info in xboxResult.AssetsInfo)
+                            {
+                                switch (info.AssetType)
+                                {
+                                    case XboxTitleInfo.XboxAssetType.Icon:
+                                    case XboxTitleInfo.XboxAssetType.Banner:
+                                        if (!iconBanner)
+                                        {
+                                            AuroraAsset.AssetFile aurora = new AuroraAsset.AssetFile();
+                                            if (info.AssetType == XboxTitleInfo.XboxAssetType.Icon)
+                                                icon = info;
+                                            else
+                                                banner = info;
+                                        }
+                                        break;
+                                    case XboxTitleInfo.XboxAssetType.Background:
+                                        if (!background)
+                                        {
+                                            AuroraAsset.AssetFile aurora = new AuroraAsset.AssetFile();
+                                            aurora.SetBackground(info.GetAsset().Image, shouldUseCompression);
+                                            if (aurora.HasBackground)
+                                            {
+                                                asset.SaveAsBackground(aurora.FileData);
+                                                background = true;
+                                            }
+                                        }
+                                        break;
+                                    case XboxTitleInfo.XboxAssetType.Screenshot:
+                                        if (!screenshots && current_ss < max_ss)
+                                        {
+                                            current_ss++;
 
-											// save screenshot to list
-											screenshots_list.Add(info);
-										}
-										break;
-								}
-							}
+                                            // save screenshot to list
+                                            screenshots_list.Add(info);
+                                        }
+                                        break;
+                                }
+                            }
 
-							if (icon != null || banner != null)
-							{
-								AuroraAsset.AssetFile aurora = new AuroraAsset.AssetFile();
-								if (icon != null)
-									aurora.SetIcon(icon.GetAsset().Image, shouldUseCompression);
-								if (banner != null)
-									aurora.SetBanner(banner.GetAsset().Image, shouldUseCompression);
+                            if (icon != null || banner != null)
+                            {
+                                AuroraAsset.AssetFile aurora = new AuroraAsset.AssetFile();
+                                if (icon != null)
+                                    aurora.SetIcon(icon.GetAsset().Image, shouldUseCompression);
+                                if (banner != null)
+                                    aurora.SetBanner(banner.GetAsset().Image, shouldUseCompression);
 
-								if (aurora.HasIconBanner)
-								{
-									asset.SaveAsIconBanner(aurora.FileData);
-									iconBanner = true;
-								}
-							}
+                                if (aurora.HasIconBanner)
+                                {
+                                    asset.SaveAsIconBanner(aurora.FileData);
+                                    iconBanner = true;
+                                }
+                            }
 
-							if (screenshots_list.Count > 0)
-							{
-								AuroraAsset.AssetFile aurora = new AuroraAsset.AssetFile();
-								int num = 0;
-								foreach (XboxAssetInfo info in screenshots_list)
-									aurora.SetScreenshot(info.GetAsset().Image, ++num, shouldUseCompression);
+                            if (screenshots_list.Count > 0)
+                            {
+                                AuroraAsset.AssetFile aurora = new AuroraAsset.AssetFile();
+                                int num = 0;
+                                foreach (XboxAssetInfo info in screenshots_list)
+                                    aurora.SetScreenshot(info.GetAsset().Image, ++num, shouldUseCompression);
 
-								asset.SaveAsScreenshots(aurora.FileData);
-							}
-						}
-					}
-					args.Result = true;
-				}
-				catch (Exception ex)
-				{
-					MainWindow.SaveError(ex);
-					args.Result = false;
-				}
-			};
-			bw.RunWorkerCompleted += (o, args) => {
-				_main.BusyIndicator.Visibility = Visibility.Collapsed;
-				if ((bool)args.Result)
-					Status.Text = "Finished updating Assets information successfully...";
-				else
-					Status.Text = "There was an error, check error.log for more information...";
-			};
-			_main.BusyIndicator.Visibility = Visibility.Visible;
-			Status.Text = "Updating Assets information...";
-			bw.RunWorkerAsync();
-		}
+                                asset.SaveAsScreenshots(aurora.FileData);
+                            }
+                        }
+                    }
+                    args.Result = true;
+                }
+                catch (Exception ex)
+                {
+                    MainWindow.SaveError(ex);
+                    args.Result = false;
+                }
+            };
+            bw.RunWorkerCompleted += (o, args) => {
+                _main.BusyIndicator.Visibility = Visibility.Collapsed;
+                if ((bool)args.Result)
+                    Status.Text = "Finished updating Assets information successfully...";
+                else
+                    Status.Text = "There was an error, check error.log for more information...";
+            };
+            _main.BusyIndicator.Visibility = Visibility.Visible;
+            Status.Text = "Updating Assets information...";
+            bw.RunWorkerAsync();
+        }
 
-		private enum Task {
+        private enum Task {
             GetBoxart,
             GetBackground,
             GetIconBanner,
