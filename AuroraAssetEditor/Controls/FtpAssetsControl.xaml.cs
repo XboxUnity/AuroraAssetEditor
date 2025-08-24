@@ -475,7 +475,6 @@ namespace AuroraAssetEditor.Controls {
 						bool boxart = false, background = false, iconBanner = false, screenshots = false;
 						if (!replaceExisting)
 						{
-							// do we have content already ?
 							if (!App.FtpOperations.ConnectionEstablished)
 							{
 								MessageBox.Show("ERROR: FTP Connection could not be established", "ERROR", MessageBoxButton.OK, MessageBoxImage.Error);
@@ -487,7 +486,6 @@ namespace AuroraAssetEditor.Controls {
 							{
 								background = VerifyAsset(asset, AuroraAsset.AssetType.Background);
 								iconBanner = (VerifyAsset(asset, AuroraAsset.AssetType.Icon) && VerifyAsset(asset, AuroraAsset.AssetType.Banner));
-								boxart = VerifyAsset(asset, AuroraAsset.AssetType.Boxart);
 								screenshots = VerifyAsset(asset, AuroraAsset.AssetType.ScreenshotStart);
 							}
 						}
@@ -519,6 +517,7 @@ namespace AuroraAssetEditor.Controls {
 						{
 							int current_ss = 0;
 							List<XboxAssetInfo> screenshots_list = new List<XboxAssetInfo>();
+							XboxAssetInfo icon = null, banner = null;
 
 							SetStatusText(string.Format("Downloading XBOX Assets for {0}", asset.TitleName));
 							XboxTitleInfo xboxResult = _xboxAssetDownloader.GetTitleInfo(titleId, xboxLocale)[0];
@@ -532,15 +531,9 @@ namespace AuroraAssetEditor.Controls {
 										{
 											AuroraAsset.AssetFile aurora = new AuroraAsset.AssetFile();
 											if (info.AssetType == XboxTitleInfo.XboxAssetType.Icon)
-												aurora.SetIcon(info.GetAsset().Image, shouldUseCompression);
+												icon = info;
 											else
-												aurora.SetBanner(info.GetAsset().Image, shouldUseCompression);
-
-											if (aurora.HasIconBanner)
-											{
-												asset.SaveAsIconBanner(aurora.FileData);
-												iconBanner = true;
-											}
+												banner = info;
 										}
 										break;
 									case XboxTitleInfo.XboxAssetType.Background:
@@ -567,6 +560,21 @@ namespace AuroraAssetEditor.Controls {
 								}
 							}
 
+							if (icon != null || banner != null)
+							{
+								AuroraAsset.AssetFile aurora = new AuroraAsset.AssetFile();
+								if (icon != null)
+									aurora.SetIcon(icon.GetAsset().Image, shouldUseCompression);
+								if (banner != null)
+									aurora.SetBanner(banner.GetAsset().Image, shouldUseCompression);
+
+								if (aurora.HasIconBanner)
+								{
+									asset.SaveAsIconBanner(aurora.FileData);
+									iconBanner = true;
+								}
+							}
+
 							if (screenshots_list.Count > 0)
 							{
 								AuroraAsset.AssetFile aurora = new AuroraAsset.AssetFile();
@@ -574,8 +582,7 @@ namespace AuroraAssetEditor.Controls {
 								foreach (XboxAssetInfo info in screenshots_list)
 									aurora.SetScreenshot(info.GetAsset().Image, ++num, shouldUseCompression);
 
-								if (aurora.HasScreenshots)
-									asset.SaveAsScreenshots(aurora.FileData);
+								asset.SaveAsScreenshots(aurora.FileData);
 							}
 						}
 					}
