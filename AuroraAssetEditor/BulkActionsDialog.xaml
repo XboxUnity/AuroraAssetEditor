@@ -7,18 +7,27 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="Auto" />
             <ColumnDefinition Width="Auto" />
         </Grid.ColumnDefinitions>
-        <TextBlock Grid.Row="0" Grid.Column="0" HorizontalAlignment="Right" Text="Replace Existing?" Margin="0,0,5,0" />
-        <CheckBox Grid.Row="0" Grid.Column="1" MinWidth="10" x:Name="ReplaceExistingChk" x:FieldModifier="private"
+        <Grid Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2" x:Name="LocaleGrid" MinWidth="300">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="Locale:" Margin="10" />
+            <ComboBox x:Name="LocaleBox" Grid.Column="1" HorizontalAlignment="Left" Margin="0,10,0,10" />
+        </Grid>
+        <TextBlock Grid.Row="1" Grid.Column="0" HorizontalAlignment="Right" Text="Replace Existing?" Margin="0,0,5,0" />
+        <CheckBox Grid.Row="1" Grid.Column="1" MinWidth="10" x:Name="ReplaceExistingChk" x:FieldModifier="private"
                  HorizontalAlignment="Stretch" Margin="0,0,5,0" />
-        <TextBlock Grid.Row="1" Grid.Column="0" HorizontalAlignment="Right" Text="Cover Art Only?" Margin="0,0,5,0" />
-        <CheckBox Grid.Row="1" Grid.Column="1" MinWidth="10" x:Name="CoverArtOnlyChk" x:FieldModifier="private"
+        <TextBlock Grid.Row="2" Grid.Column="0" HorizontalAlignment="Right" Text="Cover Art Only?" Margin="0,0,5,0" />
+        <CheckBox Grid.Row="2" Grid.Column="1" MinWidth="10" x:Name="CoverArtOnlyChk" x:FieldModifier="private"
                  HorizontalAlignment="Stretch" Margin="0,0,5,0" IsChecked="True" />
-        <WrapPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" HorizontalAlignment="Right" Margin="0,15,0,0"
+        <WrapPanel Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" HorizontalAlignment="Right" Margin="0,15,0,0"
                    VerticalAlignment="Bottom">
             <Button x:Name="OkButton" IsDefault="True" Click="btnDialogOk_Click" MinWidth="60" Margin="0,0,10,0">
                 _Ok

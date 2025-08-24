@@ -458,7 +458,8 @@ namespace AuroraAssetEditor.Controls {
             var dialog = new BulkActionsDialog(_main);
             if (dialog.ShowDialog() != true)
                 return;
-            bool replaceExisting = dialog.ReplaceExisting;
+			XboxLocale xboxLocale = dialog.Locale;
+			bool replaceExisting = dialog.ReplaceExisting;
             bool coverArtOnly = dialog.CoverArtOnly;
             var shouldUseCompression = false;
             Dispatcher.Invoke(new Action(() => shouldUseCompression = _main.UseCompression.IsChecked));
@@ -468,8 +469,6 @@ namespace AuroraAssetEditor.Controls {
                 int max_ss = 3;
                 try
                 {
-                    // forced locale for now :(
-                    XboxLocale xboxLocale = XboxAssetDownloader.GetLocales().Where(obj => obj.Locale.Equals("en-US")).First();
                     foreach (AuroraDbManager.ContentItem asset in FtpAssetsBox.Items)
                     {
                         bool boxart = false, background = false, iconBanner = false, screenshots = false;
