@@ -48,8 +48,12 @@
                         <Button Content="Test Connection" Margin="0, 5" Padding="10, 5" Click="TestConnectionClick" />
                         <Button Content="Save Settings" Margin="5, 5" Padding="10, 5" Click="SaveSettingsClick" />
                     </StackPanel>
+                    <Button Grid.Row="2" Grid.Column="2" Content="Bulk DL" Margin="0,5" Padding="10, 5"
+                        HorizontalAlignment="Center" Click="BulkDownloadClick" />
                     <Button Grid.Row="2" Grid.Column="3" Content="Get Available Assets" Margin="0, 5" Padding="10, 5"
                             HorizontalAlignment="Right" Click="GetAssetsClick" />
+                    <Button Grid.Row="2" Grid.Column="3" Content="Get Available Assets" Margin="22,5,0,5" Padding="10, 5"
+                        HorizontalAlignment="Left" Click="GetAssetsClick" />
                 </Grid>
             </GroupBox>
         </Grid>

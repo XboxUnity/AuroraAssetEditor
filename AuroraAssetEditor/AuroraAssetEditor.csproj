@@ -15,10 +15,10 @@
     <Copyright>Copyright 2015-2023</Copyright>
     <RepositoryUrl>https://github.com/XboxUnity/AuroraAssetEditor</RepositoryUrl>
     <VersionPrefix>v</VersionPrefix>
-    <Version>$(VersionPrefix)1.4.0.0</Version>
-    <FileVersion>1.4.0.0</FileVersion>
-    <PackageVersion>1.4.0.0</PackageVersion>
-    <AssemblyVersion>1.4.0.0</AssemblyVersion>
+    <Version>$(VersionPrefix)1.4.3.0</Version>
+    <FileVersion>1.4.3.0</FileVersion>
+    <PackageVersion>1.4.3.0</PackageVersion>
+    <AssemblyVersion>1.4.3.0</AssemblyVersion>
     <InformationalVersion>1.4.0.0</InformationalVersion>
     <ApplicationIcon>Resources\icon.ico</ApplicationIcon>
     <BaseOutputPath>..\bin\</BaseOutputPath>
