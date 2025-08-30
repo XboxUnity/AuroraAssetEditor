@@ -8,9 +8,7 @@
 namespace AuroraAssetEditor {
 	using System;
 	using System.ComponentModel;
-    using System.Globalization;
     using System.Windows;
-    using System.Windows.Input;
     using AuroraAssetEditor.Classes;
 
     public partial class BulkActionsDialog
@@ -49,10 +47,5 @@ namespace AuroraAssetEditor {
         public bool CoverArtOnly { get { return CoverArtOnlyChk.IsChecked ?? false; } }
 
         private void btnDialogOk_Click(object sender, RoutedEventArgs e) { DialogResult = true; }
-
-        private void OnTextInput(object sender, TextCompositionEventArgs e) {
-            uint tmp;
-            e.Handled = !uint.TryParse(e.Text, NumberStyles.HexNumber, CultureInfo.CurrentCulture, out tmp);
-        }
     }
 }
