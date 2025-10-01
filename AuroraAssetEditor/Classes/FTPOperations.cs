@@ -29,7 +29,7 @@ namespace AuroraAssetEditor.Classes {
 
         public string Password { get { return _settings.Password; } }
 
-        public bool HaveSettings { get { return _settings.Loaded; } }
+        public bool HaveSettings { get { return _settings?.Loaded ?? false; } }
 
         public bool ConnectionEstablished {
             get {
