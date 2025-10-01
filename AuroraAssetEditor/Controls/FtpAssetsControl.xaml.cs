@@ -133,7 +133,7 @@ namespace AuroraAssetEditor.Controls {
                          };
             bw.RunWorkerCompleted += (o, args) => {
                                          _main.BusyIndicator.Visibility = Visibility.Collapsed;
-                                         if((bool)args.Result)
+                                         if ((args.Result as bool?) == true)
                                              Status.Text = "Finished grabbing FTP Assets information successfully...";
                                          else
                                              Status.Text = "There was an error, check error.log for more information...";
@@ -189,7 +189,7 @@ namespace AuroraAssetEditor.Controls {
                                          if(shouldHideWhenDone)
                                              Dispatcher.InvokeIfRequired(() => _main.BusyIndicator.Visibility = Visibility.Collapsed, DispatcherPriority.Normal);
                                          var isGet = true;
-                                         if((bool)args.Result) {
+                                         if ((args.Result as bool?) == true) {
                                              if(_buffer.Length > 0) {
                                                  var aurora = new AuroraAsset.AssetFile(_buffer);
                                                  switch(task) {
