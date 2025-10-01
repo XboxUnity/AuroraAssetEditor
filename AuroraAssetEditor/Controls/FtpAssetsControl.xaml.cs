@@ -595,7 +595,7 @@ namespace AuroraAssetEditor.Controls {
             };
             bw.RunWorkerCompleted += (o, args) => {
                 _main.BusyIndicator.Visibility = Visibility.Collapsed;
-                if ((bool)args.Result)
+                if ((args.Result as bool?) == true)
                     Status.Text = "Finished updating Assets information successfully...";
                 else
                     Status.Text = "There was an error, check error.log for more information...";
