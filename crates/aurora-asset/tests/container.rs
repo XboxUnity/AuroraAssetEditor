@@ -244,7 +244,7 @@ fn keeps_unsupported_entry_bytes() {
     file.set(AssetSlot::Cover, Some(tiled));
     let bytes = file.to_bytes();
 
-    let reparsed = AssetFile::parse(&bytes).unwrap();
+    let mut reparsed = AssetFile::parse(&bytes).unwrap();
 
     assert_eq!(reparsed, file);
     assert_eq!(reparsed.to_bytes(), bytes);
@@ -309,4 +309,81 @@ fn rejects_second_entry_past_end_after_first_consumed_data() {
             ..
         })
     ));
+}
+
+fn patch_entry(bytes: &mut [u8], entry: usize, offset: u32, header_fill: u8) {
+    let start = ENTRY_TABLE_START + entry * ENTRY_LEN;
+    bytes[start..start + 4].copy_from_slice(&offset.to_be_bytes());
+    bytes[start + 12..start + 64].fill(header_fill);
+}
+
+fn entry_bytes(bytes: &[u8], entry: usize) -> &[u8] {
+    let start = ENTRY_TABLE_START + entry * ENTRY_LEN;
+    &bytes[start..start + ENTRY_LEN]
+}
+
+#[test]
+fn empty_entry_residue_survives_load_and_save() {
+    let mut file = AssetFile::new();
+    file.set(AssetSlot::Cover, Some(texture(1, 12)));
+    let mut bytes = file.to_bytes();
+    patch_entry(&mut bytes, AssetSlot::Banner.index(), 0x1234, 0x7e);
+    let mut loaded = AssetFile::parse(&bytes).unwrap();
+
+    assert_eq!(loaded.to_bytes(), bytes);
+}
+
+#[test]
+fn removed_screenshot_keeps_stale_offset_with_zero_header() {
+    let mut file = AssetFile::new();
+    file.set(shot(1), Some(texture(1, 8)));
+    file.set(shot(2), Some(texture(2, 16)));
+    file.set(shot(3), Some(texture(3, 24)));
+    let mut loaded = AssetFile::parse(&file.to_bytes()).unwrap();
+
+    loaded.set(shot(2), None);
+    let bytes = loaded.to_bytes();
+
+    let removed = entry_bytes(&bytes, shot(2).index());
+    assert_eq!(be_u32(removed, 0), 8, "stale offset");
+    assert_eq!(be_u32(removed, 4), 0, "size");
+    assert!(removed[12..].iter().all(|byte| *byte == 0), "header");
+    assert_eq!(entry_field(&bytes, shot(3).index(), 0), 8, "recomputed");
+}
+
+#[test]
+fn only_starts_fresh_and_copies_owned_headers() {
+    let mut file = AssetFile::new();
+    file.set(AssetSlot::Icon, Some(texture(1, 8)));
+    file.set(AssetSlot::Cover, Some(texture(2, 8)));
+    let mut bytes = file.to_bytes();
+    patch_entry(&mut bytes, AssetSlot::Banner.index(), 0x55, 0x7e);
+    patch_entry(&mut bytes, AssetSlot::Background.index(), 0x66, 0x7f);
+    let loaded = AssetFile::parse(&bytes).unwrap();
+
+    let mut page = loaded.only(AssetKind::IconBanner);
+    let page_bytes = page.to_bytes();
+
+    let banner = entry_bytes(&page_bytes, AssetSlot::Banner.index());
+    assert_eq!(be_u32(banner, 0), 0, "offset starts fresh");
+    assert!(
+        banner[12..].iter().all(|byte| *byte == 0x7e),
+        "owned header"
+    );
+    let background = entry_bytes(&page_bytes, AssetSlot::Background.index());
+    assert!(background.iter().all(|byte| *byte == 0), "unowned is zero");
+    assert!(page.get(AssetSlot::Icon).is_some());
+}
+
+#[test]
+fn truncated_files_never_panic() {
+    let mut file = AssetFile::new();
+    file.set(AssetSlot::Icon, Some(texture(1, 16)));
+    file.set(shot(4), Some(texture(2, 24)));
+    let bytes = file.to_bytes();
+
+    for len in 0..bytes.len() {
+        assert!(AssetFile::parse(&bytes[..len]).is_err(), "length {len}");
+    }
+    assert!(AssetFile::parse(&bytes).is_ok());
 }

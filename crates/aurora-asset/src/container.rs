@@ -11,6 +11,8 @@ const ENTRY_TABLE_START: usize = 20;
 const ENTRY_FIXED_FIELDS_LEN: usize = 12;
 const ENTRY_LEN: usize = ENTRY_FIXED_FIELDS_LEN + TEXTURE_HEADER_LEN;
 const DATA_START: usize = 2048;
+/// Always written as 0: the field held a pointer in the console memory.
+const EXTENDED_INFO: u32 = 0;
 
 /// A screenshot position, 1 to 20, as the app numbers them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -133,10 +135,36 @@ impl fmt::Display for AssetError {
 
 impl std::error::Error for AssetError {}
 
+/// One of the 25 table entries. Like the old app, an empty entry still carries the offset and
+/// header it had when loaded; Aurora files in the wild contain such residue.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Entry {
+    offset: u32,
+    texture: Option<EncodedTexture>,
+    empty_header: [u8; TEXTURE_HEADER_LEN],
+}
+
+impl Entry {
+    fn empty() -> Self {
+        Self {
+            offset: 0,
+            texture: None,
+            empty_header: [0; TEXTURE_HEADER_LEN],
+        }
+    }
+
+    fn header_bytes(&self) -> [u8; TEXTURE_HEADER_LEN] {
+        match &self.texture {
+            Some(texture) => texture.header.to_bytes(),
+            None => self.empty_header,
+        }
+    }
+}
+
 /// An Aurora `.asset` file: 25 optional textures, written the way the old app wrote them.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AssetFile {
-    entries: [Option<EncodedTexture>; ENTRY_COUNT],
+    entries: [Entry; ENTRY_COUNT],
 }
 
 impl Default for AssetFile {
@@ -148,11 +176,12 @@ impl Default for AssetFile {
 impl AssetFile {
     pub fn new() -> Self {
         Self {
-            entries: std::array::from_fn(|_| None),
+            entries: std::array::from_fn(|_| Entry::empty()),
         }
     }
 
-    /// Stored offsets and the data size are ignored: data is read back to back in entry order.
+    /// Stored offsets and the data size are ignored for data: it is read back to back in entry
+    /// order. The offset and header of empty entries are kept so they are written back unchanged.
     pub fn parse(bytes: &[u8]) -> Result<Self, AssetError> {
         if bytes.len() < DATA_START {
             return Err(AssetError::TooShort { len: bytes.len() });
@@ -168,24 +197,28 @@ impl AssetFile {
 
         let mut file = Self::new();
         let mut data_cursor = DATA_START;
-        for (index, entry) in file.entries.iter_mut().enumerate() {
-            let entry_start = ENTRY_TABLE_START + index * ENTRY_LEN;
+        for slot in all_slots() {
+            let entry_start = ENTRY_TABLE_START + slot.index() * ENTRY_LEN;
             let size = read_u32(bytes, entry_start + 4) as usize;
+            let header_start = entry_start + ENTRY_FIXED_FIELDS_LEN;
+            let mut header = [0; TEXTURE_HEADER_LEN];
+            header.copy_from_slice(&bytes[header_start..header_start + TEXTURE_HEADER_LEN]);
+
+            let entry = &mut file.entries[slot.index()];
+            entry.offset = read_u32(bytes, entry_start);
             if size == 0 {
+                entry.empty_header = header;
                 continue;
             }
             let end = data_cursor.saturating_add(size);
             let Some(data) = bytes.get(data_cursor..end) else {
                 return Err(AssetError::EntryOutOfBounds {
-                    slot: slot_at(index),
+                    slot,
                     end,
                     len: bytes.len(),
                 });
             };
-            let header_start = entry_start + ENTRY_FIXED_FIELDS_LEN;
-            let mut header = [0; TEXTURE_HEADER_LEN];
-            header.copy_from_slice(&bytes[header_start..header_start + TEXTURE_HEADER_LEN]);
-            *entry = Some(EncodedTexture {
+            entry.texture = Some(EncodedTexture {
                 header: TextureHeader::from_bytes(header),
                 data: data.to_vec(),
             });
@@ -194,30 +227,28 @@ impl AssetFile {
         Ok(file)
     }
 
-    pub fn to_bytes(&self) -> Vec<u8> {
+    /// Takes `&mut self` because the old app's save assigned the new offsets to its entries, so a
+    /// texture removed afterwards keeps the offset of the last save.
+    pub fn to_bytes(&mut self) -> Vec<u8> {
+        self.record_offsets();
         let data_size: usize = self.present().map(|texture| texture.data.len()).sum();
         let mut out = Vec::with_capacity(DATA_START + data_size);
         out.extend_from_slice(&MAGIC.to_be_bytes());
         out.extend_from_slice(&VERSION.to_be_bytes());
+        // The u32 arithmetic wraps like the old app's unchecked C# arithmetic.
         out.extend_from_slice(&(data_size as u32).to_be_bytes());
         out.extend_from_slice(&self.flags().to_be_bytes());
         out.extend_from_slice(&self.screenshot_count().to_be_bytes());
 
-        let mut next_offset = 0u32;
         for entry in &self.entries {
-            let (offset, size, header) = match entry {
-                Some(texture) => {
-                    let size = texture.data.len() as u32;
-                    let offset = next_offset;
-                    next_offset = next_offset.wrapping_add(size);
-                    (offset, size, texture.header.to_bytes())
-                }
-                None => (0, 0, [0; TEXTURE_HEADER_LEN]),
-            };
-            out.extend_from_slice(&offset.to_be_bytes());
-            out.extend_from_slice(&size.to_be_bytes());
-            out.extend_from_slice(&0u32.to_be_bytes());
-            out.extend_from_slice(&header);
+            let size = entry
+                .texture
+                .as_ref()
+                .map_or(0, |texture| texture.data.len());
+            out.extend_from_slice(&entry.offset.to_be_bytes());
+            out.extend_from_slice(&(size as u32).to_be_bytes());
+            out.extend_from_slice(&EXTENDED_INFO.to_be_bytes());
+            out.extend_from_slice(&entry.header_bytes());
         }
         out.resize(DATA_START, 0);
         for texture in self.present() {
@@ -227,11 +258,14 @@ impl AssetFile {
     }
 
     pub fn get(&self, slot: AssetSlot) -> Option<&EncodedTexture> {
-        self.entries[slot.index()].as_ref()
+        self.entries[slot.index()].texture.as_ref()
     }
 
+    /// Setting `None` zeroes the header and keeps the offset, as the old app did.
     pub fn set(&mut self, slot: AssetSlot, texture: Option<EncodedTexture>) {
-        self.entries[slot.index()] = texture;
+        let entry = &mut self.entries[slot.index()];
+        entry.texture = texture;
+        entry.empty_header = [0; TEXTURE_HEADER_LEN];
     }
 
     pub fn primary_kind(&self) -> Option<AssetKind> {
@@ -245,13 +279,15 @@ impl AssetFile {
         .find(|kind| self.has_entries_for(*kind))
     }
 
-    /// A copy holding only the entries that page owns; the Slot entry is never kept.
+    /// A fresh file (offsets 0, zero headers) with the entries that page owns copied in; the Slot
+    /// entry is never kept.
     pub fn only(&self, kind: AssetKind) -> AssetFile {
-        let mut kept = self.clone();
-        for (index, entry) in kept.entries.iter_mut().enumerate() {
-            if !kind.owns(slot_at(index)) {
-                *entry = None;
-            }
+        let mut kept = Self::new();
+        for slot in all_slots().filter(|slot| kind.owns(*slot)) {
+            let source = &self.entries[slot.index()];
+            let target = &mut kept.entries[slot.index()];
+            target.texture = source.texture.clone();
+            target.empty_header = source.empty_header;
         }
         kept
     }
@@ -261,7 +297,7 @@ impl AssetFile {
         let screenshots = &mut self.entries[FIRST_SCREENSHOT_INDEX..];
         let mut next_free = 0;
         for position in 0..screenshots.len() {
-            if screenshots[position].is_some() {
+            if screenshots[position].texture.is_some() {
                 screenshots.swap(next_free, position);
                 next_free += 1;
             }
@@ -273,7 +309,7 @@ impl AssetFile {
     pub fn move_screenshot(&mut self, from: ScreenshotNumber, to: ScreenshotNumber) {
         let screenshots = &mut self.entries[FIRST_SCREENSHOT_INDEX..];
         let (from, to) = (from.position(), to.position());
-        if screenshots[from].is_none() {
+        if screenshots[from].texture.is_none() {
             return;
         }
         if from < to {
@@ -283,36 +319,43 @@ impl AssetFile {
         }
     }
 
+    /// Present entries get consecutive offsets in entry order; empty ones keep what they had.
+    fn record_offsets(&mut self) {
+        let mut next_offset = 0u32;
+        for entry in &mut self.entries {
+            if let Some(texture) = &entry.texture {
+                entry.offset = next_offset;
+                next_offset = next_offset.wrapping_add(texture.data.len() as u32);
+            }
+        }
+    }
+
     fn present(&self) -> impl Iterator<Item = &EncodedTexture> {
-        self.entries.iter().flatten()
+        self.entries
+            .iter()
+            .filter_map(|entry| entry.texture.as_ref())
     }
 
     fn flags(&self) -> u32 {
-        self.entries
-            .iter()
-            .enumerate()
-            .filter(|(_, entry)| entry.is_some())
-            .fold(0, |flags, (index, _)| flags | 1 << index)
+        all_slots()
+            .filter(|slot| self.get(*slot).is_some())
+            .fold(0, |flags, slot| flags | 1 << slot.index())
     }
 
     fn screenshot_count(&self) -> u32 {
         self.entries[FIRST_SCREENSHOT_INDEX..]
             .iter()
-            .filter(|entry| entry.is_some())
+            .filter(|entry| entry.texture.is_some())
             .count() as u32
     }
 
     fn has_entries_for(&self, kind: AssetKind) -> bool {
-        self.entries
-            .iter()
-            .enumerate()
-            .any(|(index, entry)| entry.is_some() && kind.owns(slot_at(index)))
+        all_slots().any(|slot| kind.owns(slot) && self.get(slot).is_some())
     }
 }
 
-/// Entry indices below `ENTRY_COUNT` always map to a slot.
-fn slot_at(index: usize) -> AssetSlot {
-    AssetSlot::from_index(index).unwrap_or(AssetSlot::Slot)
+fn all_slots() -> impl Iterator<Item = AssetSlot> {
+    (0..ENTRY_COUNT).filter_map(AssetSlot::from_index)
 }
 
 fn read_u32(bytes: &[u8], offset: usize) -> u32 {
