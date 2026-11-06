@@ -1,0 +1,7 @@
+[workspace]
+resolver = "3"
+members = ["crates/aurora-asset", "tools/golden/harness", "xtask"]
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.99"
