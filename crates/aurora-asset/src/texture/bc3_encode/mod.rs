@@ -55,7 +55,8 @@ impl Bc3Options {
     /// The settings the DLL's encoder was observed to use.
     pub(crate) const DLL_BASELINE: Self = Self {
         dither_rgb: true,
-        dither_alpha: false,
+        // Derived from AuroraAsset.dll for interoperability: its one dither flag covers alpha too.
+        dither_alpha: true,
         uniform_weighting: false,
     };
 }
@@ -78,16 +79,35 @@ pub(super) fn encode_surface(image: &RgbaImage, layout: &SurfaceLayout) -> Vec<u
     surface
 }
 
-/// The 16 texels of a block, row-major. Texels past the image edge repeat the edge texel.
+/// The 16 texels of a block, row-major. A partial block fills its missing columns and rows from
+/// the ones inside the image.
 fn block_texels(image: &RgbaImage, block_x: usize, block_y: usize) -> [Texel; TEXELS_PER_BLOCK] {
-    let last_x = image.width() as usize - 1;
-    let last_y = image.height() as usize - 1;
+    let columns_inside = (image.width() as usize - block_x * BLOCK_SIDE).min(BLOCK_SIDE);
+    let rows_inside = (image.height() as usize - block_y * BLOCK_SIDE).min(BLOCK_SIDE);
     std::array::from_fn(|index| {
-        let x = (block_x * BLOCK_SIDE + index % BLOCK_SIDE).min(last_x);
-        let y = (block_y * BLOCK_SIDE + index / BLOCK_SIDE).min(last_y);
+        let column = source_position(index % BLOCK_SIDE, columns_inside);
+        let row = source_position(index / BLOCK_SIDE, rows_inside);
+        let x = block_x * BLOCK_SIDE + column;
+        let y = block_y * BLOCK_SIDE + row;
         let [red, green, blue, alpha] = image.get_pixel(x as u32, y as u32).0;
-        [red, green, blue, alpha].map(|channel| f32::from(channel) / CHANNEL_MAX)
+        [red, green, blue, alpha].map(channel_to_unit)
     })
+}
+
+// Derived from AuroraAsset.dll for interoperability: missing positions copy from 0, 0, 0, 1.
+const PARTIAL_BLOCK_SOURCE: [usize; BLOCK_SIDE] = [0, 0, 0, 1];
+
+/// The column (or row) of the block that a position outside the image takes its texel from.
+fn source_position(position: usize, positions_inside: usize) -> usize {
+    let mut source = position;
+    while source >= positions_inside {
+        source = PARTIAL_BLOCK_SOURCE[source];
+    }
+    source
+}
+
+fn channel_to_unit(channel: u8) -> f32 {
+    f32::from(channel) / CHANNEL_MAX
 }
 
 /// One 16-byte block in little-endian D3D order: the alpha half, then the color half.
