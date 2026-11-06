@@ -23,15 +23,18 @@
 // SOFTWARE
 
 //! The D3DX encoder that AuroraAsset.dll's "Use Compression" path is observed to match.
-//! Arithmetic is `f32` in the original's operation order, so results can tie out bit for bit.
+//! Arithmetic follows the DLL's operation order and precision (see `x87`), so results tie out
+//! bit for bit.
 
 mod alpha;
 mod color;
+mod x87;
 
 use image::RgbaImage;
 
 use super::endian::swap_8in16;
 use super::layout::SurfaceLayout;
+use x87::Fpu;
 
 const BLOCK_SIDE: usize = 4;
 const TEXELS_PER_BLOCK: usize = BLOCK_SIDE * BLOCK_SIDE;
@@ -106,8 +109,10 @@ fn source_position(position: usize, positions_inside: usize) -> usize {
     source
 }
 
+// Derived from AuroraAsset.dll for interoperability: bytes load as `n * (1/255)`, not `n / 255`.
 fn channel_to_unit(channel: u8) -> f32 {
-    f32::from(channel) / CHANNEL_MAX
+    const UNIT_PER_LEVEL: f32 = 1.0 / CHANNEL_MAX;
+    f32::from(channel) * UNIT_PER_LEVEL
 }
 
 /// One 16-byte block in little-endian D3D order: the alpha half, then the color half.
@@ -148,6 +153,12 @@ const NEIGHBOUR_BELOW_LEFT_WEIGHT: f32 = 3.0 / 16.0;
 const NEIGHBOUR_BELOW_WEIGHT: f32 = 5.0 / 16.0;
 const NEIGHBOUR_BELOW_RIGHT_WEIGHT: f32 = 1.0 / 16.0;
 const LAST_ROW_START: usize = TEXELS_PER_BLOCK - BLOCK_SIDE;
+
+/// A texel's accumulated error after it receives `weight` of a neighbour's `difference`.
+// Derived from AuroraAsset.dll for interoperability: its dithering loops run with the FPU truncating.
+fn diffuse_error(error: f32, difference: f32, weight: f32) -> f32 {
+    (Fpu::RoundTowardZero.load(difference) * weight + error).store()
+}
 
 /// Floyd-Steinberg error diffusion inside a block: calls `add_error(target, weight)` for each
 /// texel that receives a share of the error of `texel`, in the original's order.
@@ -193,7 +204,7 @@ mod tests {
     fn alpha_with_opaque_texels_uses_six_step_mode_low_endpoint_first() {
         let mut texels = solid([0.0, 0.0, 0.0, 1.0]);
         for texel in texels.iter_mut().take(8) {
-            texel[3] = 0.5;
+            texel[3] = channel_to_unit(0x80);
         }
         let block = encode_bc3_block(&texels, &Bc3Options::DLL_BASELINE);
         assert_eq!((block[0], block[1]), (0x80, 0xff));

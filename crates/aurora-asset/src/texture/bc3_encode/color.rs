@@ -1,7 +1,8 @@
 //! The color half of a BC3 block: two RGB565 endpoints and sixteen 2-bit indices (BC1 four-color
 //! mode). Endpoints are searched in a perceptually weighted color space.
 
-use super::{Bc3Options, TEXELS_PER_BLOCK, Texel, end_weights, spread_error};
+use super::x87::{Fpu, X87, x87};
+use super::{Bc3Options, TEXELS_PER_BLOCK, Texel, diffuse_error, end_weights, spread_error};
 
 const COLOR_HALF_BYTES: usize = 8;
 const INDEX_BITS: u32 = 2;
@@ -11,6 +12,7 @@ type Rgb = [f32; 3];
 const RED: usize = 0;
 const GREEN: usize = 1;
 const BLUE: usize = 2;
+const CHANNELS: [usize; 3] = [RED, GREEN, BLUE];
 
 const RED_LEVELS: f32 = 31.0;
 const GREEN_LEVELS: f32 = 63.0;
@@ -40,6 +42,12 @@ const REFINE_ITERATIONS: usize = 8;
 const MIN_REFINE_LENGTH_SQUARED: f32 = 1.0 / 4096.0;
 const WEIGHT_SCALE: f32 = 1.0 / 8.0;
 const REFINE_CONVERGED_SQUARED_STEP: f32 = (0.25 / 64.0) * (0.25 / 64.0);
+
+// Derived from AuroraAsset.dll for interoperability: these loops run with the FPU truncating.
+const PREPARE_FPU: Fpu = Fpu::RoundTowardZero;
+const REFINE_FPU: Fpu = Fpu::RoundTowardZero;
+const QUANTIZE_FPU: Fpu = Fpu::RoundTowardZero;
+const INDEX_FPU: Fpu = Fpu::RoundTowardZero;
 
 /// The two ends of the color axis, in the weighted color space.
 struct Endpoints {
@@ -91,35 +99,45 @@ fn prepare_block(
     weights: Rgb,
     dither: bool,
 ) -> [Rgb; TEXELS_PER_BLOCK] {
+    let fpu = PREPARE_FPU;
     let mut points = [[0.0f32; 3]; TEXELS_PER_BLOCK];
     let mut errors = [[0.0f32; 3]; TEXELS_PER_BLOCK];
 
     for (index, texel) in texels.iter().enumerate() {
         let mut wanted = [texel[RED], texel[GREEN], texel[BLUE]];
         if dither {
-            for channel in 0..3 {
-                wanted[channel] += errors[index][channel];
+            for channel in CHANNELS {
+                wanted[channel] = (fpu.load(errors[index][channel]) + wanted[channel]).store();
             }
         }
 
         let rounded = [
-            (wanted[RED] * RED_LEVELS + ROUNDING) as i32 as f32 * RED_LEVEL_STEP,
-            (wanted[GREEN] * GREEN_LEVELS + ROUNDING) as i32 as f32 * GREEN_LEVEL_STEP,
-            (wanted[BLUE] * BLUE_LEVELS + ROUNDING) as i32 as f32 * BLUE_LEVEL_STEP,
+            round_to_level(wanted[RED], RED_LEVELS, RED_LEVEL_STEP, fpu),
+            round_to_level(wanted[GREEN], GREEN_LEVELS, GREEN_LEVEL_STEP, fpu),
+            round_to_level(wanted[BLUE], BLUE_LEVELS, BLUE_LEVEL_STEP, fpu),
         ];
 
         if dither {
-            let difference = subtract(wanted, rounded);
+            let difference =
+                CHANNELS.map(|channel| (fpu.load(wanted[channel]) - rounded[channel]).store());
             spread_error(index, |target, weight| {
-                for channel in 0..3 {
-                    errors[target][channel] += difference[channel] * weight;
+                for channel in CHANNELS {
+                    errors[target][channel] =
+                        diffuse_error(errors[target][channel], difference[channel], weight);
                 }
             });
         }
 
-        points[index] = scale_rgb(rounded, weights);
+        points[index] =
+            CHANNELS.map(|channel| (fpu.load(rounded[channel]) * weights[channel]).store());
     }
     points
+}
+
+/// Rounds a channel to the nearest of `levels + 1` evenly spaced values.
+fn round_to_level(value: f32, levels: f32, level_step: f32, fpu: Fpu) -> f32 {
+    let level = (fpu.load(value) * levels + ROUNDING).store() as i32;
+    (fpu.load(level as f32) * level_step).store()
 }
 
 /// Starting endpoints: the corners of the points' bounding box, choosing the box diagonal that
@@ -128,7 +146,7 @@ fn choose_endpoints(points: &[Rgb; TEXELS_PER_BLOCK], weights: Rgb) -> Endpoints
     let mut low = weights;
     let mut high = [0.0f32; 3];
     for point in points {
-        for channel in 0..3 {
+        for channel in CHANNELS {
             if point[channel] < low[channel] {
                 low[channel] = point[channel];
             }
@@ -139,7 +157,7 @@ fn choose_endpoints(points: &[Rgb; TEXELS_PER_BLOCK], weights: Rgb) -> Endpoints
     }
 
     let axis = subtract(high, low);
-    let axis_length_squared = dot(axis, axis);
+    let axis_length_squared = wide_dot(axis, axis, Fpu::RoundToNearest).store();
     if axis_length_squared < MIN_AXIS_LENGTH_SQUARED {
         return Endpoints {
             first: low,
@@ -149,28 +167,23 @@ fn choose_endpoints(points: &[Rgb; TEXELS_PER_BLOCK], weights: Rgb) -> Endpoints
 
     let inverse_length_squared = 1.0 / axis_length_squared;
     let direction = axis.map(|component| component * inverse_length_squared);
-    let middle = [
-        (low[RED] + high[RED]) * 0.5,
-        (low[GREEN] + high[GREEN]) * 0.5,
-        (low[BLUE] + high[BLUE]) * 0.5,
-    ];
+    let middle = CHANNELS.map(|channel| (low[channel] + high[channel]) * 0.5);
 
     // The four box diagonals differ in the signs of green and blue relative to red.
     let mut diagonal_fit = [0.0f32; 4];
     for point in points {
-        let along = [
-            (point[RED] - middle[RED]) * direction[RED],
-            (point[GREEN] - middle[GREEN]) * direction[GREEN],
-            (point[BLUE] - middle[BLUE]) * direction[BLUE],
-        ];
+        let [red, green, blue] = CHANNELS
+            .map(|channel| ((x87(point[channel]) - middle[channel]) * direction[channel]).store())
+            .map(x87);
         let sums = [
-            along[RED] + along[GREEN] + along[BLUE],
-            along[RED] + along[GREEN] - along[BLUE],
-            along[RED] - along[GREEN] + along[BLUE],
-            along[RED] - along[GREEN] - along[BLUE],
+            green + red + blue,
+            green + red - blue,
+            red - green + blue,
+            red - green - blue,
         ];
         for (fit, sum) in diagonal_fit.iter_mut().zip(sums) {
-            *fit += sum * sum;
+            let sum = sum.store();
+            *fit = (x87(sum) * sum + *fit).store();
         }
     }
 
@@ -207,28 +220,32 @@ fn refine_endpoints(points: &[Rgb; TEXELS_PER_BLOCK], start: Endpoints) -> Endpo
     } = start;
 
     let start_axis = subtract(high, low);
-    if dot(start_axis, start_axis) < TWO_COLOR_AXIS_LENGTH_SQUARED {
+    let start_length_squared = wide_dot(start_axis, start_axis, Fpu::RoundToNearest).store();
+    if start_length_squared < TWO_COLOR_AXIS_LENGTH_SQUARED {
         return Endpoints {
             first: low,
             second: high,
         };
     }
 
+    let fpu = REFINE_FPU;
     let (first_end_weight, second_end_weight) = end_weights::<STEP_COUNT>(STEP_COUNT);
     for _ in 0..REFINE_ITERATIONS {
         let palette: [Rgb; STEP_COUNT] = std::array::from_fn(|step| {
-            [RED, GREEN, BLUE].map(|channel| {
-                low[channel] * first_end_weight[step] + high[channel] * second_end_weight[step]
+            CHANNELS.map(|channel| {
+                let from_high = fpu.load(second_end_weight[step]) * high[channel];
+                (from_high + fpu.load(first_end_weight[step]) * low[channel]).store()
             })
         });
 
-        let mut direction = subtract(high, low);
-        let length_squared = dot(direction, direction);
+        let mut direction =
+            CHANNELS.map(|channel| (fpu.load(high[channel]) - low[channel]).store());
+        let length_squared = wide_dot(direction, direction, fpu).store();
         if length_squared < MIN_REFINE_LENGTH_SQUARED {
             break;
         }
-        let scale = LAST_POSITION / length_squared;
-        direction = direction.map(|component| component * scale);
+        let scale = (fpu.load(LAST_POSITION) / length_squared).store();
+        direction = direction.map(|component| (fpu.load(scale) * component).store());
 
         let mut low_curvature = 0.0f32;
         let mut high_curvature = 0.0f32;
@@ -236,38 +253,36 @@ fn refine_endpoints(points: &[Rgb; TEXELS_PER_BLOCK], start: Endpoints) -> Endpo
         let mut high_gradient = [0.0f32; 3];
 
         for point in points {
-            let position = dot(subtract(*point, low), direction);
-            let step = nearest_step(position);
-            let difference = subtract(palette[step], *point);
+            let position = projection(*point, low, direction, fpu);
+            let step = refine_step(position, fpu);
+            let difference =
+                CHANNELS.map(|channel| (fpu.load(palette[step][channel]) - point[channel]).store());
 
-            let low_weight = first_end_weight[step] * WEIGHT_SCALE;
-            let high_weight = second_end_weight[step] * WEIGHT_SCALE;
+            let low_weight = (fpu.load(first_end_weight[step]) * WEIGHT_SCALE).store();
+            let high_weight = (fpu.load(second_end_weight[step]) * WEIGHT_SCALE).store();
 
-            low_curvature += low_weight * first_end_weight[step];
-            high_curvature += high_weight * second_end_weight[step];
-            for channel in 0..3 {
-                low_gradient[channel] += low_weight * difference[channel];
-                high_gradient[channel] += high_weight * difference[channel];
+            low_curvature = (fpu.load(low_weight) * first_end_weight[step] + low_curvature).store();
+            high_curvature =
+                (fpu.load(high_weight) * second_end_weight[step] + high_curvature).store();
+            for channel in CHANNELS {
+                low_gradient[channel] =
+                    (fpu.load(low_weight) * difference[channel] + low_gradient[channel]).store();
+                high_gradient[channel] =
+                    (fpu.load(high_weight) * difference[channel] + high_gradient[channel]).store();
             }
         }
 
         if low_curvature > 0.0 {
-            let move_scale = -1.0 / low_curvature;
-            for channel in 0..3 {
-                low[channel] += low_gradient[channel] * move_scale;
-            }
+            move_endpoint(&mut low, low_gradient, low_curvature, fpu);
         }
         if high_curvature > 0.0 {
-            let move_scale = -1.0 / high_curvature;
-            for channel in 0..3 {
-                high[channel] += high_gradient[channel] * move_scale;
-            }
+            move_endpoint(&mut high, high_gradient, high_curvature, fpu);
         }
 
         let converged = low_gradient
             .iter()
             .chain(high_gradient.iter())
-            .all(|gradient| gradient * gradient < REFINE_CONVERGED_SQUARED_STEP);
+            .all(|&gradient| fpu.load(gradient) * gradient < REFINE_CONVERGED_SQUARED_STEP);
         if converged {
             break;
         }
@@ -279,15 +294,37 @@ fn refine_endpoints(points: &[Rgb; TEXELS_PER_BLOCK], start: Endpoints) -> Endpo
     }
 }
 
-/// The palette position nearest a point's projection onto the endpoint axis.
-fn nearest_step(position: f32) -> usize {
+/// One Newton step: moves the endpoint against its gradient, scaled by the curvature.
+fn move_endpoint(endpoint: &mut Rgb, gradient: Rgb, curvature: f32, fpu: Fpu) {
+    let move_scale = (fpu.load(-1.0) / curvature).store();
+    for channel in CHANNELS {
+        endpoint[channel] = (fpu.load(move_scale) * gradient[channel] + endpoint[channel]).store();
+    }
+}
+
+/// The palette position nearest a point's projection onto the endpoint axis. The DLL has no
+/// `position <= 0` test here and reads before its palette below -1.5; no golden block gets there
+/// (see docs/codec/xg-bc3-encoder.md), so this keeps DirectXTex's step 0.
+fn refine_step(position: f32, fpu: Fpu) -> usize {
     if position <= 0.0 {
         0
     } else if position >= LAST_POSITION {
         STEP_COUNT - 1
     } else {
-        (position + ROUNDING) as u32 as usize
+        (fpu.load(position) + ROUNDING).store() as u32 as usize
     }
+}
+
+/// `(point - origin) . direction`, with the differences kept on the FPU stack.
+fn projection(point: Rgb, origin: Rgb, direction: Rgb, fpu: Fpu) -> f32 {
+    let along = |channel: usize| (fpu.load(point[channel]) - origin[channel]) * direction[channel];
+    (along(GREEN) + along(RED) + along(BLUE)).store()
+}
+
+/// `a . b` evaluated on the FPU stack.
+fn wide_dot(a: Rgb, b: Rgb, fpu: Fpu) -> X87 {
+    let along = |channel: usize| fpu.load(a[channel]) * b[channel];
+    along(RED) + along(GREEN) + along(BLUE)
 }
 
 /// Orders the quantized endpoints for four-color mode (first greater than second) and builds the
@@ -322,10 +359,11 @@ fn assign_indices(
     weights: Rgb,
     dither: bool,
 ) -> u32 {
+    let fpu = INDEX_FPU;
     let start = palette.colors[0];
     let axis = subtract(palette.colors[1], start);
     let scale = if palette.stored_first != palette.stored_second {
-        LAST_POSITION / dot(axis, axis)
+        (x87(LAST_POSITION) / wide_dot(axis, axis, Fpu::RoundToNearest)).store()
     } else {
         0.0
     };
@@ -334,29 +372,32 @@ fn assign_indices(
     let mut errors = [[0.0f32; 3]; TEXELS_PER_BLOCK];
     let mut indices = 0u32;
     for (index, texel) in texels.iter().enumerate() {
-        let mut wanted = scale_rgb([texel[RED], texel[GREEN], texel[BLUE]], weights);
+        let mut wanted =
+            CHANNELS.map(|channel| (fpu.load(texel[channel]) * weights[channel]).store());
         if dither {
-            for channel in 0..3 {
-                wanted[channel] += errors[index][channel];
+            for channel in CHANNELS {
+                wanted[channel] = (fpu.load(errors[index][channel]) + wanted[channel]).store();
             }
         }
 
-        let position = dot(subtract(wanted, start), direction);
+        let position = projection(wanted, start, direction, fpu);
         let code = if position <= 0.0 {
             0
         } else if position >= LAST_POSITION {
             1
         } else {
-            POSITION_TO_CODE[(position + ROUNDING) as u32 as usize]
+            POSITION_TO_CODE[(fpu.load(position) + ROUNDING).store() as u32 as usize]
         };
 
         indices = ((code as u32) << INDEX_ENTRY_SHIFT) | (indices >> INDEX_BITS);
 
         if dither {
-            let difference = subtract(wanted, palette.colors[code]);
+            let difference = CHANNELS
+                .map(|channel| (fpu.load(wanted[channel]) - palette.colors[code][channel]).store());
             spread_error(index, |target, weight| {
-                for channel in 0..3 {
-                    errors[target][channel] += difference[channel] * weight;
+                for channel in CHANNELS {
+                    errors[target][channel] =
+                        diffuse_error(errors[target][channel], difference[channel], weight);
                 }
             });
         }
@@ -374,10 +415,11 @@ fn pack_color_block(first: u16, second: u16, indices: u32) -> [u8; COLOR_HALF_BY
 }
 
 fn encode_565(color: Rgb) -> u16 {
+    let fpu = QUANTIZE_FPU;
     let [red, green, blue] = color.map(|channel| channel.clamp(0.0, 1.0));
-    let red_bits = (red * RED_LEVELS + ROUNDING) as i32;
-    let green_bits = (green * GREEN_LEVELS + ROUNDING) as i32;
-    let blue_bits = (blue * BLUE_LEVELS + ROUNDING) as i32;
+    let red_bits = (fpu.load(red) * RED_LEVELS + ROUNDING).store() as i32;
+    let green_bits = (fpu.load(green) * GREEN_LEVELS + ROUNDING).store() as i32;
+    let blue_bits = (fpu.load(blue) * BLUE_LEVELS + ROUNDING).store() as i32;
     ((red_bits << RED_SHIFT) | (green_bits << GREEN_SHIFT) | blue_bits) as u16
 }
 
@@ -402,10 +444,6 @@ fn scale_rgb(color: Rgb, weights: Rgb) -> Rgb {
 
 fn subtract(a: Rgb, b: Rgb) -> Rgb {
     [a[RED] - b[RED], a[GREEN] - b[GREEN], a[BLUE] - b[BLUE]]
-}
-
-fn dot(a: Rgb, b: Rgb) -> f32 {
-    a[RED] * b[RED] + a[GREEN] * b[GREEN] + a[BLUE] * b[BLUE]
 }
 
 fn lerp(from: Rgb, to: Rgb, fraction: f32) -> Rgb {

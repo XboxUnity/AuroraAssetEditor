@@ -9,31 +9,6 @@ const COLOR_HALF: std::ops::Range<usize> = 8..16;
 /// Fixtures whose color half must match the DLL on every interior block.
 const EXACT_COLOR_FIXTURES: [&str; 4] = ["ph_cover", "ph_background", "ph_icon", "ph_screenshot"];
 
-/// Per-fixture floors for the share of interior blocks whose color half equals the DLL's: the
-/// rates measured for this encoder, truncated to four decimals. They equal or exceed the spike's
-/// DirectXTex `dither_rgb` results, and the placeholders stay above 0.99.
-const COLOR_MATCH_FLOORS: &[(&str, f64)] = &[
-    ("alpha_binary", 0.9992),
-    ("alpha_zero", 0.9997),
-    ("alphagrad", 0.9259),
-    ("alphanoise", 0.9997),
-    ("checker_1px", 1.0),
-    ("grad", 0.9352),
-    ("near_black", 0.9699),
-    ("near_white", 0.9298),
-    ("noise", 0.9994),
-    ("odd_130x70", 1.0),
-    ("odd_63x65", 1.0),
-    ("ph_background", 1.0),
-    ("ph_banner", 1.0),
-    ("ph_cover", 1.0),
-    ("ph_icon", 1.0),
-    ("ph_screenshot", 1.0),
-    ("sines", 0.9813),
-    ("solid_mid", 1.0),
-    ("two_tone", 1.0),
-];
-
 struct Surfaces {
     ours: Vec<u8>,
     dll: Vec<u8>,
@@ -148,34 +123,39 @@ fn color_blocks_match_dll_on_placeholders() {
 }
 
 #[test]
-fn color_match_rate_does_not_regress() {
-    for (name, floor) in COLOR_MATCH_FLOORS {
-        let fixture = fixtures_with_interior_blocks()
-            .into_iter()
-            .find(|fixture| fixture.name == *name)
-            .unwrap();
-        let rate = surfaces(&fixture).color_match_rate();
-        assert!(
-            rate >= *floor,
-            "{name}: color match {rate:.4} below {floor}"
-        );
-    }
-}
-
-#[test]
-#[ignore = "closed in Task 8"]
 fn dxt_encode_matches_dll_on_all_fixtures() {
+    const LISTED_MISMATCHES: usize = 5;
+    let mut mismatches = Vec::new();
     for fixture in support::manifest().fixture {
-        let texture = encode(&support::input_rgba(&fixture.name), Compression::Dxt).unwrap();
-        assert!(
-            texture.data == support::dxt_video(&fixture.name),
-            "{}",
-            fixture.name
-        );
+        let surfaces = surfaces(&fixture);
+        let mut listed = 0;
+        for by in 0..surfaces.blocks_high {
+            for bx in 0..surfaces.blocks_wide {
+                let ours = surfaces.block(&surfaces.ours, bx, by);
+                let dll = surfaces.block(&surfaces.dll, bx, by);
+                if ours != dll && listed < LISTED_MISMATCHES {
+                    listed += 1;
+                    mismatches.push(format!(
+                        "{} block {bx}/{by}: ours {} dll {}",
+                        fixture.name,
+                        hex(ours),
+                        hex(dll)
+                    ));
+                }
+            }
+        }
+        if surfaces.ours != surfaces.dll && listed == 0 {
+            mismatches.push(format!("{}: padding differs", fixture.name));
+        }
     }
+    assert!(mismatches.is_empty(), "{}", mismatches.join("\n"));
 }
 
-/// Measurement for Task 8: run with `--nocapture` to see how close each fixture is to the DLL.
+fn hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+/// Run with `--nocapture` to see how close each fixture is to the DLL.
 #[test]
 fn report_match_rates_against_dll() {
     println!(
