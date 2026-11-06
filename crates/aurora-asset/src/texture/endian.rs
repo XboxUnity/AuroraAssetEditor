@@ -1,5 +1,4 @@
 /// Swaps the two bytes of every 16-bit word (GPU endian mode 8in16).
-#[cfg_attr(not(test), expect(dead_code, reason = "first used by the DXT encoder"))]
 pub(crate) fn swap_8in16(data: &mut [u8]) {
     for word in data.as_chunks_mut::<2>().0.iter_mut() {
         word.reverse();

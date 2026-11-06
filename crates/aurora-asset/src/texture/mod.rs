@@ -1,4 +1,5 @@
 mod argb;
+mod block_decode;
 mod endian;
 mod format;
 mod header;
@@ -90,9 +91,14 @@ pub fn decode(texture: &EncodedTexture) -> Result<RgbaImage, DecodeError> {
             header.height(),
             &layout,
         )),
-        TextureFormat::LinearDxt1 => todo!("DXT1 decode: Task 5"),
-        TextureFormat::LinearDxt4 | TextureFormat::LinearDxt5 => {
-            todo!("DXT4/DXT5 decode: Task 6")
+        TextureFormat::LinearDxt4 => Ok(block_decode::decode_dxt4(
+            &texture.data,
+            header.width(),
+            header.height(),
+            &layout,
+        )),
+        TextureFormat::LinearDxt1 | TextureFormat::LinearDxt5 => {
+            todo!("DXT1/DXT5 decode: Task 6")
         }
         TextureFormat::Unsupported { .. } => Err(DecodeError::UnsupportedFormat(format)),
     }
