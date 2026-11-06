@@ -1,4 +1,5 @@
-use super::format::{Compression, FetchFormat, TextureFormat};
+use super::endian::GpuEndian;
+use super::format::{self, ChannelOrder, Compression, FetchFields, TextureFormat};
 use super::layout::{PITCH_UNIT_BYTES, SurfaceLayout};
 use super::{EncodeError, MAX_DIMENSION};
 
@@ -72,6 +73,7 @@ mod field {
     ];
 
     pub const NUM_FORMAT: BitField = BitField::new(0, 1);
+    pub const SIGN: BitField = BitField::new(2, 8);
 
     pub const PACKED_MIPS: BitField = BitField::new(11, 1);
     pub const DIMENSION: BitField = BitField::new(9, 2);
@@ -149,30 +151,13 @@ impl TextureHeader {
     }
 
     pub fn format(&self) -> TextureFormat {
-        let tiled = self.tiled();
-        let data_format = self.data_format();
-        let endian = self.endian();
-        let is = |known: FetchFormat| {
-            !tiled && data_format == known.data_format && endian == known.endian
-        };
-
-        if is(FetchFormat::LINEAR_DXT4) {
-            TextureFormat::LinearDxt4
-        } else if is(FetchFormat::LINEAR_ARGB8888) {
-            TextureFormat::LinearArgb8888
-        } else {
-            TextureFormat::Unsupported {
-                data_format: data_format as u8,
-                tiled,
-            }
-        }
+        format::classify(&self.fetch_fields())
     }
 
     pub(crate) fn tiled(&self) -> bool {
         field::TILED.get(self.dword(dword::FETCH_0)) == 1
     }
 
-    #[cfg_attr(not(test), expect(dead_code, reason = "first used by the decoder"))]
     pub(crate) fn pitch(&self) -> u32 {
         field::PITCH.get(self.dword(dword::FETCH_0))
     }
@@ -185,27 +170,22 @@ impl TextureHeader {
         field::ENDIAN.get(self.dword(dword::FETCH_1))
     }
 
-    #[cfg_attr(not(test), expect(dead_code, reason = "first used by the decoder"))]
     pub(crate) fn swizzle_x(&self) -> u32 {
         self.swizzle(0)
     }
 
-    #[cfg_attr(not(test), expect(dead_code, reason = "first used by the decoder"))]
     pub(crate) fn swizzle_y(&self) -> u32 {
         self.swizzle(1)
     }
 
-    #[cfg_attr(not(test), expect(dead_code, reason = "first used by the decoder"))]
     pub(crate) fn swizzle_z(&self) -> u32 {
         self.swizzle(2)
     }
 
-    #[cfg_attr(not(test), expect(dead_code, reason = "first used by the decoder"))]
     pub(crate) fn swizzle_w(&self) -> u32 {
         self.swizzle(3)
     }
 
-    #[cfg_attr(not(test), expect(dead_code, reason = "first used by the decoder"))]
     pub(crate) fn num_format(&self) -> u32 {
         field::NUM_FORMAT.get(self.dword(dword::FETCH_3))
     }
@@ -213,6 +193,38 @@ impl TextureHeader {
     #[cfg_attr(not(test), expect(dead_code, reason = "first used by the decoder"))]
     pub(crate) fn dimension(&self) -> u32 {
         field::DIMENSION.get(self.dword(dword::FETCH_5))
+    }
+
+    pub(crate) fn sign_bits(&self) -> u32 {
+        field::SIGN.get(self.dword(dword::FETCH_0))
+    }
+
+    pub(crate) fn gpu_endian(&self) -> GpuEndian {
+        GpuEndian::from_field(self.endian())
+    }
+
+    pub(crate) fn channel_order(&self) -> ChannelOrder {
+        ChannelOrder::from_swizzle(self.swizzle_channels())
+    }
+
+    fn swizzle_channels(&self) -> [u32; 4] {
+        [
+            self.swizzle_x(),
+            self.swizzle_y(),
+            self.swizzle_z(),
+            self.swizzle_w(),
+        ]
+    }
+
+    fn fetch_fields(&self) -> FetchFields {
+        FetchFields {
+            tiled: self.tiled(),
+            data_format: self.data_format(),
+            endian: self.endian(),
+            swizzle: self.swizzle_channels(),
+            num_format: self.num_format(),
+            sign_bits: self.sign_bits(),
+        }
     }
 
     fn swizzle(&self, channel: usize) -> u32 {

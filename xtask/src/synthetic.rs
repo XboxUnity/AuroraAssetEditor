@@ -35,7 +35,11 @@ pub struct Prng {
 
 impl Prng {
     pub fn new() -> Self {
-        Self { state: PRNG_SEED }
+        Self::with_seed(PRNG_SEED)
+    }
+
+    pub fn with_seed(seed: u64) -> Self {
+        Self { state: seed }
     }
 
     fn next_u64(&mut self) -> u64 {
@@ -45,7 +49,7 @@ impl Prng {
         self.state.wrapping_mul(PRNG_MULTIPLIER)
     }
 
-    fn next_byte(&mut self) -> u8 {
+    pub fn next_byte(&mut self) -> u8 {
         (self.next_u64() >> TOP_BYTE_SHIFT) as u8
     }
 

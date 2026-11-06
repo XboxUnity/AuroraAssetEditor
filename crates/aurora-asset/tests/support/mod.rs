@@ -10,6 +10,16 @@ use sha2::{Digest, Sha256};
 #[derive(Debug, Deserialize)]
 pub struct Manifest {
     pub fixture: Vec<Fixture>,
+    pub crafted: Vec<Crafted>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Crafted {
+    pub name: String,
+    pub header: String,
+    pub video: String,
+    pub decoded_sha256: String,
+    pub dll_accepted: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -69,6 +79,19 @@ pub fn argb_video(name: &str) -> Vec<u8> {
         codec_fixtures_dir()
             .join("argb")
             .join(format!("{name}.vid")),
+    )
+    .unwrap()
+}
+
+pub fn crafted_video(case: &Crafted) -> Vec<u8> {
+    fs::read(codec_fixtures_dir().join(&case.video)).unwrap()
+}
+
+pub fn crafted_decoded_rgba(case: &Crafted) -> Vec<u8> {
+    fs::read(
+        codec_fixtures_dir()
+            .join("crafted")
+            .join(format!("{}.rgba", case.name)),
     )
     .unwrap()
 }

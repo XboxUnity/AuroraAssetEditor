@@ -37,7 +37,14 @@ impl std::error::Error for EncodeError {}
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DecodeError {
     UnsupportedFormat(TextureFormat),
-    TruncatedData { expected: usize, actual: usize },
+    TruncatedData {
+        expected: usize,
+        actual: usize,
+    },
+    RowPitchTooSmall {
+        pitch_units: u32,
+        required_units: u32,
+    },
 }
 
 impl fmt::Display for DecodeError {
@@ -49,6 +56,13 @@ impl fmt::Display for DecodeError {
             Self::TruncatedData { expected, actual } => write!(
                 f,
                 "texture data is {actual} bytes but its header requires {expected}"
+            ),
+            Self::RowPitchTooSmall {
+                pitch_units,
+                required_units,
+            } => write!(
+                f,
+                "texture row pitch of {pitch_units} units cannot hold a row, which needs {required_units}"
             ),
         }
     }
@@ -77,7 +91,7 @@ pub fn encode(image: &RgbaImage, compression: Compression) -> Result<EncodedText
 fn checked_layout(texture: &EncodedTexture) -> Result<(TextureFormat, SurfaceLayout), DecodeError> {
     let header = &texture.header;
     let format = header.format();
-    let layout = SurfaceLayout::for_header(header).ok_or(DecodeError::UnsupportedFormat(format))?;
+    let layout = SurfaceLayout::for_header(header)?;
     let expected = layout.padded_len();
     if texture.data.len() < expected {
         return Err(DecodeError::TruncatedData {
@@ -91,6 +105,17 @@ fn checked_layout(texture: &EncodedTexture) -> Result<(TextureFormat, SurfaceLay
 pub fn decode(texture: &EncodedTexture) -> Result<RgbaImage, DecodeError> {
     let header = &texture.header;
     let (format, layout) = checked_layout(texture)?;
+    if let Some(codec) = format.block_codec() {
+        return Ok(block_decode::decode_surface(
+            &texture.data,
+            header.width(),
+            header.height(),
+            &layout,
+            codec,
+            header.gpu_endian(),
+            header.channel_order(),
+        ));
+    }
     match format {
         TextureFormat::LinearArgb8888 => Ok(argb::unpack(
             &texture.data,
@@ -98,32 +123,26 @@ pub fn decode(texture: &EncodedTexture) -> Result<RgbaImage, DecodeError> {
             header.height(),
             &layout,
         )),
-        TextureFormat::LinearDxt4 => Ok(block_decode::decode_dxt4(
-            &texture.data,
-            header.width(),
-            header.height(),
-            &layout,
-        )),
-        TextureFormat::LinearDxt1 | TextureFormat::LinearDxt5 => {
-            todo!("DXT1/DXT5 decode: Task 6")
-        }
-        TextureFormat::Unsupported { .. } => Err(DecodeError::UnsupportedFormat(format)),
+        _ => Err(DecodeError::UnsupportedFormat(format)),
     }
 }
 
-/// Pre-rounding RGBA channel values of a DXT4 decode, row-major. Exposed only so the golden
-/// tests can prove the DLL differences are exact .5 rounding ties.
+/// Pre-rounding RGBA channel values of a block-compressed decode, row-major. Exposed only so the
+/// golden tests can prove the DLL differences are exact .5 rounding ties.
 #[doc(hidden)]
-pub fn dxt4_unrounded_values(texture: &EncodedTexture) -> Result<Vec<[f64; 4]>, DecodeError> {
+pub fn unrounded_values(texture: &EncodedTexture) -> Result<Vec<[f64; 4]>, DecodeError> {
     let (format, layout) = checked_layout(texture)?;
-    if format != TextureFormat::LinearDxt4 {
-        return Err(DecodeError::UnsupportedFormat(format));
-    }
     let header = &texture.header;
-    Ok(block_decode::dxt4_values(
+    let codec = format
+        .block_codec()
+        .ok_or(DecodeError::UnsupportedFormat(format))?;
+    Ok(block_decode::surface_values(
         &texture.data,
         header.width(),
         header.height(),
         &layout,
+        codec,
+        header.gpu_endian(),
+        header.channel_order(),
     ))
 }

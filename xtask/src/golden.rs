@@ -10,6 +10,7 @@ use image::{ImageFormat, RgbaImage};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+use crate::crafted::{self, Crafted};
 use crate::synthetic;
 
 const HARNESS_TARGET: &str = "i686-pc-windows-msvc";
@@ -20,7 +21,8 @@ const DXT_DECODED_STORED_NAMES: [&str; 2] = ["alphagrad", "alphanoise"];
 const DXT_DECODED_STORED_PREFIX: &str = "odd_";
 const BYTES_PER_PIXEL: usize = 4;
 const HEADER_BYTE_LENGTH: usize = 52;
-const HARNESS_REFUSED_EXIT_CODE: i32 = 4;
+const HARNESS_ENCODE_REFUSED_EXIT_CODE: i32 = 4;
+const HARNESS_DECODE_REFUSED_EXIT_CODE: i32 = 5;
 const VERBATIM_PATH_PREFIX: &str = r"\\?\";
 const UNC_PATH_MARKER: &str = "UNC";
 
@@ -36,6 +38,8 @@ const PLACEHOLDERS: [(&str, &str, u32, u32); 5] = [
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 struct Manifest {
     fixture: Vec<Fixture>,
+    #[serde(default)]
+    crafted: Vec<Crafted>,
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
@@ -80,7 +84,7 @@ fn dxt_decoded_is_stored(name: &str) -> bool {
     DXT_DECODED_STORED_NAMES.contains(&name) || name.starts_with(DXT_DECODED_STORED_PREFIX)
 }
 
-struct Paths {
+pub(crate) struct Paths {
     root: PathBuf,
 }
 
@@ -95,7 +99,7 @@ impl Paths {
         })
     }
 
-    fn corpus(&self) -> PathBuf {
+    pub(crate) fn corpus(&self) -> PathBuf {
         self.root.join("fixtures").join("codec")
     }
 
@@ -103,7 +107,7 @@ impl Paths {
         self.corpus().join("inputs")
     }
 
-    fn dll(&self) -> PathBuf {
+    pub(crate) fn dll(&self) -> PathBuf {
         self.root
             .join("tools")
             .join("golden")
@@ -121,7 +125,7 @@ impl Paths {
 }
 
 /// Canonical path without the `\\?\` prefix, which the DLL loader's altered search path mishandles.
-fn absolute(path: &Path) -> Result<PathBuf> {
+pub(crate) fn absolute(path: &Path) -> Result<PathBuf> {
     let canonical = path
         .canonicalize()
         .with_context(|| format!("cannot resolve {}", path.display()))?;
@@ -164,33 +168,45 @@ fn build_harness(paths: &Paths) -> Result<()> {
     Ok(())
 }
 
-fn run_harness(paths: &Paths, arguments: &[OsString]) -> Result<String> {
+/// Runs the harness; `None` means the DLL refused the input, any other failure is an error.
+pub(crate) fn run_harness_allowing_refusal(
+    paths: &Paths,
+    arguments: &[OsString],
+) -> Result<Option<String>> {
     let output = Command::new(paths.harness())
         .args(arguments)
         .output()
         .context("cannot start the golden harness")?;
-    if !output.status.success() {
-        let reason = match output.status.code() {
-            Some(HARNESS_REFUSED_EXIT_CODE) => "the DLL refused the input".to_string(),
-            _ => format!("exit status {}", output.status),
-        };
-        bail!(
-            "golden harness failed ({reason}): {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        );
+    if output.status.success() {
+        return Ok(Some(String::from_utf8_lossy(&output.stdout).into_owned()));
     }
-    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+    let refused = matches!(
+        output.status.code(),
+        Some(HARNESS_ENCODE_REFUSED_EXIT_CODE | HARNESS_DECODE_REFUSED_EXIT_CODE)
+    );
+    if refused {
+        return Ok(None);
+    }
+    bail!(
+        "golden harness failed (exit status {}): {}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr).trim()
+    )
 }
 
-fn os(text: &str) -> OsString {
+pub(crate) fn run_harness(paths: &Paths, arguments: &[OsString]) -> Result<String> {
+    run_harness_allowing_refusal(paths, arguments)?.context("the DLL refused the input")
+}
+
+pub(crate) fn os(text: &str) -> OsString {
     OsString::from(text)
 }
 
-fn sha256_hex(bytes: &[u8]) -> String {
+pub(crate) fn sha256_hex(bytes: &[u8]) -> String {
     hex::encode(Sha256::digest(bytes))
 }
 
-fn bgra_to_rgba(bgra: &[u8]) -> Vec<u8> {
+pub(crate) fn bgra_to_rgba(bgra: &[u8]) -> Vec<u8> {
     let mut rgba = Vec::with_capacity(bgra.len());
     for pixel in bgra.as_chunks::<BYTES_PER_PIXEL>().0.iter() {
         rgba.extend_from_slice(&[pixel[2], pixel[1], pixel[0], pixel[3]]);
@@ -342,7 +358,11 @@ fn write_goldens(paths: &Paths, inputs_dir: &Path, out_dir: &Path) -> Result<Man
             dxt_decoded_stored,
         });
     }
-    let manifest = Manifest { fixture: fixtures };
+    let crafted = crafted::write_crafted(paths, &work_path, out_dir)?;
+    let manifest = Manifest {
+        fixture: fixtures,
+        crafted,
+    };
     std::fs::write(out_dir.join("manifest.toml"), toml::to_string(&manifest)?)?;
     Ok(manifest)
 }
@@ -396,7 +416,11 @@ pub fn generate(refresh_inputs: bool) -> Result<()> {
     }
     build_harness(&paths)?;
     let manifest = write_goldens(&paths, &paths.inputs(), &paths.corpus())?;
-    println!("{} fixtures written", manifest.fixture.len());
+    println!(
+        "{} fixtures and {} crafted cases written",
+        manifest.fixture.len(),
+        manifest.crafted.len()
+    );
     Ok(())
 }
 
@@ -429,6 +453,30 @@ fn compare_manifests(committed: &Manifest, regenerated: &Manifest, mismatches: &
             .any(|other| other.name == fixture.name)
         {
             mismatches.push(format!("manifest entry for {} has no input", fixture.name));
+        }
+    }
+    for case in &regenerated.crafted {
+        let committed_entry = committed
+            .crafted
+            .iter()
+            .find(|other| other.name() == case.name());
+        if committed_entry != Some(case) {
+            mismatches.push(format!(
+                "manifest entry for crafted {} differs",
+                case.name()
+            ));
+        }
+    }
+    for case in &committed.crafted {
+        if !regenerated
+            .crafted
+            .iter()
+            .any(|other| other.name() == case.name())
+        {
+            mismatches.push(format!(
+                "manifest entry for crafted {} is no longer generated",
+                case.name()
+            ));
         }
     }
 }
@@ -473,11 +521,23 @@ pub fn check() -> Result<()> {
             )?;
         }
     }
+    for case in &regenerated.crafted {
+        let mut relative_files = vec![case.video_file().to_string()];
+        relative_files.extend(case.decoded_file());
+        for relative in relative_files {
+            compare_file(
+                &paths.corpus().join(&relative),
+                &regenerated_dir.join(&relative),
+                &mut mismatches,
+            )?;
+        }
+    }
 
     if mismatches.is_empty() {
         println!(
-            "golden corpus matches ({} fixtures)",
-            regenerated.fixture.len()
+            "golden corpus matches ({} fixtures, {} crafted cases)",
+            regenerated.fixture.len(),
+            regenerated.crafted.len()
         );
         return Ok(());
     }

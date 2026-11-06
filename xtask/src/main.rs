@@ -1,3 +1,4 @@
+mod crafted;
 mod golden;
 mod synthetic;
 

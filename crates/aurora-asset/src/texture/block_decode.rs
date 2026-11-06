@@ -1,10 +1,12 @@
 use image::{Rgba, RgbaImage};
 
-use super::endian::swap_8in16;
+use super::endian::GpuEndian;
+use super::format::ChannelOrder;
 use super::layout::SurfaceLayout;
 
 const BLOCK_SIDE: usize = 4;
 const TEXELS_PER_BLOCK: usize = BLOCK_SIDE * BLOCK_SIDE;
+const BC1_BLOCK_BYTES: usize = 8;
 const BC3_BLOCK_BYTES: usize = 16;
 
 const ALPHA_ENDPOINTS: std::ops::Range<usize> = 0..2;
@@ -27,60 +29,85 @@ type Texel = [u8; 4];
 type FloatColour = [f64; 3];
 type FloatTexel = [f64; 4];
 
-/// Which colour palette a BC1 block uses.
+const TRANSPARENT_BLACK: FloatTexel = [0.0, 0.0, 0.0, 0.0];
+
+/// How the blocks of a surface are decoded.
 #[derive(Clone, Copy)]
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "DXT1 decode arrives with Task 6")
-)]
-pub(crate) enum Bc1Palette {
-    /// Four opaque colours, as in the colour half of a BC3 block.
-    FourColor,
-    /// Three colours plus transparent black when the first endpoint is not greater than the second.
-    #[cfg_attr(test, expect(dead_code, reason = "DXT1 decode arrives with Task 6"))]
-    Dxt1,
+pub(super) enum BlockCodec {
+    Bc1,
+    /// With `divide_alpha`, colour is divided by alpha: the quirk of the DLL's DXT4 decode,
+    /// kept so that decoded pixels equal what Aurora's tooling shows.
+    Bc3 {
+        divide_alpha: bool,
+    },
 }
 
-/// Decodes a BC1 colour block (little-endian words) to RGBA texels, row-major within the block.
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "DXT1 decode arrives with Task 6")
-)]
-pub(crate) fn decode_bc1_block(block: &[u8; 8], palette: Bc1Palette) -> [Texel; TEXELS_PER_BLOCK] {
-    match palette {
-        Bc1Palette::FourColor => {
-            let colours = four_colour_palette(block);
-            let indices = colour_indices(block);
-            std::array::from_fn(|texel| {
-                let [red, green, blue] = colours[indices[texel]];
-                [
-                    round_to_channel(red),
-                    round_to_channel(green),
-                    round_to_channel(blue),
-                    u8::MAX,
-                ]
-            })
+impl BlockCodec {
+    fn block_bytes(self) -> usize {
+        match self {
+            Self::Bc1 => BC1_BLOCK_BYTES,
+            Self::Bc3 { .. } => BC3_BLOCK_BYTES,
         }
-        Bc1Palette::Dxt1 => todo!("DXT1 palette: Task 6"),
+    }
+
+    fn decode_block(self, block: &[u8]) -> [FloatTexel; TEXELS_PER_BLOCK] {
+        match self {
+            Self::Bc1 => decode_bc1_block_values(&block_array(block)),
+            Self::Bc3 { divide_alpha } => {
+                decode_bc3_block_values(&block_array(block), divide_alpha)
+            }
+        }
     }
 }
 
+fn block_array<const BYTES: usize>(block: &[u8]) -> [u8; BYTES] {
+    std::array::from_fn(|offset| block[offset])
+}
+
+/// Decodes a BC1 colour block (little-endian words) to RGBA texels, row-major within the block.
+#[cfg(test)]
+pub(crate) fn decode_bc1_block(block: &[u8; 8]) -> [Texel; TEXELS_PER_BLOCK] {
+    decode_bc1_block_values(block).map(round_texel)
+}
+
+fn decode_bc1_block_values(block: &[u8; 8]) -> [FloatTexel; TEXELS_PER_BLOCK] {
+    let colours = dxt1_palette(block);
+    let indices = colour_indices(block);
+    std::array::from_fn(|texel| colours[indices[texel]])
+}
+
+fn opaque([red, green, blue]: FloatColour) -> FloatTexel {
+    [red, green, blue, CHANNEL_MAX]
+}
+
+/// The palette of a BC1 block and of the colour half of a BC3 block: four colours when the first endpoint is greater than the second, otherwise
+/// the two endpoints, their midpoint and transparent black.
+fn dxt1_palette(block: &[u8; 8]) -> [FloatTexel; 4] {
+    let first_packed = u16::from_le_bytes([block[0], block[1]]);
+    let second_packed = u16::from_le_bytes([block[2], block[3]]);
+    if first_packed > second_packed {
+        return four_colour_palette(block).map(opaque);
+    }
+    let first = expand_565(first_packed);
+    let second = expand_565(second_packed);
+    let midpoint = std::array::from_fn(|channel| (first[channel] + second[channel]) / 2.0);
+    [
+        opaque(first),
+        opaque(second),
+        opaque(midpoint),
+        TRANSPARENT_BLACK,
+    ]
+}
+
 /// Decodes a BC3 block to RGBA texels, row-major within the block.
-///
-/// With `divide_alpha`, colour is divided by alpha: the quirk of the DLL's DXT4 decode,
-/// kept so that decoded pixels equal what Aurora's tooling shows.
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "DXT5 decode arrives with Task 6")
-)]
+#[cfg(test)]
 pub(crate) fn decode_bc3_block(block: &[u8; 16], divide_alpha: bool) -> [Texel; TEXELS_PER_BLOCK] {
     decode_bc3_block_values(block, divide_alpha).map(round_texel)
 }
 
-/// Like [`decode_bc3_block`], but with the channel values before rounding.
 fn decode_bc3_block_values(block: &[u8; 16], divide_alpha: bool) -> [FloatTexel; TEXELS_PER_BLOCK] {
     let colour_block: [u8; 8] = std::array::from_fn(|offset| block[COLOUR_BLOCK_START + offset]);
-    let colours = four_colour_palette(&colour_block);
+    let colours = dxt1_palette(&colour_block).map(|[red, green, blue, _]| [red, green, blue]);
     let colour_indices = colour_indices(&colour_block);
     let alphas = alpha_ramp(block[ALPHA_ENDPOINTS][0], block[ALPHA_ENDPOINTS][1]);
     let alpha_indices = alpha_indices(block);
@@ -199,15 +226,18 @@ fn alpha_ramp(first: u8, second: u8) -> [f64; 8] {
     }
 }
 
-/// Decodes the visible `width` x `height` pixels of a DXT4 surface laid out per `layout`.
-/// `surface` must hold at least `layout.padded_len()` bytes.
-pub(super) fn decode_dxt4(
+/// Decodes the visible `width` x `height` pixels of a block-compressed surface laid out per
+/// `layout`. `surface` must hold at least `layout.padded_len()` bytes.
+pub(super) fn decode_surface(
     surface: &[u8],
     width: u32,
     height: u32,
     layout: &SurfaceLayout,
+    codec: BlockCodec,
+    endian: GpuEndian,
+    channels: ChannelOrder,
 ) -> RgbaImage {
-    let values = dxt4_values(surface, width, height, layout);
+    let values = surface_values(surface, width, height, layout, codec, endian, channels);
     RgbaImage::from_fn(width, height, |x, y| {
         Rgba(round_texel(
             values[y as usize * width as usize + x as usize],
@@ -216,29 +246,34 @@ pub(super) fn decode_dxt4(
 }
 
 /// Channel values before rounding for every visible pixel, row-major.
-pub(super) fn dxt4_values(
+pub(super) fn surface_values(
     surface: &[u8],
     width: u32,
     height: u32,
     layout: &SurfaceLayout,
+    codec: BlockCodec,
+    endian: GpuEndian,
+    channels: ChannelOrder,
 ) -> Vec<FloatTexel> {
     let (width, height) = (width as usize, height as usize);
     let mut unswapped = surface.to_vec();
-    swap_8in16(&mut unswapped);
+    endian.to_native(&mut unswapped);
     let mut values = vec![[0.0; 4]; width * height];
     for (block_y, row) in unswapped
         .chunks_exact(layout.row_pitch)
         .take(height.div_ceil(BLOCK_SIDE))
         .enumerate()
     {
-        let (blocks, _) = row.as_chunks::<BC3_BLOCK_BYTES>();
-        for (block_x, block) in blocks.iter().take(width.div_ceil(BLOCK_SIDE)).enumerate() {
-            let texels = decode_bc3_block_values(block, true);
+        let blocks = row
+            .chunks_exact(codec.block_bytes())
+            .take(width.div_ceil(BLOCK_SIDE));
+        for (block_x, block) in blocks.enumerate() {
+            let texels = codec.decode_block(block);
             for (texel, texel_values) in texels.iter().enumerate() {
                 let x = block_x * BLOCK_SIDE + texel % BLOCK_SIDE;
                 let y = block_y * BLOCK_SIDE + texel / BLOCK_SIDE;
                 if x < width && y < height {
-                    values[y * width + x] = *texel_values;
+                    values[y * width + x] = channels.arrange(*texel_values);
                 }
             }
         }
@@ -281,13 +316,36 @@ mod tests {
     }
 
     #[test]
-    fn bc1_four_colour_decode_is_opaque_and_ignores_endpoint_order() {
+    fn bc1_uses_four_opaque_colours_when_first_endpoint_is_greater() {
         let block = [0xFF, 0xFF, 0x00, 0x00, 0b1110_0100, 0, 0, 0];
-        let texels = decode_bc1_block(&block, Bc1Palette::FourColor);
+        let texels = decode_bc1_block(&block);
         assert_eq!(texels[0], [255, 255, 255, 255]);
         assert_eq!(texels[1], [0, 0, 0, 255]);
         assert_eq!(texels[2], [170, 170, 170, 255]);
         assert_eq!(texels[3], [85, 85, 85, 255]);
+    }
+
+    #[test]
+    fn bc1_uses_midpoint_and_transparent_black_otherwise() {
+        let block = [0x00, 0x00, 0xFF, 0xFF, 0b1110_0100, 0, 0, 0];
+        let texels = decode_bc1_block(&block);
+        assert_eq!(texels[0], [0, 0, 0, 255]);
+        assert_eq!(texels[1], [255, 255, 255, 255]);
+        assert_eq!(texels[2], [128, 128, 128, 255]);
+        assert_eq!(texels[3], [0, 0, 0, 0]);
+    }
+
+    #[test]
+    fn equal_endpoints_use_the_three_colour_palette() {
+        let block = [0x1F, 0x00, 0x1F, 0x00, 0b1110_0100, 0, 0, 0];
+        assert_eq!(decode_bc1_block(&block)[3], [0, 0, 0, 0]);
+    }
+
+    #[test]
+    fn bc3_colour_half_uses_the_three_colour_palette_without_transparency() {
+        let mut block = block_with(0xFFFF, 0b11, [255, 255], 0);
+        block[8..12].copy_from_slice(&[0x00, 0x00, 0xFF, 0xFF]);
+        assert_eq!(decode_bc3_block(&block, false)[0], [0, 0, 0, 255]);
     }
 
     #[test]

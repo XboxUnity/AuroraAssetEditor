@@ -1,7 +1,7 @@
 mod support;
 
 use aurora_asset::{
-    Compression, DecodeError, EncodedTexture, TextureHeader, decode, dxt4_unrounded_values,
+    Compression, DecodeError, EncodedTexture, TextureHeader, decode, unrounded_values,
 };
 
 fn zeroed_dxt_texture(width: u32, height: u32, data_len: usize) -> EncodedTexture {
@@ -70,7 +70,7 @@ fn half_tie_fixtures_differ_from_dll_only_on_exact_ties() {
         assert!(fixture.dxt_decoded_stored, "{name} DLL decode is stored");
         let texture = dxt_texture(fixture);
         let ours = decode(&texture).unwrap();
-        let unrounded = dxt4_unrounded_values(&texture).unwrap();
+        let unrounded = unrounded_values(&texture).unwrap();
         let dll = support::dxt_decoded_rgba(name);
         assert_eq!(dll.len(), ours.as_raw().len(), "{name} decoded size");
 
