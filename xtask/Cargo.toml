@@ -4,3 +4,12 @@ version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
 publish = false
+
+[dependencies]
+anyhow = "1"
+hex = "0.4"
+image = { version = "0.25", default-features = false, features = ["png"] }
+serde = { version = "1", features = ["derive"] }
+sha2 = "0.10"
+tempfile = "3"
+toml = "0.8"
