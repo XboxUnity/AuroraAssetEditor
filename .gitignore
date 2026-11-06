@@ -1,0 +1,4 @@
+/target/
+
+# Test-only reference binaries (see tools/golden/README.md); overrides global *.dll ignores.
+!/tools/golden/dll/*.dll
