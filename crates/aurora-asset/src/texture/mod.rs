@@ -1,4 +1,5 @@
 mod argb;
+mod bc3_encode;
 mod block_decode;
 mod endian;
 mod format;
@@ -82,7 +83,7 @@ pub fn encode(image: &RgbaImage, compression: Compression) -> Result<EncodedText
     let layout = SurfaceLayout::for_compression(image.width(), image.height(), compression);
     let data = match compression {
         Compression::None => argb::pack(image, &layout),
-        Compression::Dxt => todo!("DXT encode: Task 7"),
+        Compression::Dxt => bc3_encode::encode_surface(image, &layout),
     };
     Ok(EncodedTexture { header, data })
 }
