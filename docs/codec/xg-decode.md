@@ -78,7 +78,7 @@ separate SSE path instead, and every step there is `f32`, so the x87 control wor
 | `0x10001c0d` | RGB565 to `f32`: the fields times `{1/31, 1/63, 1/31}` (`0x1001a100`, `f32` constants). |
 | `0x10002018` | Alpha half: endpoints times `1/255` (`0x1001a230`), then the palette from weight tables. |
 | `0x10003d9e` | The row loop: calls the block decoder, rearranges each texel's channels, calls the writer. |
-| `0x10002768` | Writer: clamp to bounds the caller passes, scale, round with `cvtps2dq`, pack. |
+| `0x10002768` | Writer: clamps and scales by vectors the caller passes, rounds with `cvtps2dq`, packs. |
 
 Each step, in `f32`:
 
@@ -89,12 +89,9 @@ Each step, in `f32`:
 4. **Alpha palette:** `first * w_first + second * w_second`, with the weights `f32` constants `(n-i)/n`
    and `i/n` (`n` is 7 when the first endpoint is greater, otherwise 5; the 5-step form ends in 0 and 1).
 5. **DXT4 divide:** `min((1/alpha) * colour, 1)`, zero where alpha is zero; alpha itself is kept.
-6. **To a byte:** `value * 255`, rounded to nearest with ties to even (the default MXCSR mode).
-
-Each of these differs from exact arithmetic by an ulp at most, but that decides every value that is
-exactly halfway between two bytes. The earlier port computed in `f64` and rounded exact .5 ties to
-even, which gave 13 off-by-one pixels on three fixtures (alphagrad 5, alphanoise 7, odd_130x70 1) and
-295 on 20 crafted cases. With the `f32` steps above there are none.
+6. **To a byte:** `value * 255`, rounded to nearest with ties to even (`cvtps2dq` in the default
+   MXCSR mode). The clamp bounds (0 to 1) and the scale (255) are the caller's arguments and were not
+   traced; they are inferred from the exact match on the whole corpus.
 
 Theories ruled out on the way:
 

@@ -107,7 +107,7 @@ fn dxt1_palette(block: &[u8; 8]) -> [FloatTexel; 4] {
     }
 }
 
-// Derived from AuroraAsset.dll for interoperability: SSE `f32` `first + (second - first) * weight`.
+// Derived from AuroraAsset.dll for interoperability: SSE `f32` lerp.
 fn step_between(first: FloatColour, second: FloatColour, weight: f32) -> FloatColour {
     std::array::from_fn(|channel| first[channel] + (second[channel] - first[channel]) * weight)
 }
@@ -156,7 +156,7 @@ fn channel_to_byte(value: f32) -> u8 {
 }
 
 /// The three channels of an RGB565 colour, from 0 to 1.
-// Derived from AuroraAsset.dll for interoperability: each field times the `f32` reciprocal of its maximum.
+// Derived from AuroraAsset.dll for interoperability: times `f32` reciprocals.
 fn expand_565(packed: u16) -> FloatColour {
     let packed = u64::from(packed);
     let red = bit_field(packed, RED_SHIFT, RED_BLUE_MASK_5_BITS) as f32;
@@ -211,7 +211,7 @@ fn alpha_ramp(first: u8, second: u8) -> [f32; 8] {
 }
 
 /// The first six steps from `first` towards `second` in `intervals` equal parts.
-// Derived from AuroraAsset.dll for interoperability: SSE `f32` `first * ((n - i) / n) + second * (i / n)`.
+// Derived from AuroraAsset.dll for interoperability: SSE `f32` weights.
 fn alpha_steps(first: f32, second: f32, intervals: u8) -> [f32; 6] {
     let intervals = f32::from(intervals);
     std::array::from_fn(|step| {

@@ -78,7 +78,7 @@ impl ChannelOrder {
     }
 
     /// Reorders decoded RGBA values to the presented channel order.
-    pub(super) fn arrange<T: Copy>(self, values: [T; 4]) -> [T; 4] {
+    pub(super) fn arrange(self, values: [f32; 4]) -> [f32; 4] {
         self.0.map(|selector| values[selector])
     }
 }
