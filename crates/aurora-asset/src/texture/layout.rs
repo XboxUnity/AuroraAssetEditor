@@ -34,7 +34,6 @@ pub(crate) struct SurfaceLayout {
 }
 
 impl SurfaceLayout {
-    #[cfg_attr(not(test), expect(dead_code, reason = "first used by the decoder"))]
     pub(crate) fn for_header(header: &TextureHeader) -> Option<Self> {
         let shape = match header.format() {
             TextureFormat::LinearDxt1 => DXT1_BLOCK,
@@ -63,7 +62,6 @@ impl SurfaceLayout {
         }
     }
 
-    #[cfg_attr(not(test), expect(dead_code, reason = "first used by the decoder"))]
     pub(crate) fn padded_len(&self) -> usize {
         self.row_pitch * self.rows
     }

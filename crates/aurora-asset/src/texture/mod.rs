@@ -1,9 +1,14 @@
+mod argb;
 mod endian;
 mod format;
 mod header;
 mod layout;
 
 use std::fmt;
+
+use image::RgbaImage;
+
+use layout::SurfaceLayout;
 
 pub use format::{Compression, TextureFormat};
 pub use header::{TEXTURE_HEADER_LEN, TextureHeader};
@@ -27,3 +32,68 @@ impl fmt::Display for EncodeError {
 }
 
 impl std::error::Error for EncodeError {}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DecodeError {
+    UnsupportedFormat(TextureFormat),
+    TruncatedData { expected: usize, actual: usize },
+}
+
+impl fmt::Display for DecodeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::UnsupportedFormat(format) => {
+                write!(f, "texture format {format:?} cannot be decoded")
+            }
+            Self::TruncatedData { expected, actual } => write!(
+                f,
+                "texture data is {actual} bytes but its header requires {expected}"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for DecodeError {}
+
+/// A texture as stored in an `.asset` entry: the 52-byte header plus the surface bytes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EncodedTexture {
+    pub header: TextureHeader,
+    pub data: Vec<u8>,
+}
+
+pub fn encode(image: &RgbaImage, compression: Compression) -> Result<EncodedTexture, EncodeError> {
+    let header = TextureHeader::for_image(image.width(), image.height(), compression)?;
+    let layout = SurfaceLayout::for_compression(image.width(), image.height(), compression);
+    let data = match compression {
+        Compression::None => argb::pack(image, &layout),
+        Compression::Dxt => todo!("DXT encode: Task 7"),
+    };
+    Ok(EncodedTexture { header, data })
+}
+
+pub fn decode(texture: &EncodedTexture) -> Result<RgbaImage, DecodeError> {
+    let header = &texture.header;
+    let format = header.format();
+    let layout = SurfaceLayout::for_header(header).ok_or(DecodeError::UnsupportedFormat(format))?;
+    let expected = layout.padded_len();
+    if texture.data.len() < expected {
+        return Err(DecodeError::TruncatedData {
+            expected,
+            actual: texture.data.len(),
+        });
+    }
+    match format {
+        TextureFormat::LinearArgb8888 => Ok(argb::unpack(
+            &texture.data,
+            header.width(),
+            header.height(),
+            &layout,
+        )),
+        TextureFormat::LinearDxt1 => todo!("DXT1 decode: Task 5"),
+        TextureFormat::LinearDxt4 | TextureFormat::LinearDxt5 => {
+            todo!("DXT4/DXT5 decode: Task 6")
+        }
+        TextureFormat::Unsupported { .. } => Err(DecodeError::UnsupportedFormat(format)),
+    }
+}

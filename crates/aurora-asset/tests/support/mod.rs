@@ -53,3 +53,12 @@ pub fn rgba_sha256(bgra_or_rgba: &[u8]) -> String {
 pub fn header_bytes(hex_text: &str) -> [u8; 52] {
     hex::decode(hex_text).unwrap().try_into().unwrap()
 }
+
+pub fn argb_video(name: &str) -> Vec<u8> {
+    fs::read(
+        codec_fixtures_dir()
+            .join("argb")
+            .join(format!("{name}.vid")),
+    )
+    .unwrap()
+}
