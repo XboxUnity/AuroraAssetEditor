@@ -18,6 +18,10 @@ const DXT_BLOCK: BlockShape = BlockShape {
     texels_per_side: 4,
     bytes: 16,
 };
+const DXT1_BLOCK: BlockShape = BlockShape {
+    texels_per_side: 4,
+    bytes: 8,
+};
 const ARGB_TEXEL: BlockShape = BlockShape {
     texels_per_side: 1,
     bytes: 4,
@@ -31,14 +35,14 @@ pub(crate) struct SurfaceLayout {
 
 impl SurfaceLayout {
     #[cfg_attr(not(test), expect(dead_code, reason = "first used by the decoder"))]
-    pub(crate) fn for_header(header: &TextureHeader) -> Self {
+    pub(crate) fn for_header(header: &TextureHeader) -> Option<Self> {
         let shape = match header.format() {
-            TextureFormat::LinearDxt1 | TextureFormat::LinearDxt4 | TextureFormat::LinearDxt5 => {
-                DXT_BLOCK
-            }
-            TextureFormat::LinearArgb8888 | TextureFormat::Unsupported { .. } => ARGB_TEXEL,
+            TextureFormat::LinearDxt1 => DXT1_BLOCK,
+            TextureFormat::LinearDxt4 | TextureFormat::LinearDxt5 => DXT_BLOCK,
+            TextureFormat::LinearArgb8888 => ARGB_TEXEL,
+            TextureFormat::Unsupported { .. } => return None,
         };
-        Self::new(header.width(), header.height(), shape)
+        Some(Self::new(header.width(), header.height(), shape))
     }
 
     pub(super) fn for_compression(width: u32, height: u32, compression: Compression) -> Self {
@@ -92,10 +96,20 @@ mod tests {
         for (width, height, compression, padded_len) in table {
             let header = TextureHeader::for_image(width, height, compression).unwrap();
             assert_eq!(
-                SurfaceLayout::for_header(&header).padded_len(),
+                SurfaceLayout::for_header(&header).unwrap().padded_len(),
                 padded_len,
                 "{width}x{height} {compression:?}"
             );
         }
+    }
+
+    #[test]
+    fn unsupported_header_has_no_layout() {
+        let mut bytes = TextureHeader::for_image(64, 64, Compression::Dxt)
+            .unwrap()
+            .to_bytes();
+        bytes[32..36].copy_from_slice(&0x0000_003Fu32.to_be_bytes());
+        let header = TextureHeader::from_bytes(bytes);
+        assert!(SurfaceLayout::for_header(&header).is_none());
     }
 }

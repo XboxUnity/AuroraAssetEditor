@@ -48,11 +48,11 @@ fn parsed_format_of_dll_headers() {
 #[test]
 fn unknown_fetch_constant_is_reported_as_unsupported() {
     let mut bytes = support::header_bytes(&support::manifest().fixture[0].dxt_header);
-    bytes[32..36].copy_from_slice(&0x0000_0012u32.to_be_bytes());
+    bytes[32..36].copy_from_slice(&0x0000_003Fu32.to_be_bytes());
     assert_eq!(
         TextureHeader::from_bytes(bytes).format(),
         TextureFormat::Unsupported {
-            data_format: 0x12,
+            data_format: 0x3F,
             tiled: false
         }
     );
@@ -72,4 +72,14 @@ fn dimensions_outside_the_supported_range_are_rejected() {
         );
     }
     assert!(TextureHeader::for_image(MAX_DIMENSION, MAX_DIMENSION, Compression::Dxt).is_ok());
+}
+
+#[test]
+fn maximum_dimension_round_trips() {
+    for (width, height) in [(MAX_DIMENSION, MAX_DIMENSION), (MAX_DIMENSION, 1)] {
+        for compression in [Compression::Dxt, Compression::None] {
+            let header = TextureHeader::for_image(width, height, compression).unwrap();
+            assert_eq!((header.width(), header.height()), (width, height));
+        }
+    }
 }

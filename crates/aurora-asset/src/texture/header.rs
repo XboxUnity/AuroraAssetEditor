@@ -71,6 +71,8 @@ mod field {
         BitField::new(10, 3),
     ];
 
+    pub const NUM_FORMAT: BitField = BitField::new(0, 1);
+
     pub const PACKED_MIPS: BitField = BitField::new(11, 1);
     pub const DIMENSION: BitField = BitField::new(9, 2);
 }
@@ -166,16 +168,55 @@ impl TextureHeader {
         }
     }
 
-    fn tiled(&self) -> bool {
+    pub(crate) fn tiled(&self) -> bool {
         field::TILED.get(self.dword(dword::FETCH_0)) == 1
     }
 
-    fn data_format(&self) -> u32 {
+    #[cfg_attr(not(test), expect(dead_code, reason = "first used by the decoder"))]
+    pub(crate) fn pitch(&self) -> u32 {
+        field::PITCH.get(self.dword(dword::FETCH_0))
+    }
+
+    pub(crate) fn data_format(&self) -> u32 {
         field::DATA_FORMAT.get(self.dword(dword::FETCH_1))
     }
 
-    fn endian(&self) -> u32 {
+    pub(crate) fn endian(&self) -> u32 {
         field::ENDIAN.get(self.dword(dword::FETCH_1))
+    }
+
+    #[cfg_attr(not(test), expect(dead_code, reason = "first used by the decoder"))]
+    pub(crate) fn swizzle_x(&self) -> u32 {
+        self.swizzle(0)
+    }
+
+    #[cfg_attr(not(test), expect(dead_code, reason = "first used by the decoder"))]
+    pub(crate) fn swizzle_y(&self) -> u32 {
+        self.swizzle(1)
+    }
+
+    #[cfg_attr(not(test), expect(dead_code, reason = "first used by the decoder"))]
+    pub(crate) fn swizzle_z(&self) -> u32 {
+        self.swizzle(2)
+    }
+
+    #[cfg_attr(not(test), expect(dead_code, reason = "first used by the decoder"))]
+    pub(crate) fn swizzle_w(&self) -> u32 {
+        self.swizzle(3)
+    }
+
+    #[cfg_attr(not(test), expect(dead_code, reason = "first used by the decoder"))]
+    pub(crate) fn num_format(&self) -> u32 {
+        field::NUM_FORMAT.get(self.dword(dword::FETCH_3))
+    }
+
+    #[cfg_attr(not(test), expect(dead_code, reason = "first used by the decoder"))]
+    pub(crate) fn dimension(&self) -> u32 {
+        field::DIMENSION.get(self.dword(dword::FETCH_5))
+    }
+
+    fn swizzle(&self, channel: usize) -> u32 {
+        field::SWIZZLE[channel].get(self.dword(dword::FETCH_3))
     }
 
     fn dword(&self, index: usize) -> u32 {
@@ -183,5 +224,97 @@ impl TextureHeader {
         let mut bytes = [0u8; DWORD_LEN];
         bytes.copy_from_slice(&self.0[start..start + DWORD_LEN]);
         u32::from_be_bytes(bytes)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn header_from_dwords(words: [u32; HEADER_DWORDS]) -> TextureHeader {
+        let mut bytes = [0u8; TEXTURE_HEADER_LEN];
+        for (chunk, word) in bytes.as_chunks_mut::<DWORD_LEN>().0.iter_mut().zip(words) {
+            *chunk = word.to_be_bytes();
+        }
+        TextureHeader::from_bytes(bytes)
+    }
+
+    const DXT_256: [u32; HEADER_DWORDS] = [
+        0x3,
+        0x1,
+        0,
+        0,
+        0,
+        0xFFFF_0000,
+        0xFFFF_0000,
+        0x0200_0002,
+        0x54,
+        0x001F_E0FF,
+        0x0D10,
+        0,
+        0x0A00,
+    ];
+    const ARGB_256: [u32; HEADER_DWORDS] = [
+        0x3,
+        0x1,
+        0,
+        0,
+        0,
+        0xFFFF_0000,
+        0xFFFF_0000,
+        0x0200_0002,
+        0x86,
+        0x001F_E0FF,
+        0x0C14,
+        0,
+        0x0A00,
+    ];
+
+    #[test]
+    fn accessors_read_the_dll_dxt_header() {
+        let header = header_from_dwords(DXT_256);
+        assert!(!header.tiled());
+        assert_eq!(header.pitch(), 8);
+        assert_eq!(header.data_format(), 0x14);
+        assert_eq!(header.endian(), 1);
+        assert_eq!((header.width(), header.height()), (256, 256));
+        assert_eq!(
+            [
+                header.swizzle_x(),
+                header.swizzle_y(),
+                header.swizzle_z(),
+                header.swizzle_w()
+            ],
+            [0, 1, 2, 3]
+        );
+        assert_eq!(header.num_format(), 0);
+        assert_eq!(header.dimension(), 1);
+    }
+
+    #[test]
+    fn accessors_read_the_dll_argb_header() {
+        let header = header_from_dwords(ARGB_256);
+        assert!(!header.tiled());
+        assert_eq!(header.pitch(), 8);
+        assert_eq!(header.data_format(), 0x06);
+        assert_eq!(header.endian(), 2);
+        assert_eq!(
+            [
+                header.swizzle_x(),
+                header.swizzle_y(),
+                header.swizzle_z(),
+                header.swizzle_w()
+            ],
+            [2, 1, 0, 3]
+        );
+        assert_eq!(header.num_format(), 0);
+        assert_eq!(header.dimension(), 1);
+    }
+
+    #[test]
+    fn tiled_flag_is_read_from_the_top_bit() {
+        let mut words = DXT_256;
+        words[dword::FETCH_0] |= 0x8000_0000;
+        assert!(header_from_dwords(words).tiled());
     }
 }
