@@ -73,7 +73,8 @@ pub fn encode(image: &RgbaImage, compression: Compression) -> Result<EncodedText
     Ok(EncodedTexture { header, data })
 }
 
-pub fn decode(texture: &EncodedTexture) -> Result<RgbaImage, DecodeError> {
+/// The header's format and surface layout, once the data is known to be long enough.
+fn checked_layout(texture: &EncodedTexture) -> Result<(TextureFormat, SurfaceLayout), DecodeError> {
     let header = &texture.header;
     let format = header.format();
     let layout = SurfaceLayout::for_header(header).ok_or(DecodeError::UnsupportedFormat(format))?;
@@ -84,6 +85,12 @@ pub fn decode(texture: &EncodedTexture) -> Result<RgbaImage, DecodeError> {
             actual: texture.data.len(),
         });
     }
+    Ok((format, layout))
+}
+
+pub fn decode(texture: &EncodedTexture) -> Result<RgbaImage, DecodeError> {
+    let header = &texture.header;
+    let (format, layout) = checked_layout(texture)?;
     match format {
         TextureFormat::LinearArgb8888 => Ok(argb::unpack(
             &texture.data,
@@ -102,4 +109,21 @@ pub fn decode(texture: &EncodedTexture) -> Result<RgbaImage, DecodeError> {
         }
         TextureFormat::Unsupported { .. } => Err(DecodeError::UnsupportedFormat(format)),
     }
+}
+
+/// Pre-rounding RGBA channel values of a DXT4 decode, row-major. Exposed only so the golden
+/// tests can prove the DLL differences are exact .5 rounding ties.
+#[doc(hidden)]
+pub fn dxt4_unrounded_values(texture: &EncodedTexture) -> Result<Vec<[f64; 4]>, DecodeError> {
+    let (format, layout) = checked_layout(texture)?;
+    if format != TextureFormat::LinearDxt4 {
+        return Err(DecodeError::UnsupportedFormat(format));
+    }
+    let header = &texture.header;
+    Ok(block_decode::dxt4_values(
+        &texture.data,
+        header.width(),
+        header.height(),
+        &layout,
+    ))
 }

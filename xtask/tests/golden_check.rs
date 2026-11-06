@@ -19,6 +19,7 @@ struct Fixture {
     dxt_header: String,
     argb_header: String,
     argb_video_stored: bool,
+    dxt_decoded_stored: bool,
 }
 
 fn workspace_root() -> PathBuf {
@@ -83,6 +84,15 @@ fn manifest_lists_every_input() {
             fixture.argb_video_stored,
             fixture.width * fixture.height <= MAX_STORED_ARGB_PIXELS,
             "{} argb_video_stored",
+            fixture.name
+        );
+        assert_eq!(
+            fixture.dxt_decoded_stored,
+            codec_dir
+                .join("decoded")
+                .join(format!("{}.dxt.rgba", fixture.name))
+                .is_file(),
+            "{} dxt_decoded_stored",
             fixture.name
         );
     }

@@ -16,6 +16,8 @@ const HARNESS_TARGET: &str = "i686-pc-windows-msvc";
 const HARNESS_PACKAGE: &str = "golden-harness";
 const MASTER_PLACEHOLDER_DIRECTORY: &str = "AuroraAssetEditor/Resources/Placeholders";
 const MAX_STORED_ARGB_PIXELS: u32 = 65_536;
+const DXT_DECODED_STORED_NAMES: [&str; 2] = ["alphagrad", "alphanoise"];
+const DXT_DECODED_STORED_PREFIX: &str = "odd_";
 const BYTES_PER_PIXEL: usize = 4;
 const HEADER_BYTE_LENGTH: usize = 52;
 const HARNESS_REFUSED_EXIT_CODE: i32 = 4;
@@ -48,6 +50,7 @@ struct Fixture {
     argb_video_sha256: String,
     argb_decoded_sha256: String,
     argb_video_stored: bool,
+    dxt_decoded_stored: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -68,7 +71,13 @@ impl Compression {
 struct Encoded {
     header_hex: String,
     video: Vec<u8>,
-    decoded_rgba_sha256: String,
+    decoded_rgba: Vec<u8>,
+}
+
+/// The DLL's DXT decode is stored for the fixtures where our decode is compared pixel by pixel:
+/// the ones with known rounding ties and the odd-sized ones.
+fn dxt_decoded_is_stored(name: &str) -> bool {
+    DXT_DECODED_STORED_NAMES.contains(&name) || name.starts_with(DXT_DECODED_STORED_PREFIX)
 }
 
 struct Paths {
@@ -260,7 +269,7 @@ fn encode_and_decode(
     Ok(Encoded {
         header_hex: hex::encode(&header),
         video: std::fs::read(&video_path)?,
-        decoded_rgba_sha256: sha256_hex(&bgra_to_rgba(&decoded_bgra)),
+        decoded_rgba: bgra_to_rgba(&decoded_bgra),
     })
 }
 
@@ -282,8 +291,10 @@ fn sorted_input_pngs(inputs_dir: &Path) -> Result<Vec<PathBuf>> {
 fn write_goldens(paths: &Paths, inputs_dir: &Path, out_dir: &Path) -> Result<Manifest> {
     let dxt_dir = out_dir.join("dxt");
     let argb_dir = out_dir.join("argb");
+    let decoded_dir = out_dir.join("decoded");
     std::fs::create_dir_all(&dxt_dir)?;
     std::fs::create_dir_all(&argb_dir)?;
+    std::fs::create_dir_all(&decoded_dir)?;
     let work_dir = tempfile::tempdir()?;
     let work_path = absolute(work_dir.path())?;
 
@@ -305,7 +316,14 @@ fn write_goldens(paths: &Paths, inputs_dir: &Path, out_dir: &Path) -> Result<Man
             .with_context(|| format!("{name}: ARGB"))?;
         let argb_video_stored = width * height <= MAX_STORED_ARGB_PIXELS;
 
+        let dxt_decoded_stored = dxt_decoded_is_stored(&name);
         std::fs::write(dxt_dir.join(format!("{name}.vid")), &dxt.video)?;
+        if dxt_decoded_stored {
+            std::fs::write(
+                decoded_dir.join(format!("{name}.dxt.rgba")),
+                &dxt.decoded_rgba,
+            )?;
+        }
         if argb_video_stored {
             std::fs::write(argb_dir.join(format!("{name}.vid")), &argb.video)?;
         }
@@ -316,11 +334,12 @@ fn write_goldens(paths: &Paths, inputs_dir: &Path, out_dir: &Path) -> Result<Man
             height,
             dxt_header: dxt.header_hex,
             dxt_video_sha256: sha256_hex(&dxt.video),
-            dxt_decoded_sha256: dxt.decoded_rgba_sha256,
+            dxt_decoded_sha256: sha256_hex(&dxt.decoded_rgba),
             argb_header: argb.header_hex,
             argb_video_sha256: sha256_hex(&argb.video),
-            argb_decoded_sha256: argb.decoded_rgba_sha256,
+            argb_decoded_sha256: sha256_hex(&argb.decoded_rgba),
             argb_video_stored,
+            dxt_decoded_stored,
         });
     }
     let manifest = Manifest { fixture: fixtures };
@@ -437,6 +456,14 @@ pub fn check() -> Result<()> {
             &regenerated_dir.join(&relative_dxt),
             &mut mismatches,
         )?;
+        if fixture.dxt_decoded_stored {
+            let relative_decoded = Path::new("decoded").join(format!("{}.dxt.rgba", fixture.name));
+            compare_file(
+                &paths.corpus().join(&relative_decoded),
+                &regenerated_dir.join(&relative_decoded),
+                &mut mismatches,
+            )?;
+        }
         if fixture.argb_video_stored {
             let relative_argb = Path::new("argb").join(format!("{}.vid", fixture.name));
             compare_file(

@@ -24,6 +24,7 @@ pub struct Fixture {
     pub argb_video_sha256: String,
     pub argb_decoded_sha256: String,
     pub argb_video_stored: bool,
+    pub dxt_decoded_stored: bool,
 }
 
 fn codec_fixtures_dir() -> PathBuf {
@@ -44,6 +45,15 @@ pub fn input_rgba(name: &str) -> RgbaImage {
 
 pub fn dxt_video(name: &str) -> Vec<u8> {
     fs::read(codec_fixtures_dir().join("dxt").join(format!("{name}.vid"))).unwrap()
+}
+
+pub fn dxt_decoded_rgba(name: &str) -> Vec<u8> {
+    fs::read(
+        codec_fixtures_dir()
+            .join("decoded")
+            .join(format!("{name}.dxt.rgba")),
+    )
+    .unwrap()
 }
 
 pub fn rgba_sha256(bgra_or_rgba: &[u8]) -> String {

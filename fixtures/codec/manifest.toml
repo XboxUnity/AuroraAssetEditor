@@ -9,6 +9,7 @@ argb_header = "0000000300000001000000000000000000000000ffff0000ffff0000020000020
 argb_video_sha256 = "ccc3caed3e7a709d8b21b98d7f8b5ba4ecf9263d57518d96c99b07b9d78b0e9f"
 argb_decoded_sha256 = "90c2ba6db41cec59b006f269d29a0cfa69b661c4eb4a3f083169bf24e65d642a"
 argb_video_stored = true
+dxt_decoded_stored = false
 
 [[fixture]]
 name = "alpha_zero"
@@ -21,6 +22,7 @@ argb_header = "0000000300000001000000000000000000000000ffff0000ffff0000020000020
 argb_video_sha256 = "1d07781f0f7be98315bd59056315c7d8ca9223bee8875b84e9892a05fee5e91e"
 argb_decoded_sha256 = "451e05ac9198b44d14d2d9fa44c9cacc22b749f693d01cb70a34755aa27b20f6"
 argb_video_stored = true
+dxt_decoded_stored = false
 
 [[fixture]]
 name = "alphagrad"
@@ -33,6 +35,7 @@ argb_header = "0000000300000001000000000000000000000000ffff0000ffff0000020000020
 argb_video_sha256 = "325f58545b40a31ceef725a94ce535be29fc854a671c05df3ab2a1d229bffd1d"
 argb_decoded_sha256 = "f2bc10c4932b7314f5712947f8137a602e2ef70c0577780d2ec3786b6f08706c"
 argb_video_stored = true
+dxt_decoded_stored = true
 
 [[fixture]]
 name = "alphanoise"
@@ -45,6 +48,7 @@ argb_header = "0000000300000001000000000000000000000000ffff0000ffff0000020000020
 argb_video_sha256 = "89682ebf97be5e55a0ba05bb60eff8573cc6795d5a472fefb2cbe38d7077aaed"
 argb_decoded_sha256 = "e2b7e9353031df648515ee0fbbc73c58d9f4ee1c17a1f90d8290212a5b73e84b"
 argb_video_stored = true
+dxt_decoded_stored = true
 
 [[fixture]]
 name = "checker_1px"
@@ -57,6 +61,7 @@ argb_header = "0000000300000001000000000000000000000000ffff0000ffff0000020000020
 argb_video_sha256 = "40576f5f24bd150063f7ada8104e0f428af7df84af2d4e096e2eb4131cb2f09a"
 argb_decoded_sha256 = "4b613ffacbef35a53b571ad2b5b76576fdf395a61be80c968f70591a9e0c21f1"
 argb_video_stored = true
+dxt_decoded_stored = false
 
 [[fixture]]
 name = "grad"
@@ -69,6 +74,7 @@ argb_header = "0000000300000001000000000000000000000000ffff0000ffff0000020000020
 argb_video_sha256 = "7826c9dbc7575bcf888186364d2e9a36b20e249390c33bce88a040716db891c5"
 argb_decoded_sha256 = "c26746e688605d31a4025d70977827ac7e612bacf56890d21786e938ec37a845"
 argb_video_stored = true
+dxt_decoded_stored = false
 
 [[fixture]]
 name = "near_black"
@@ -81,6 +87,7 @@ argb_header = "0000000300000001000000000000000000000000ffff0000ffff0000020000020
 argb_video_sha256 = "c7f02867d7c964cce4e496ef0ba2c051bf2cb62335cfc4ed64dbdf2e8f8b4f4d"
 argb_decoded_sha256 = "3d955a28c6da45adcaacd58e48478e33b9bdeb69a67fda7245448e7f9cf638ec"
 argb_video_stored = true
+dxt_decoded_stored = false
 
 [[fixture]]
 name = "near_white"
@@ -93,6 +100,7 @@ argb_header = "0000000300000001000000000000000000000000ffff0000ffff0000020000020
 argb_video_sha256 = "c57375d72c1eff206e6175e8f64f6e0aaeb26020848581323bfbb9b3fee33b5e"
 argb_decoded_sha256 = "620c2dc9ffc4ece1bd877a4eec0ce442f8aa23d9b13543cbc339947476e7a7be"
 argb_video_stored = true
+dxt_decoded_stored = false
 
 [[fixture]]
 name = "noise"
@@ -105,6 +113,7 @@ argb_header = "0000000300000001000000000000000000000000ffff0000ffff0000020000020
 argb_video_sha256 = "4343ef4ab890fd39fc003c8b051c520255fea089da6625ffa10457d4847d9100"
 argb_decoded_sha256 = "51f3c0e759bfb6193f87248313a2dc46b00bff2eda1e75b57e66afd7c6a2d58c"
 argb_video_stored = true
+dxt_decoded_stored = false
 
 [[fixture]]
 name = "odd_130x70"
@@ -117,6 +126,7 @@ argb_header = "0000000300000001000000000000000000000000ffff0000ffff0000018000020
 argb_video_sha256 = "bc8d2baa1665dd1fc3d77758696048b19a81896b0df7b575765404e958e33908"
 argb_decoded_sha256 = "da41b281a7f04c3fc09a0cf7fafb098057fa8fc87a610c9f3d9c0d073cecf7e9"
 argb_video_stored = true
+dxt_decoded_stored = true
 
 [[fixture]]
 name = "odd_1x1"
@@ -129,6 +139,7 @@ argb_header = "0000000300000001000000000000000000000000ffff0000ffff0000008000020
 argb_video_sha256 = "48ab978f67e0d8627a2001e7bcbcaa81b8f46e214ae0925fec9aa118b367ba27"
 argb_decoded_sha256 = "b20bc6de5f3dd7d590ac2b4da49b70768f55ee0ab922b135ff2f63010743a91d"
 argb_video_stored = true
+dxt_decoded_stored = true
 
 [[fixture]]
 name = "odd_3x5"
@@ -141,6 +152,7 @@ argb_header = "0000000300000001000000000000000000000000ffff0000ffff0000008000020
 argb_video_sha256 = "2484755c9d61955af6a0f66555e291bd2226780e66efc19d15c34b2344bb548d"
 argb_decoded_sha256 = "8dcb47b76555508302866f02cf0340f21ac5db76087f9eda9cb3f828a2ae79af"
 argb_video_stored = true
+dxt_decoded_stored = true
 
 [[fixture]]
 name = "odd_5x3"
@@ -153,6 +165,7 @@ argb_header = "0000000300000001000000000000000000000000ffff0000ffff0000008000020
 argb_video_sha256 = "f15c2b2301aab76a08cbef9ca33758ad5e892c0429f51ae564746660698da2c4"
 argb_decoded_sha256 = "f0cbffbeb87d364a67c83f50d38687bc9ce53a0998a26aa55c506354ebaaa221"
 argb_video_stored = true
+dxt_decoded_stored = true
 
 [[fixture]]
 name = "odd_63x65"
@@ -165,6 +178,7 @@ argb_header = "0000000300000001000000000000000000000000ffff0000ffff0000008000020
 argb_video_sha256 = "58a07fd1c371fb62ada4149b10aaa6f6a9e1bba1a4b849e1952be762b5782500"
 argb_decoded_sha256 = "c1fd35d2fb5a8ab4762b0e33d1d97224920f402dfdb4403e7bcf1e32fb23481d"
 argb_video_stored = true
+dxt_decoded_stored = true
 
 [[fixture]]
 name = "ph_background"
@@ -177,6 +191,7 @@ argb_header = "0000000300000001000000000000000000000000ffff0000ffff00000a0000020
 argb_video_sha256 = "e136a060b07a8f492bcb6643ec365ed0ba6a930ce68f995582afa7e869410a41"
 argb_decoded_sha256 = "699440e719fd18fc1e1393dc4eacef06a0197e2af315648dcd5be5cfc9511940"
 argb_video_stored = false
+dxt_decoded_stored = false
 
 [[fixture]]
 name = "ph_banner"
@@ -189,6 +204,7 @@ argb_header = "0000000300000001000000000000000000000000ffff0000ffff0000038000020
 argb_video_sha256 = "822638c28190605dc304d3ed1ca5fdcce33512c7212cad0d984f54d238ebee12"
 argb_decoded_sha256 = "204f9670258c73a705c984bb71b98d58a603f8b7ff3621b97a35c49aeaab65f8"
 argb_video_stored = true
+dxt_decoded_stored = false
 
 [[fixture]]
 name = "ph_cover"
@@ -201,6 +217,7 @@ argb_header = "0000000300000001000000000000000000000000ffff0000ffff0000078000020
 argb_video_sha256 = "d8565e6be1c895ee763a19e9880da627b901ea3379ad971c88ebc64fc87ed413"
 argb_decoded_sha256 = "becc1926d7d9d4bea29bb5ef888af6a31f219e75524a4ac3dadc1fb9543e7d9c"
 argb_video_stored = false
+dxt_decoded_stored = false
 
 [[fixture]]
 name = "ph_icon"
@@ -213,6 +230,7 @@ argb_header = "0000000300000001000000000000000000000000ffff0000ffff0000008000020
 argb_video_sha256 = "cedb4d577d023dadacb81eb016f4f786133006345deb03744a3b2509cf6ebb32"
 argb_decoded_sha256 = "1df6f332b1420485674335c90ec2f7f36b0ef0341cfc910803d459b1c7c80442"
 argb_video_stored = true
+dxt_decoded_stored = false
 
 [[fixture]]
 name = "ph_screenshot"
@@ -225,6 +243,7 @@ argb_header = "0000000300000001000000000000000000000000ffff0000ffff0000080000020
 argb_video_sha256 = "582ec7c77d5db1ea85fac99d9fc85c9f889df3145501a86f186bdb5dcdff542c"
 argb_decoded_sha256 = "d67dea076e67d62073f7299456a8b5e90dff8a13e2af524e44bcebf65e9a9abf"
 argb_video_stored = false
+dxt_decoded_stored = false
 
 [[fixture]]
 name = "sines"
@@ -237,6 +256,7 @@ argb_header = "0000000300000001000000000000000000000000ffff0000ffff0000020000020
 argb_video_sha256 = "0c145214d8a87458133d65ad94a82e072cf09aadaf326d40d731d24957fdfa4b"
 argb_decoded_sha256 = "a25921dab4cecf6543c15c6598ffa341984997a14fb302e95875102f0d75e860"
 argb_video_stored = true
+dxt_decoded_stored = false
 
 [[fixture]]
 name = "solid_mid"
@@ -249,6 +269,7 @@ argb_header = "0000000300000001000000000000000000000000ffff0000ffff0000020000020
 argb_video_sha256 = "cc7e06769502b383769378f66264b526325aba641cb71b65b54d1d8883071428"
 argb_decoded_sha256 = "32f27e5387ecd7f787968cce9291ac453edb943af7dab5744994d7c5c982262b"
 argb_video_stored = true
+dxt_decoded_stored = false
 
 [[fixture]]
 name = "two_tone"
@@ -261,3 +282,4 @@ argb_header = "0000000300000001000000000000000000000000ffff0000ffff0000020000020
 argb_video_sha256 = "e952312a9bf9c29768564358dd7c1b98d216255c072407c59961cff207f52e14"
 argb_decoded_sha256 = "da9da549f2d73851f42d274e30fe8439c1076e2d8667bfe44cac13203bcffa90"
 argb_video_stored = true
+dxt_decoded_stored = false

@@ -12,8 +12,11 @@ const ALPHA_INDEX_BYTES: std::ops::Range<usize> = 2..8;
 const COLOUR_BLOCK_START: usize = 8;
 const ALPHA_INDEX_BITS: u32 = 3;
 const COLOUR_INDEX_BITS: u32 = 2;
-const COLOUR_INDEX_MASK: u32 = 0b11;
-const ALPHA_INDEX_MASK: u64 = 0b111;
+
+const RED_SHIFT: u32 = 11;
+const GREEN_SHIFT: u32 = 5;
+const RED_BLUE_MASK_5_BITS: u64 = 0b1_1111;
+const GREEN_MASK_6_BITS: u64 = 0b11_1111;
 
 const RED_BITS_MAX: f64 = 31.0;
 const GREEN_BITS_MAX: f64 = 63.0;
@@ -22,6 +25,7 @@ const CHANNEL_MAX: f64 = 255.0;
 
 type Texel = [u8; 4];
 type FloatColour = [f64; 3];
+type FloatTexel = [f64; 4];
 
 /// Which colour palette a BC1 block uses.
 #[derive(Clone, Copy)]
@@ -65,14 +69,23 @@ pub(crate) fn decode_bc1_block(block: &[u8; 8], palette: Bc1Palette) -> [Texel; 
 ///
 /// With `divide_alpha`, colour is divided by alpha: the quirk of the DLL's DXT4 decode,
 /// kept so that decoded pixels equal what Aurora's tooling shows.
+#[cfg_attr(
+    not(test),
+    expect(dead_code, reason = "DXT5 decode arrives with Task 6")
+)]
 pub(crate) fn decode_bc3_block(block: &[u8; 16], divide_alpha: bool) -> [Texel; TEXELS_PER_BLOCK] {
+    decode_bc3_block_values(block, divide_alpha).map(round_texel)
+}
+
+/// Like [`decode_bc3_block`], but with the channel values before rounding.
+fn decode_bc3_block_values(block: &[u8; 16], divide_alpha: bool) -> [FloatTexel; TEXELS_PER_BLOCK] {
     let colour_block: [u8; 8] = std::array::from_fn(|offset| block[COLOUR_BLOCK_START + offset]);
     let colours = four_colour_palette(&colour_block);
     let colour_indices = colour_indices(&colour_block);
     let alphas = alpha_ramp(block[ALPHA_ENDPOINTS][0], block[ALPHA_ENDPOINTS][1]);
     let alpha_indices = alpha_indices(block);
     std::array::from_fn(|texel| {
-        finish_texel(
+        texel_values(
             colours[colour_indices[texel]],
             alphas[alpha_indices[texel]],
             divide_alpha,
@@ -80,10 +93,10 @@ pub(crate) fn decode_bc3_block(block: &[u8; 16], divide_alpha: bool) -> [Texel; 
     })
 }
 
-/// Final per-texel arithmetic, in `f64`. This is the single place to change when matching
-/// the DLL's float precision exactly.
-fn finish_texel(colour: FloatColour, alpha: f64, divide_alpha: bool) -> Texel {
-    let colour = colour.map(|channel| {
+/// Per-texel arithmetic before rounding, in `f64`: the alpha divide and clamp. This is the single
+/// place to change when matching the DLL's float precision exactly.
+fn texel_values(colour: FloatColour, alpha: f64, divide_alpha: bool) -> FloatTexel {
+    let [red, green, blue] = colour.map(|channel| {
         if !divide_alpha {
             channel
         } else if alpha > 0.0 {
@@ -92,13 +105,11 @@ fn finish_texel(colour: FloatColour, alpha: f64, divide_alpha: bool) -> Texel {
             0.0
         }
     });
-    let [red, green, blue] = colour;
-    [
-        round_to_channel(red),
-        round_to_channel(green),
-        round_to_channel(blue),
-        round_to_channel(alpha),
-    ]
+    [red, green, blue, alpha]
+}
+
+fn round_texel(values: FloatTexel) -> Texel {
+    values.map(round_to_channel)
 }
 
 fn round_to_channel(value: f64) -> u8 {
@@ -117,9 +128,10 @@ fn four_colour_palette(colour_block: &[u8; 8]) -> [FloatColour; 4] {
 }
 
 fn expand_565(packed: u16) -> FloatColour {
-    let red = f64::from(packed >> 11 & 0b1_1111);
-    let green = f64::from(packed >> 5 & 0b11_1111);
-    let blue = f64::from(packed & 0b1_1111);
+    let packed = u64::from(packed);
+    let red = bit_field(packed, RED_SHIFT, RED_BLUE_MASK_5_BITS) as f64;
+    let green = bit_field(packed, GREEN_SHIFT, GREEN_MASK_6_BITS) as f64;
+    let blue = bit_field(packed, 0, RED_BLUE_MASK_5_BITS) as f64;
     [
         red * CHANNEL_MAX / RED_BITS_MAX,
         green * CHANNEL_MAX / GREEN_BITS_MAX,
@@ -139,6 +151,17 @@ fn blend(
     })
 }
 
+/// The bits of `value` selected by `mask` after shifting right by `shift`.
+fn bit_field(value: u64, shift: u32, mask: u64) -> u64 {
+    (value >> shift) & mask
+}
+
+/// The `texel`-th packed palette index, `bits_per_index` wide, counting from the low bits.
+fn index_at(packed: u64, bits_per_index: u32, texel: usize) -> usize {
+    let mask = (1 << bits_per_index) - 1;
+    bit_field(packed, bits_per_index * texel as u32, mask) as usize
+}
+
 fn colour_indices(colour_block: &[u8; 8]) -> [usize; TEXELS_PER_BLOCK] {
     let bits = u32::from_le_bytes([
         colour_block[4],
@@ -146,18 +169,14 @@ fn colour_indices(colour_block: &[u8; 8]) -> [usize; TEXELS_PER_BLOCK] {
         colour_block[6],
         colour_block[7],
     ]);
-    std::array::from_fn(|texel| {
-        (bits >> (COLOUR_INDEX_BITS * texel as u32) & COLOUR_INDEX_MASK) as usize
-    })
+    std::array::from_fn(|texel| index_at(u64::from(bits), COLOUR_INDEX_BITS, texel))
 }
 
 fn alpha_indices(block: &[u8; 16]) -> [usize; TEXELS_PER_BLOCK] {
     let mut bytes = [0u8; 8];
     bytes[..6].copy_from_slice(&block[ALPHA_INDEX_BYTES]);
     let bits = u64::from_le_bytes(bytes);
-    std::array::from_fn(|texel| {
-        (bits >> (ALPHA_INDEX_BITS * texel as u32) & ALPHA_INDEX_MASK) as usize
-    })
+    std::array::from_fn(|texel| index_at(bits, ALPHA_INDEX_BITS, texel))
 }
 
 /// Eight alpha values: the endpoints plus either six or four interpolated steps
@@ -188,40 +207,43 @@ pub(super) fn decode_dxt4(
     height: u32,
     layout: &SurfaceLayout,
 ) -> RgbaImage {
+    let values = dxt4_values(surface, width, height, layout);
+    RgbaImage::from_fn(width, height, |x, y| {
+        Rgba(round_texel(
+            values[y as usize * width as usize + x as usize],
+        ))
+    })
+}
+
+/// Channel values before rounding for every visible pixel, row-major.
+pub(super) fn dxt4_values(
+    surface: &[u8],
+    width: u32,
+    height: u32,
+    layout: &SurfaceLayout,
+) -> Vec<FloatTexel> {
+    let (width, height) = (width as usize, height as usize);
     let mut unswapped = surface.to_vec();
     swap_8in16(&mut unswapped);
-    let mut image = RgbaImage::new(width, height);
+    let mut values = vec![[0.0; 4]; width * height];
     for (block_y, row) in unswapped
         .chunks_exact(layout.row_pitch)
-        .take((height as usize).div_ceil(BLOCK_SIDE))
+        .take(height.div_ceil(BLOCK_SIDE))
         .enumerate()
     {
         let (blocks, _) = row.as_chunks::<BC3_BLOCK_BYTES>();
-        for (block_x, block) in blocks
-            .iter()
-            .take((width as usize).div_ceil(BLOCK_SIDE))
-            .enumerate()
-        {
-            let texels = decode_bc3_block(block, true);
-            copy_visible_texels(&mut image, block_x, block_y, &texels);
+        for (block_x, block) in blocks.iter().take(width.div_ceil(BLOCK_SIDE)).enumerate() {
+            let texels = decode_bc3_block_values(block, true);
+            for (texel, texel_values) in texels.iter().enumerate() {
+                let x = block_x * BLOCK_SIDE + texel % BLOCK_SIDE;
+                let y = block_y * BLOCK_SIDE + texel / BLOCK_SIDE;
+                if x < width && y < height {
+                    values[y * width + x] = *texel_values;
+                }
+            }
         }
     }
-    image
-}
-
-fn copy_visible_texels(
-    image: &mut RgbaImage,
-    block_x: usize,
-    block_y: usize,
-    texels: &[Texel; TEXELS_PER_BLOCK],
-) {
-    for (texel, rgba) in texels.iter().enumerate() {
-        let x = block_x * BLOCK_SIDE + texel % BLOCK_SIDE;
-        let y = block_y * BLOCK_SIDE + texel / BLOCK_SIDE;
-        if x < image.width() as usize && y < image.height() as usize {
-            image.put_pixel(x as u32, y as u32, Rgba(*rgba));
-        }
-    }
+    values
 }
 
 #[cfg(test)]
