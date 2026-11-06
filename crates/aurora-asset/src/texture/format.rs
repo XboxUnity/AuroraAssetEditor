@@ -63,34 +63,23 @@ impl FetchFormat {
     };
 }
 
-/// The order in which a block-compressed texture presents its channels.
+/// Which decoded channel each presented channel (x, y, z, w) shows, from the fetch swizzle.
+/// The DLL honours any selection of the four stored channels; constant 0 and 1 are not supported.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum ChannelOrder {
-    Rgba,
-    /// Red and blue are swapped relative to the stored colour.
-    Bgra,
-}
+pub(crate) struct ChannelOrder([usize; 4]);
 
 impl ChannelOrder {
-    pub(super) fn from_swizzle(swizzle: [u32; 4]) -> Self {
-        if swizzle == FetchFormat::LINEAR_ARGB8888.swizzle {
-            Self::Bgra
-        } else {
-            Self::Rgba
-        }
+    pub(super) fn from_swizzle(swizzle: [u32; 4]) -> Option<Self> {
+        let selects_stored_channel = |selector: u32| selector <= GPU_SWIZZLE_A;
+        swizzle
+            .iter()
+            .all(|selector| selects_stored_channel(*selector))
+            .then(|| Self(swizzle.map(|selector| selector as usize)))
     }
 
     /// Reorders decoded RGBA values to the presented channel order.
-    pub(super) fn arrange(self, [red, green, blue, alpha]: [f64; 4]) -> [f64; 4] {
-        match self {
-            Self::Rgba => [red, green, blue, alpha],
-            Self::Bgra => [blue, green, red, alpha],
-        }
-    }
-
-    fn is_known_swizzle(swizzle: [u32; 4]) -> bool {
-        swizzle == FetchFormat::LINEAR_DXT4.swizzle
-            || swizzle == FetchFormat::LINEAR_ARGB8888.swizzle
+    pub(super) fn arrange(self, values: [f64; 4]) -> [f64; 4] {
+        self.0.map(|selector| values[selector])
     }
 }
 
@@ -102,6 +91,8 @@ pub(super) struct FetchFields {
     pub swizzle: [u32; 4],
     pub num_format: u32,
     pub sign_bits: u32,
+    /// The fields the port does not model hold the value the DLL's own headers have.
+    pub template_fields_match: bool,
 }
 
 impl FetchFields {
@@ -109,22 +100,17 @@ impl FetchFields {
         self.data_format == known.data_format
             && self.endian == known.endian
             && self.swizzle == known.swizzle
-    }
-
-    /// The exact header the DLL writes for DXT4: the only one it decodes with the alpha divide.
-    fn is_dxt4(&self) -> bool {
-        self.is(FetchFormat::LINEAR_DXT4)
             && self.num_format == GPU_NUM_FORMAT_FRACTION
             && self.sign_bits == GPU_SIGN_ALL_UNSIGNED
     }
 
-    /// Any byte order and either sign setting, with the two channel orders the DLL's headers use.
+    /// Any byte order and either sign setting, with any channel selection of the stored channels.
     /// Gamma and the other sign settings change the DLL's decode and are not supported.
     fn is_readable_block_format(&self, data_format: u32) -> bool {
         let known_sign = [GPU_SIGN_ALL_UNSIGNED, GPU_SIGN_ALL_SIGNED].contains(&self.sign_bits);
         self.data_format == data_format
             && known_sign
-            && ChannelOrder::is_known_swizzle(self.swizzle)
+            && ChannelOrder::from_swizzle(self.swizzle).is_some()
     }
 }
 
@@ -133,12 +119,12 @@ pub(super) fn classify(fields: &FetchFields) -> TextureFormat {
         data_format: fields.data_format as u8,
         tiled: fields.tiled,
     };
-    if fields.tiled {
+    if fields.tiled || !fields.template_fields_match {
         return unsupported;
     }
-    if fields.data_format == GPU_FORMAT_8_8_8_8 && fields.endian == GPU_ENDIAN_8IN32 {
+    if fields.is(FetchFormat::LINEAR_ARGB8888) {
         TextureFormat::LinearArgb8888
-    } else if fields.is_dxt4() {
+    } else if fields.is(FetchFormat::LINEAR_DXT4) {
         TextureFormat::LinearDxt4
     } else if fields.is_readable_block_format(GPU_FORMAT_DXT4_5) {
         TextureFormat::LinearDxt5

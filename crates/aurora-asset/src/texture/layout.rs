@@ -5,7 +5,7 @@ use super::header::TextureHeader;
 /// One GPU pitch unit is 32 texels: 128 bytes of ARGB, or 8 compressed blocks (128 bytes of
 /// BC3, 64 bytes of DXT1).
 pub(super) const PITCH_UNIT_BYTES: usize = 128;
-const BLOCKS_PER_PITCH_UNIT: usize = 8;
+const TEXELS_PER_PITCH_UNIT: usize = 32;
 
 const BLOCKS_PER_ROW_ALIGNMENT: usize = 32;
 const ROW_PITCH_ALIGNMENT_BYTES: usize = 256;
@@ -40,21 +40,20 @@ impl SurfaceLayout {
     pub(crate) fn for_header(header: &TextureHeader) -> Result<Self, DecodeError> {
         let format = header.format();
         match format {
-            TextureFormat::LinearDxt1 => Self::for_block_header(header, DXT1_BLOCK),
+            TextureFormat::LinearDxt1 => Self::with_header_pitch(header, DXT1_BLOCK),
             TextureFormat::LinearDxt4 | TextureFormat::LinearDxt5 => {
-                Self::for_block_header(header, DXT_BLOCK)
+                Self::with_header_pitch(header, DXT_BLOCK)
             }
-            TextureFormat::LinearArgb8888 => {
-                Ok(Self::new(header.width(), header.height(), ARGB_TEXEL))
-            }
+            TextureFormat::LinearArgb8888 => Self::with_header_pitch(header, ARGB_TEXEL),
             TextureFormat::Unsupported { .. } => Err(DecodeError::UnsupportedFormat(format)),
         }
     }
 
-    /// Block formats take their row pitch from the header, as the DLL does.
-    fn for_block_header(header: &TextureHeader, shape: BlockShape) -> Result<Self, DecodeError> {
-        let blocks_wide = (header.width() as usize).div_ceil(shape.texels_per_side);
-        let required_units = blocks_wide.div_ceil(BLOCKS_PER_PITCH_UNIT);
+    /// Every format takes its row pitch from the header, as the DLL does.
+    fn with_header_pitch(header: &TextureHeader, shape: BlockShape) -> Result<Self, DecodeError> {
+        let units_per_pitch_unit = TEXELS_PER_PITCH_UNIT / shape.texels_per_side;
+        let units_wide = (header.width() as usize).div_ceil(shape.texels_per_side);
+        let required_units = units_wide.div_ceil(units_per_pitch_unit);
         let pitch_units = header.pitch() as usize;
         if pitch_units < required_units {
             return Err(DecodeError::RowPitchTooSmall {
@@ -64,7 +63,7 @@ impl SurfaceLayout {
         }
         let blocks_high = (header.height() as usize).div_ceil(shape.texels_per_side);
         Ok(Self {
-            row_pitch: pitch_units * BLOCKS_PER_PITCH_UNIT * shape.bytes,
+            row_pitch: pitch_units * units_per_pitch_unit * shape.bytes,
             rows: align(blocks_high, BLOCK_ROWS_ALIGNMENT),
         })
     }

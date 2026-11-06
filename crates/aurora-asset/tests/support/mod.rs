@@ -20,6 +20,7 @@ pub struct Crafted {
     pub video: String,
     pub decoded_sha256: String,
     pub dll_accepted: bool,
+    pub same_as: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -87,11 +88,16 @@ pub fn crafted_video(case: &Crafted) -> Vec<u8> {
     fs::read(codec_fixtures_dir().join(&case.video)).unwrap()
 }
 
-pub fn crafted_decoded_rgba(case: &Crafted) -> Vec<u8> {
+pub fn crafted_rgba_file(name: &str) -> Vec<u8> {
     fs::read(
         codec_fixtures_dir()
             .join("crafted")
-            .join(format!("{}.rgba", case.name)),
+            .join(format!("{name}.rgba")),
     )
     .unwrap()
+}
+
+/// The DLL's decode of the case; a case equal to another stores no pixels of its own.
+pub fn crafted_decoded_rgba(case: &Crafted) -> Vec<u8> {
+    crafted_rgba_file(case.same_as.as_deref().unwrap_or(&case.name))
 }

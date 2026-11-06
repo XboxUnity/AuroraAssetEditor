@@ -75,6 +75,10 @@ mod field {
     pub const NUM_FORMAT: BitField = BitField::new(0, 1);
     pub const SIGN: BitField = BitField::new(2, 8);
 
+    /// The low bits of the first dword that select the resource type; any other value crashes the DLL.
+    pub const COMMON_TYPE: BitField = BitField::new(0, 4);
+    /// FETCH_3 bit 31: when set the DLL decodes a texture two pixels wider and taller.
+    pub const BORDER_SIZE: BitField = BitField::new(31, 1);
     pub const PACKED_MIPS: BitField = BitField::new(11, 1);
     pub const DIMENSION: BitField = BitField::new(9, 2);
 }
@@ -190,7 +194,6 @@ impl TextureHeader {
         field::NUM_FORMAT.get(self.dword(dword::FETCH_3))
     }
 
-    #[cfg_attr(not(test), expect(dead_code, reason = "first used by the decoder"))]
     pub(crate) fn dimension(&self) -> u32 {
         field::DIMENSION.get(self.dword(dword::FETCH_5))
     }
@@ -203,8 +206,16 @@ impl TextureHeader {
         GpuEndian::from_field(self.endian())
     }
 
-    pub(crate) fn channel_order(&self) -> ChannelOrder {
+    pub(crate) fn channel_order(&self) -> Option<ChannelOrder> {
         ChannelOrder::from_swizzle(self.swizzle_channels())
+    }
+
+    /// Fields the port does not model but the DLL's decode depends on (found by probing) must hold
+    /// the value of the DLL's own headers. Every other unmodelled field was probed and has no effect.
+    fn template_fields_match(&self) -> bool {
+        field::COMMON_TYPE.get(self.dword(dword::COMMON)) == COMMON_TEXTURE
+            && field::BORDER_SIZE.get(self.dword(dword::FETCH_3)) == 0
+            && self.dimension() == GPU_DIMENSION_2D
     }
 
     fn swizzle_channels(&self) -> [u32; 4] {
@@ -224,6 +235,7 @@ impl TextureHeader {
             swizzle: self.swizzle_channels(),
             num_format: self.num_format(),
             sign_bits: self.sign_bits(),
+            template_fields_match: self.template_fields_match(),
         }
     }
 

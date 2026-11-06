@@ -106,6 +106,9 @@ pub fn decode(texture: &EncodedTexture) -> Result<RgbaImage, DecodeError> {
     let header = &texture.header;
     let (format, layout) = checked_layout(texture)?;
     if let Some(codec) = format.block_codec() {
+        let channels = header
+            .channel_order()
+            .ok_or(DecodeError::UnsupportedFormat(format))?;
         return Ok(block_decode::decode_surface(
             &texture.data,
             header.width(),
@@ -113,7 +116,7 @@ pub fn decode(texture: &EncodedTexture) -> Result<RgbaImage, DecodeError> {
             &layout,
             codec,
             header.gpu_endian(),
-            header.channel_order(),
+            channels,
         ));
     }
     match format {
@@ -136,6 +139,9 @@ pub fn unrounded_values(texture: &EncodedTexture) -> Result<Vec<[f64; 4]>, Decod
     let codec = format
         .block_codec()
         .ok_or(DecodeError::UnsupportedFormat(format))?;
+    let channels = header
+        .channel_order()
+        .ok_or(DecodeError::UnsupportedFormat(format))?;
     Ok(block_decode::surface_values(
         &texture.data,
         header.width(),
@@ -143,6 +149,6 @@ pub fn unrounded_values(texture: &EncodedTexture) -> Result<Vec<[f64; 4]>, Decod
         &layout,
         codec,
         header.gpu_endian(),
-        header.channel_order(),
+        channels,
     ))
 }

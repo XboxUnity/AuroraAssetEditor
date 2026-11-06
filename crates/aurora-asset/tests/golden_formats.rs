@@ -7,7 +7,17 @@ use aurora_asset::{
 
 /// Crafted cases the DLL decodes but the port refuses, matched by a name fragment.
 /// Anything that is not listed here has to decode exactly as the DLL does.
-const EXPECTED_REFUSALS: [&str; 4] = ["dxt2_3", "_tiled_", "_abgr_", "_gamma_"];
+const EXPECTED_REFUSALS: [&str; 5] = [
+    "dxt2_3",
+    "_tiled_",
+    "_gamma_",
+    "_probe_border_",
+    "_swz0124_",
+];
+
+/// How many crafted cases the DLL accepts and the port refuses: a case that stops being refused
+/// must be noticed.
+const EXPECTED_REFUSAL_COUNT: usize = 23;
 
 /// Crafted cases whose only mismatches against the DLL are off by one on exact .5 ties
 /// (the DLL's float precision, closed in Task 9), with the exact count of mismatching pixels.
@@ -110,7 +120,7 @@ fn crafted_cases_match_dll() {
         let texture = crafted_texture(&case);
         if !case.dll_accepted {
             assert!(
-                decode(&texture).is_err(),
+                matches!(decode(&texture), Err(DecodeError::UnsupportedFormat(_))),
                 "{} is refused by the DLL",
                 case.name
             );
@@ -128,6 +138,15 @@ fn crafted_cases_match_dll() {
             (Err(error), false) => panic!("{} was refused: {error}", case.name),
             (Ok(_), true) => panic!("{} should be refused", case.name),
             (Ok(decoded), false) => {
+                if texture.header.format() == TextureFormat::LinearArgb8888 {
+                    assert_eq!(
+                        decoded.as_raw(),
+                        &support::crafted_decoded_rgba(&case),
+                        "{}",
+                        case.name
+                    );
+                    continue;
+                }
                 let unrounded = unrounded_values(&texture).unwrap();
                 let mismatches = count_tie_mismatches(&case, decoded.as_raw(), &unrounded);
                 if mismatches > 0 {
@@ -137,6 +156,7 @@ fn crafted_cases_match_dll() {
         }
     }
     println!("refused by the port: {refused}; tie cases: {tie_cases:?}");
+    assert_eq!(refused, EXPECTED_REFUSAL_COUNT);
     let expected: Vec<(String, usize)> = HALF_TIE_CASES
         .iter()
         .map(|(name, count)| (name.to_string(), *count))
@@ -201,4 +221,69 @@ fn bc3_in_other_texture_formats_is_unsupported() {
             tiled: false
         }
     );
+}
+
+#[test]
+fn stored_crafted_decodes_match_their_manifest_hashes() {
+    for case in support::manifest().crafted {
+        if case.dll_accepted {
+            assert_eq!(
+                support::rgba_sha256(&support::crafted_decoded_rgba(&case)),
+                case.decoded_sha256,
+                "{}",
+                case.name
+            );
+        }
+    }
+}
+
+#[test]
+fn cases_stored_as_equal_to_another_have_its_hash() {
+    let manifest = support::manifest();
+    for case in &manifest.crafted {
+        let Some(baseline_name) = &case.same_as else {
+            continue;
+        };
+        let baseline = manifest
+            .crafted
+            .iter()
+            .find(|other| &other.name == baseline_name)
+            .unwrap();
+        assert_eq!(
+            case.decoded_sha256, baseline.decoded_sha256,
+            "{}",
+            case.name
+        );
+    }
+}
+
+#[test]
+fn unmodelled_fields_the_dll_depends_on_must_match_its_template() {
+    const COMMON_OFFSET: usize = 3;
+    const FETCH_3_OFFSET: usize = 40;
+    const FETCH_5_OFFSET: usize = 50;
+    let template = TextureHeader::for_image(64, 64, Compression::Dxt)
+        .unwrap()
+        .to_bytes();
+    assert_eq!(
+        TextureHeader::from_bytes(template).format(),
+        TextureFormat::LinearDxt4
+    );
+    let tampered = [
+        (COMMON_OFFSET, 0b0010),
+        (FETCH_3_OFFSET, 0x80),
+        (FETCH_5_OFFSET, 0x04),
+    ];
+    for (offset, bits) in tampered {
+        let mut bytes = template;
+        bytes[offset] ^= bits;
+        assert_eq!(
+            TextureHeader::from_bytes(bytes).format(),
+            TextureFormat::Unsupported {
+                data_format: 0x14,
+                tiled: false
+            },
+            "byte {offset} xor {bits:#x}"
+        );
+    }
 }

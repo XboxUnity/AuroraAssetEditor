@@ -51,7 +51,6 @@ const SIGN_ALL_GAMMA: u32 = 0b1111_1111;
 const BLOCKS_PER_ROW_ALIGNMENT: usize = 32;
 const BLOCK_ROWS_ALIGNMENT: usize = 32;
 const BLOCK_SIDE_TEXELS: usize = 4;
-const BLOCKS_PER_PITCH_UNIT: usize = 8;
 const DXT1_BLOCK_BYTES: usize = 8;
 const BC3_BLOCK_BYTES: usize = 16;
 const BC3_COLOUR_HALF_OFFSET: usize = 8;
@@ -62,11 +61,47 @@ const ODD_SIZE: (u32, u32) = (130, 70);
 const ENDIANS: [u32; 4] = [0, 1, 2, 3];
 const RGBA: (&str, [u32; 4]) = ("rgba", [0, 1, 2, 3]);
 const BGRA: (&str, [u32; 4]) = ("bgra", [2, 1, 0, 3]);
-const ABGR: (&str, [u32; 4]) = ("abgr", [3, 2, 1, 0]);
 const DXT1: (&str, u32) = ("dxt1", GPU_FORMAT_DXT1);
 const DXT2_3: (&str, u32) = ("dxt2_3", GPU_FORMAT_DXT2_3);
 const DXT4_5: (&str, u32) = ("dxt4_5", GPU_FORMAT_DXT4_5);
 const PITCH_UNITS_WIDER_THAN_NEEDED: u32 = 12;
+const ARGB_PITCH_UNITS_WIDER_THAN_NEEDED: u32 = 4;
+const TINY_SIZE: (u32, u32) = (8, 8);
+const ARGB_ODD_SIZE: (u32, u32) = (40, 24);
+const GPU_FORMAT_8_8_8_8: u32 = 0x06;
+const ARGB_BYTES: usize = 4;
+const TEXELS_PER_PITCH_UNIT: usize = 32;
+const BLOCK_ROW_PITCH_ALIGNMENT_BYTES: usize = 256;
+const ARGB_ENDIAN: u32 = 2;
+const ARGB_SWIZZLE: (&str, [u32; 4]) = ("bgra", [2, 1, 0, 3]);
+
+/// Header bits the port does not read, flipped together to prove they do not change the DLL's
+/// decode: (label, [(dword, xor mask)]). The one group that does change it is `border`.
+const IGNORED_FIELD_PROBES: [(&str, &[(usize, u32)]); 8] = [
+    ("common_flags", &[(0, 0xFFFF_FFF0)]),
+    (
+        "gpu_runtime",
+        &[
+            (1, u32::MAX),
+            (2, u32::MAX),
+            (3, u32::MAX),
+            (4, u32::MAX),
+            (5, u32::MAX),
+            (6, u32::MAX),
+        ],
+    ),
+    ("fetch0_misc", &[(7, 0x003F_FC03)]),
+    ("fetch1_misc", &[(8, 0xFFFF_FF00)]),
+    ("fetch2_depth", &[(9, 0xFC00_0000)]),
+    ("fetch3_filters", &[(10, 0x7FFF_E000)]),
+    ("fetch4", &[(11, u32::MAX)]),
+    ("fetch5_misc", &[(12, 0xFFFF_F9FF)]),
+];
+/// FETCH_3 bit 31, which changes the DLL's decode, so the port requires it to be clear.
+const BORDER_PROBE: (&str, &[(usize, u32)]) = ("border", &[(10, 0x8000_0000)]);
+
+const SWIZZLE_SELECTORS: [u32; 4] = [0, 1, 2, 3];
+const SWIZZLE_CONSTANT_ZERO: u32 = 4;
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct Crafted {
@@ -75,6 +110,9 @@ pub struct Crafted {
     video: String,
     decoded_sha256: String,
     dll_accepted: bool,
+    /// The case whose decoded pixels this one equals, so no pixels are stored for it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    same_as: Option<String>,
 }
 
 impl Crafted {
@@ -87,7 +125,7 @@ impl Crafted {
     }
 
     pub fn decoded_file(&self) -> Option<String> {
-        self.dll_accepted
+        (self.dll_accepted && self.same_as.is_none())
             .then(|| format!("{CRAFTED_DIRECTORY}/{}.rgba", self.name))
     }
 }
@@ -99,8 +137,43 @@ enum VideoPattern {
     EqualColourEndpoints,
 }
 
+/// How a surface is divided into the units its rows are made of.
+#[derive(Clone, Copy, PartialEq)]
+enum Surface {
+    Bc1,
+    Bc3,
+    Argb,
+}
+
+impl Surface {
+    fn texels_per_side(self) -> usize {
+        match self {
+            Self::Bc1 | Self::Bc3 => BLOCK_SIDE_TEXELS,
+            Self::Argb => 1,
+        }
+    }
+
+    fn unit_bytes(self) -> usize {
+        match self {
+            Self::Bc1 => DXT1_BLOCK_BYTES,
+            Self::Bc3 => BC3_BLOCK_BYTES,
+            Self::Argb => ARGB_BYTES,
+        }
+    }
+
+    fn video_name_part(self) -> &'static str {
+        match self {
+            Self::Bc1 => "bc1",
+            Self::Bc3 => "bc3",
+            Self::Argb => "argb",
+        }
+    }
+}
+
+#[derive(Clone)]
 struct Case {
     name: String,
+    surface: Surface,
     data_format: u32,
     endian: u32,
     swizzle: [u32; 4],
@@ -108,6 +181,9 @@ struct Case {
     sign: u32,
     tiled: bool,
     pitch_units: Option<u32>,
+    flips: Vec<(usize, u32)>,
+    /// The case whose decode this one is compared with: equal output is stored as a reference.
+    baseline: Option<String>,
     width: u32,
     height: u32,
     pattern: VideoPattern,
@@ -120,8 +196,14 @@ impl Case {
         (swizzle_name, swizzle): (&str, [u32; 4]),
         (width, height): (u32, u32),
     ) -> Self {
+        let surface = if data_format == GPU_FORMAT_DXT1 {
+            Surface::Bc1
+        } else {
+            Surface::Bc3
+        };
         Self {
             name: format!("{format_name}_e{endian}_{swizzle_name}_{width}x{height}"),
+            surface,
             data_format,
             endian,
             swizzle,
@@ -129,10 +211,24 @@ impl Case {
             sign: SIGN_ALL_UNSIGNED,
             tiled: false,
             pitch_units: None,
+            flips: Vec::new(),
+            baseline: None,
             width,
             height,
             pattern: VideoPattern::Random,
         }
+    }
+
+    /// The DLL's own ARGB8888 header.
+    fn argb(size: (u32, u32)) -> Self {
+        let mut case = Self::new(
+            ("argb", GPU_FORMAT_8_8_8_8),
+            ARGB_ENDIAN,
+            ARGB_SWIZZLE,
+            size,
+        );
+        case.surface = Surface::Argb;
+        case
     }
 
     /// Inserts `label` before the size suffix of the name.
@@ -167,54 +263,65 @@ impl Case {
         self.labelled("equal_endpoints")
     }
 
-    fn block_bytes(&self) -> usize {
-        if self.data_format == GPU_FORMAT_DXT1 {
-            DXT1_BLOCK_BYTES
-        } else {
-            BC3_BLOCK_BYTES
-        }
+    fn with_swizzle(mut self, swizzle: [u32; 4]) -> Self {
+        let digits: String = swizzle.iter().map(u32::to_string).collect();
+        self.swizzle = swizzle;
+        self.name = self.name.replace("_rgba_", &format!("_swz{digits}_"));
+        self
+    }
+
+    /// Flips header bits and compares the decode with the unflipped case.
+    fn flipped(mut self, (label, flips): (&str, &[(usize, u32)])) -> Self {
+        self.baseline = Some(self.name.clone());
+        self.flips = flips.to_vec();
+        self.labelled(&format!("probe_{label}"))
     }
 
     fn row_pitch(&self) -> usize {
+        let unit_bytes = self.surface.unit_bytes();
         match self.pitch_units {
-            Some(units) => units as usize * BLOCKS_PER_PITCH_UNIT * self.block_bytes(),
+            Some(units) => {
+                let units_per_pitch_unit = TEXELS_PER_PITCH_UNIT / self.surface.texels_per_side();
+                units as usize * units_per_pitch_unit * unit_bytes
+            }
             None => {
-                let blocks_wide = (self.width as usize).div_ceil(BLOCK_SIDE_TEXELS);
-                align(blocks_wide, BLOCKS_PER_ROW_ALIGNMENT) * self.block_bytes()
+                let units_wide = (self.width as usize).div_ceil(self.surface.texels_per_side());
+                let row_bytes = align(units_wide, BLOCKS_PER_ROW_ALIGNMENT) * unit_bytes;
+                align(row_bytes, BLOCK_ROW_PITCH_ALIGNMENT_BYTES)
             }
         }
     }
 
     /// The zero-padded surface size the DLL needs for this header.
+    fn video_len(&self) -> usize {
+        let rows = (self.height as usize).div_ceil(self.surface.texels_per_side());
+        self.row_pitch() * align(rows, BLOCK_ROWS_ALIGNMENT)
+    }
+
     /// Cases with the same bytes share one video file.
     fn video_file_name(&self) -> String {
         let pattern = match self.pattern {
             VideoPattern::Random => "random",
             VideoPattern::EqualColourEndpoints => "equal_endpoints",
         };
-        let codec = match self.block_bytes() {
-            DXT1_BLOCK_BYTES => "bc1",
-            _ => "bc3",
-        };
         let pitch = match self.pitch_units {
             Some(units) => format!("_pitch{units}"),
             None => String::new(),
         };
         format!(
-            "{pattern}_{codec}_{}x{}{pitch}.vid",
-            self.width, self.height
+            "{pattern}_{}_{}x{}{pitch}.vid",
+            self.surface.video_name_part(),
+            self.width,
+            self.height
         )
     }
 
-    fn video_len(&self) -> usize {
-        let blocks_high = (self.height as usize).div_ceil(BLOCK_SIDE_TEXELS);
-        self.row_pitch() * align(blocks_high, BLOCK_ROWS_ALIGNMENT)
-    }
-
-    /// Cases of one block size and width share their random bytes, so two cases whose headers
+    /// Cases of one unit size and width share their random bytes, so two cases whose headers
     /// differ in a probed field decode identically exactly when that field does not matter.
     fn video_seed(&self) -> u64 {
-        PRNG_SEED_BASE + self.block_bytes() as u64 * VIDEO_SEED_BLOCK_STRIDE + u64::from(self.width)
+        PRNG_SEED_BASE
+            + self.surface.unit_bytes() as u64 * VIDEO_SEED_BLOCK_STRIDE
+            + u64::from(self.width)
     }
 
     fn video(&self) -> Vec<u8> {
@@ -228,16 +335,33 @@ impl Case {
     }
 
     fn equalise_colour_endpoints(&self, video: &mut [u8]) {
-        let colour_offset = match self.block_bytes() {
-            BC3_BLOCK_BYTES => BC3_COLOUR_HALF_OFFSET,
+        let colour_offset = match self.surface {
+            Surface::Bc3 => BC3_COLOUR_HALF_OFFSET,
             _ => 0,
         };
-        for block in video.chunks_exact_mut(self.block_bytes()) {
+        for block in video.chunks_exact_mut(self.surface.unit_bytes()) {
             let first = colour_offset..colour_offset + COLOUR_ENDPOINT_BYTES;
             let second_start = first.end;
             block.copy_within(first, second_start);
         }
     }
+}
+
+fn swizzle_permutations() -> Vec<[u32; 4]> {
+    let mut permutations = Vec::new();
+    for first in SWIZZLE_SELECTORS {
+        for second in SWIZZLE_SELECTORS {
+            for third in SWIZZLE_SELECTORS {
+                for fourth in SWIZZLE_SELECTORS {
+                    let candidate = [first, second, third, fourth];
+                    if SWIZZLE_SELECTORS.iter().all(|s| candidate.contains(s)) {
+                        permutations.push(candidate);
+                    }
+                }
+            }
+        }
+    }
+    permutations
 }
 
 fn cases() -> Vec<Case> {
@@ -259,11 +383,40 @@ fn cases() -> Vec<Case> {
         cases.push(aurora_like().with_sign(SIGN_ALL_GAMMA, "gamma"));
     }
     for format in [DXT1, DXT4_5] {
-        cases.push(Case::new(format, 1, ABGR, SMALL_SIZE));
         cases.push(
             Case::new(format, 1, RGBA, ODD_SIZE).with_pitch_units(PITCH_UNITS_WIDER_THAN_NEEDED),
         );
         cases.push(Case::new(format, 1, RGBA, SMALL_SIZE).with_equal_colour_endpoints());
+    }
+    cases.push(Case::argb(ARGB_ODD_SIZE));
+    cases.push(Case::argb(ARGB_ODD_SIZE).with_pitch_units(ARGB_PITCH_UNITS_WIDER_THAN_NEEDED));
+
+    for format in [DXT1, DXT4_5] {
+        cases.push(Case::new(format, 1, RGBA, TINY_SIZE));
+        for permutation in swizzle_permutations() {
+            if permutation != RGBA.1 {
+                cases.push(Case::new(format, 1, RGBA, TINY_SIZE).with_swizzle(permutation));
+            }
+        }
+        for selectors in [[0, 0, 0, 3], [3, 3, 3, 3]] {
+            cases.push(Case::new(format, 1, RGBA, TINY_SIZE).with_swizzle(selectors));
+        }
+        let constant_alpha = [0, 1, 2, SWIZZLE_CONSTANT_ZERO];
+        cases.push(Case::new(format, 1, RGBA, TINY_SIZE).with_swizzle(constant_alpha));
+    }
+
+    let baselines = [
+        Case::new(DXT4_5, 1, RGBA, TINY_SIZE),
+        Case::new(DXT1, 1, RGBA, TINY_SIZE),
+        Case::argb(TINY_SIZE),
+    ];
+    for baseline in baselines {
+        if baseline.surface == Surface::Argb {
+            cases.push(baseline.clone());
+        }
+        for probe in IGNORED_FIELD_PROBES.into_iter().chain([BORDER_PROBE]) {
+            cases.push(baseline.clone().flipped(probe));
+        }
     }
     cases
 }
@@ -285,11 +438,12 @@ fn patch_dword(header: &mut [u8; HEADER_BYTE_LENGTH], index: usize, patch: impl 
     header[range].copy_from_slice(&patch(word).to_be_bytes());
 }
 
-/// The header the DLL writes for a DXT texture of this size, used as the base to patch.
-fn dll_dxt_header(
+/// The header the DLL writes for a texture of this size and compression, used as the base to patch.
+fn dll_header(
     paths: &Paths,
     work_dir: &Path,
     (width, height): (u32, u32),
+    compression: &str,
 ) -> Result<[u8; HEADER_BYTE_LENGTH]> {
     let pixels = work_dir.join("base.argb");
     let header_path = work_dir.join("base.header");
@@ -311,7 +465,7 @@ fn dll_dxt_header(
             os("--height"),
             height.to_string().into(),
             os("--compression"),
-            os("dxt"),
+            os(compression),
             os("--header-out"),
             header_path.clone().into(),
             os("--video-out"),
@@ -348,74 +502,103 @@ fn crafted_header(base: [u8; HEADER_BYTE_LENGTH], case: &Case) -> [u8; HEADER_BY
                 set_bits(word, shift, SWIZZLE_BITS, *channel)
             })
     });
+    for (dword, mask) in &case.flips {
+        patch_dword(&mut header, *dword, |word| word ^ mask);
+    }
     header
+}
+
+/// The DLL's RGBA decode of the case, or `None` when it refuses the header.
+fn dll_decode(
+    paths: &Paths,
+    work_dir: &Path,
+    case: &Case,
+    header: &[u8; HEADER_BYTE_LENGTH],
+    video: &[u8],
+) -> Result<Option<Vec<u8>>> {
+    let header_path = work_dir.join("crafted.header");
+    let video_path = work_dir.join("crafted.video");
+    let decoded_path = work_dir.join("crafted.bgra");
+    std::fs::write(&header_path, header)?;
+    std::fs::write(&video_path, video)?;
+    if decoded_path.exists() {
+        std::fs::remove_file(&decoded_path)?;
+    }
+    let report = run_harness_allowing_refusal(
+        paths,
+        &[
+            os("decode"),
+            os("--dll"),
+            paths.dll().into(),
+            os("--header"),
+            header_path.into(),
+            os("--video"),
+            video_path.into(),
+            os("--out"),
+            decoded_path.clone().into(),
+        ],
+    )
+    .with_context(|| format!("crafted case {}", case.name))?;
+    let Some(report) = report else {
+        return Ok(None);
+    };
+    let bgra = std::fs::read(&decoded_path)?;
+    let reported_pixels = report
+        .split_whitespace()
+        .map(str::parse::<usize>)
+        .product::<Result<usize, _>>()
+        .with_context(|| {
+            format!(
+                "{}: unreadable decode report {:?}",
+                case.name,
+                report.trim()
+            )
+        })?;
+    ensure!(
+        bgra.len() == reported_pixels * BYTES_PER_PIXEL,
+        "{}: decode report {:?} does not match {} output bytes",
+        case.name,
+        report.trim(),
+        bgra.len()
+    );
+    Ok(Some(bgra_to_rgba(&bgra)))
 }
 
 /// Decodes every crafted case with the DLL and writes the videos and decoded pixels.
 pub fn write_crafted(paths: &Paths, work_dir: &Path, out_dir: &Path) -> Result<Vec<Crafted>> {
     let crafted_dir = out_dir.join(CRAFTED_DIRECTORY);
     std::fs::create_dir_all(&crafted_dir)?;
-    let small_base = dll_dxt_header(paths, work_dir, SMALL_SIZE)?;
-    let odd_base = dll_dxt_header(paths, work_dir, ODD_SIZE)?;
 
-    let mut crafted = Vec::new();
+    let mut crafted: Vec<Crafted> = Vec::new();
     for case in &cases() {
-        let base = if (case.width, case.height) == SMALL_SIZE {
-            small_base
-        } else {
-            odd_base
+        let compression = match case.surface {
+            Surface::Argb => "none",
+            Surface::Bc1 | Surface::Bc3 => "dxt",
         };
+        let base = dll_header(paths, work_dir, (case.width, case.height), compression)?;
         let header = crafted_header(base, case);
         let video = case.video();
         let video_file = format!("{CRAFTED_DIRECTORY}/{}", case.video_file_name());
         std::fs::write(out_dir.join(&video_file), &video)?;
 
-        let header_path = work_dir.join("crafted.header");
-        let video_path = work_dir.join("crafted.video");
-        let decoded_path = work_dir.join("crafted.bgra");
-        std::fs::write(&header_path, header)?;
-        std::fs::write(&video_path, &video)?;
-        if decoded_path.exists() {
-            std::fs::remove_file(&decoded_path)?;
+        let decoded = dll_decode(paths, work_dir, case, &header, &video)?;
+        let decoded_sha256 = decoded.as_deref().map(sha256_hex).unwrap_or_default();
+        let same_as = case
+            .baseline
+            .as_ref()
+            .and_then(|name| crafted.iter().find(|other| other.name == *name))
+            .filter(|baseline| baseline.dll_accepted && baseline.decoded_sha256 == decoded_sha256)
+            .map(|baseline| baseline.name.clone());
+        if let (Some(rgba), None) = (&decoded, &same_as) {
+            std::fs::write(crafted_dir.join(format!("{}.rgba", case.name)), rgba)?;
         }
-        let report = run_harness_allowing_refusal(
-            paths,
-            &[
-                os("decode"),
-                os("--dll"),
-                paths.dll().into(),
-                os("--header"),
-                header_path.into(),
-                os("--video"),
-                video_path.into(),
-                os("--out"),
-                decoded_path.clone().into(),
-            ],
-        )
-        .with_context(|| format!("crafted case {}", case.name))?;
-
-        let decoded_sha256 = match report {
-            Some(report) => {
-                ensure!(
-                    report.trim() == format!("{} {}", case.width, case.height),
-                    "{}: decoded size {:?} differs from {}x{}",
-                    case.name,
-                    report.trim(),
-                    case.width,
-                    case.height
-                );
-                let rgba = bgra_to_rgba(&std::fs::read(&decoded_path)?);
-                std::fs::write(crafted_dir.join(format!("{}.rgba", case.name)), &rgba)?;
-                sha256_hex(&rgba)
-            }
-            None => String::new(),
-        };
         crafted.push(Crafted {
             name: case.name.clone(),
             header: hex::encode(header),
             video: video_file,
-            dll_accepted: !decoded_sha256.is_empty(),
+            dll_accepted: decoded.is_some(),
             decoded_sha256,
+            same_as,
         });
     }
     Ok(crafted)
