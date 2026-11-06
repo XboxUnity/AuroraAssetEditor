@@ -130,26 +130,3 @@ pub fn decode(texture: &EncodedTexture) -> Result<RgbaImage, DecodeError> {
         _ => Err(DecodeError::UnsupportedFormat(format)),
     }
 }
-
-/// Pre-rounding RGBA channel values of a block-compressed decode, row-major. Exposed only so the
-/// golden tests can prove the DLL differences are exact .5 rounding ties.
-#[doc(hidden)]
-pub fn unrounded_values(texture: &EncodedTexture) -> Result<Vec<[f64; 4]>, DecodeError> {
-    let (format, layout) = checked_layout(texture)?;
-    let header = &texture.header;
-    let codec = format
-        .block_codec()
-        .ok_or(DecodeError::UnsupportedFormat(format))?;
-    let channels = header
-        .channel_order()
-        .ok_or(DecodeError::UnsupportedFormat(format))?;
-    Ok(block_decode::surface_values(
-        &texture.data,
-        header.width(),
-        header.height(),
-        &layout,
-        codec,
-        header.gpu_endian(),
-        channels,
-    ))
-}

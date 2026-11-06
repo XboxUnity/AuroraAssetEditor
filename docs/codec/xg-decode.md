@@ -61,3 +61,45 @@ wider pitch decodes differently from the plain one), so the port does the same f
 A pitch wider than the image needs decodes normally; a pitch too small for one row is refused by the
 port (`DecodeError::RowPitchTooSmall`). The DLL accepts it but its output depends on memory outside the
 surface, and it crashed the harness with heap corruption, so no golden case exists for it.
+
+## Decode arithmetic
+
+Found by disassembling `tools/golden/dll/AuroraAsset.dll` (rizin, image base `0x10000000`) and
+confirmed by decoding every fixture and every accepted crafted case exactly. `ConvertAssetToImage`
+does not decode through the codec objects the encoder uses (`0x10010f98`): a probe that hooked their
+BC3 decoder (`0x1001454c`) and their BC1 colour decoder (`0x1001415e`) saw no calls. It takes a
+separate SSE path instead, and every step there is `f32`, so the x87 control word plays no part.
+
+| Address | What it does |
+|---|---|
+| `0x1000249c` | DXT4 block: decode as DXT5 (`0x100021ab`), then divide colour by alpha (`0x100021cd`). |
+| `0x100021ab` | DXT5 block: colour half (`0x10001cb5`), alpha half (`0x10002018`). |
+| `0x10001cb5` | Colour half; DXT1 blocks reach it too, through `0x10002479`. |
+| `0x10001c0d` | RGB565 to `f32`: the fields times `{1/31, 1/63, 1/31}` (`0x1001a100`, `f32` constants). |
+| `0x10002018` | Alpha half: endpoints times `1/255` (`0x1001a230`), then the palette from weight tables. |
+| `0x10003d9e` | The row loop: calls the block decoder, rearranges each texel's channels, calls the writer. |
+| `0x10002768` | Writer: clamp to bounds the caller passes, scale, round with `cvtps2dq`, pack. |
+
+Each step, in `f32`:
+
+1. **Colour endpoints:** `field * (1/31)` (or `1/63` for green), the reciprocal rounded to `f32`.
+2. **Colour palette:** `first + (second - first) * weight`, with weights `1/3`, `2/3` (four colours) or
+   `0.5` (three colours, the fourth entry all zero).
+3. **Alpha endpoints:** `byte * (1/255)`.
+4. **Alpha palette:** `first * w_first + second * w_second`, with the weights `f32` constants `(n-i)/n`
+   and `i/n` (`n` is 7 when the first endpoint is greater, otherwise 5; the 5-step form ends in 0 and 1).
+5. **DXT4 divide:** `min((1/alpha) * colour, 1)`, zero where alpha is zero; alpha itself is kept.
+6. **To a byte:** `value * 255`, rounded to nearest with ties to even (the default MXCSR mode).
+
+Each of these differs from exact arithmetic by an ulp at most, but that decides every value that is
+exactly halfway between two bytes. The earlier port computed in `f64` and rounded exact .5 ties to
+even, which gave 13 off-by-one pixels on three fixtures (alphagrad 5, alphanoise 7, odd_130x70 1) and
+295 on 20 crafted cases. With the `f32` steps above there are none.
+
+Theories ruled out on the way:
+
+- The A8R8G8B8 writer of the codec objects (`0x10009f4b`), which truncates (`fldcw` with `or 0xc00`)
+  and adds a bias of a half: modelling it left 23 mismatching pixels on two fixtures and two
+  crafted cases. That writer is not on the decode path.
+- x87 truncation in the endpoint expansion: it fixed some of those and broke DXT1 cases that had
+  matched.

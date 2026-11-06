@@ -2,7 +2,7 @@ mod support;
 
 use aurora_asset::{
     Compression, DecodeError, EncodedTexture, TEXTURE_HEADER_LEN, TextureFormat, TextureHeader,
-    decode, unrounded_values,
+    decode,
 };
 
 /// Crafted cases the DLL decodes but the port refuses, matched by a name fragment.
@@ -18,34 +18,6 @@ const EXPECTED_REFUSALS: [&str; 5] = [
 /// How many crafted cases the DLL accepts and the port refuses: a case that stops being refused
 /// must be noticed.
 const EXPECTED_REFUSAL_COUNT: usize = 23;
-
-/// Crafted cases whose only mismatches against the DLL are off by one on exact .5 ties
-/// (the DLL's float precision, closed in Task 9), with the exact count of mismatching pixels.
-const HALF_TIE_CASES: [(&str, usize); 20] = [
-    ("dxt1_e0_rgba_32x32", 7),
-    ("dxt1_e0_bgra_32x32", 7),
-    ("dxt1_e1_rgba_32x32", 7),
-    ("dxt1_e1_bgra_32x32", 7),
-    ("dxt1_e2_rgba_32x32", 6),
-    ("dxt1_e2_bgra_32x32", 6),
-    ("dxt1_e3_rgba_32x32", 2),
-    ("dxt1_e3_bgra_32x32", 2),
-    ("dxt4_5_e0_rgba_32x32", 6),
-    ("dxt4_5_e0_bgra_32x32", 6),
-    ("dxt4_5_e2_rgba_32x32", 3),
-    ("dxt4_5_e2_bgra_32x32", 3),
-    ("dxt1_e1_rgba_130x70", 52),
-    ("dxt1_e1_bgra_130x70", 52),
-    ("dxt4_5_e1_rgba_130x70", 7),
-    ("dxt4_5_e1_bgra_130x70", 67),
-    ("dxt1_e1_rgba_n1_32x32", 7),
-    ("dxt1_e1_rgba_signed_32x32", 7),
-    ("dxt1_e1_rgba_pitch12_130x70", 39),
-    ("dxt4_5_e1_rgba_pitch12_130x70", 2),
-];
-
-/// A mathematically exact .5 comes out of the f64 arithmetic with noise around 1e-14.
-const TIE_TOLERANCE: f64 = 1e-9;
 
 fn crafted_texture(case: &support::Crafted) -> EncodedTexture {
     EncodedTexture {
@@ -72,49 +44,8 @@ fn is_expected_refusal(name: &str) -> bool {
         .any(|fragment| name.contains(fragment))
 }
 
-/// The pixels where `ours` differs from the DLL's decode, after proving each difference is an
-/// off-by-one on an exact .5 tie. Panics on any other difference.
-fn count_tie_mismatches(case: &support::Crafted, ours: &[u8], unrounded: &[[f64; 4]]) -> usize {
-    let dll = support::crafted_decoded_rgba(case);
-    assert_eq!(dll.len(), ours.len(), "{} decoded size", case.name);
-    let mut mismatching_pixels = 0;
-    for (pixel, ((ours, dll), values)) in ours
-        .as_chunks::<4>()
-        .0
-        .iter()
-        .zip(dll.as_chunks::<4>().0.iter())
-        .zip(unrounded)
-        .enumerate()
-    {
-        if ours == dll {
-            continue;
-        }
-        mismatching_pixels += 1;
-        for channel in 0..4 {
-            if ours[channel] == dll[channel] {
-                continue;
-            }
-            assert_eq!(
-                ours[channel].abs_diff(dll[channel]),
-                1,
-                "{} pixel {pixel} channel {channel}",
-                case.name
-            );
-            let fraction = values[channel] - values[channel].floor();
-            assert!(
-                (fraction - 0.5).abs() < TIE_TOLERANCE,
-                "{} pixel {pixel} channel {channel} is not a .5 tie ({})",
-                case.name,
-                values[channel]
-            );
-        }
-    }
-    mismatching_pixels
-}
-
 #[test]
 fn crafted_cases_match_dll() {
-    let mut tie_cases = Vec::new();
     let mut refused = 0;
     for case in support::manifest().crafted {
         let texture = crafted_texture(&case);
@@ -138,30 +69,16 @@ fn crafted_cases_match_dll() {
             (Err(error), false) => panic!("{} was refused: {error}", case.name),
             (Ok(_), true) => panic!("{} should be refused", case.name),
             (Ok(decoded), false) => {
-                if texture.header.format() == TextureFormat::LinearArgb8888 {
-                    assert_eq!(
-                        decoded.as_raw(),
-                        &support::crafted_decoded_rgba(&case),
-                        "{}",
-                        case.name
-                    );
-                    continue;
-                }
-                let unrounded = unrounded_values(&texture).unwrap();
-                let mismatches = count_tie_mismatches(&case, decoded.as_raw(), &unrounded);
-                if mismatches > 0 {
-                    tie_cases.push((case.name.clone(), mismatches));
-                }
+                assert_eq!(
+                    support::rgba_sha256(decoded.as_raw()),
+                    case.decoded_sha256,
+                    "{}",
+                    case.name
+                );
             }
         }
     }
-    println!("refused by the port: {refused}; tie cases: {tie_cases:?}");
     assert_eq!(refused, EXPECTED_REFUSAL_COUNT);
-    let expected: Vec<(String, usize)> = HALF_TIE_CASES
-        .iter()
-        .map(|(name, count)| (name.to_string(), *count))
-        .collect();
-    assert_eq!(tie_cases, expected);
 }
 
 #[test]

@@ -1,8 +1,6 @@
 mod support;
 
-use aurora_asset::{
-    Compression, DecodeError, EncodedTexture, TextureHeader, decode, unrounded_values,
-};
+use aurora_asset::{Compression, DecodeError, EncodedTexture, TextureHeader, decode};
 
 fn zeroed_dxt_texture(width: u32, height: u32, data_len: usize) -> EncodedTexture {
     EncodedTexture {
@@ -34,81 +32,6 @@ fn assert_decodes_like_dll(fixture: &support::Fixture) {
     );
 }
 
-/// Fixtures whose only mismatches against the DLL are off by one on exact .5 ties
-/// (the DLL's float precision, closed in Task 9), with the exact count of mismatching pixels.
-const HALF_TIE_FIXTURES: [(&str, usize); 3] =
-    [("alphagrad", 5), ("alphanoise", 7), ("odd_130x70", 1)];
-
-/// A mathematically exact .5 comes out of the f64 arithmetic with noise around 1e-14.
-const TIE_TOLERANCE: f64 = 1e-9;
-
-fn is_half_tie_fixture(name: &str) -> bool {
-    HALF_TIE_FIXTURES
-        .iter()
-        .any(|(tie_name, _)| *tie_name == name)
-}
-
-#[test]
-fn dxt_decode_matches_dll_on_real_and_structured_images() {
-    for fixture in support::manifest().fixture {
-        if is_half_tie_fixture(&fixture.name) {
-            continue;
-        }
-        assert_decodes_like_dll(&fixture);
-    }
-}
-
-#[test]
-fn half_tie_fixtures_differ_from_dll_only_on_exact_ties() {
-    let manifest = support::manifest();
-    for (name, expected_mismatches) in HALF_TIE_FIXTURES {
-        let fixture = manifest
-            .fixture
-            .iter()
-            .find(|fixture| fixture.name == name)
-            .unwrap();
-        assert!(fixture.dxt_decoded_stored, "{name} DLL decode is stored");
-        let texture = dxt_texture(fixture);
-        let ours = decode(&texture).unwrap();
-        let unrounded = unrounded_values(&texture).unwrap();
-        let dll = support::dxt_decoded_rgba(name);
-        assert_eq!(dll.len(), ours.as_raw().len(), "{name} decoded size");
-
-        let mut mismatching_pixels = 0;
-        for (pixel, ((ours, dll), values)) in ours
-            .as_raw()
-            .as_chunks::<4>()
-            .0
-            .iter()
-            .zip(dll.as_chunks::<4>().0.iter())
-            .zip(&unrounded)
-            .enumerate()
-        {
-            if ours == dll {
-                continue;
-            }
-            mismatching_pixels += 1;
-            for channel in 0..4 {
-                if ours[channel] == dll[channel] {
-                    continue;
-                }
-                assert_eq!(
-                    ours[channel].abs_diff(dll[channel]),
-                    1,
-                    "{name} pixel {pixel} channel {channel}"
-                );
-                let fraction = values[channel] - values[channel].floor();
-                assert!(
-                    (fraction - 0.5).abs() < TIE_TOLERANCE,
-                    "{name} pixel {pixel} channel {channel} is not a .5 tie ({})",
-                    values[channel]
-                );
-            }
-        }
-        assert_eq!(mismatching_pixels, expected_mismatches, "{name}");
-    }
-}
-
 #[test]
 fn stored_dll_decodes_match_their_manifest_hashes() {
     for fixture in support::manifest().fixture {
@@ -124,7 +47,6 @@ fn stored_dll_decodes_match_their_manifest_hashes() {
 }
 
 #[test]
-#[ignore = "closed in Task 9"]
 fn dxt_decode_matches_dll_on_all_fixtures() {
     for fixture in support::manifest().fixture {
         assert_decodes_like_dll(&fixture);

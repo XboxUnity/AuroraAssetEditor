@@ -20,14 +20,16 @@ const GREEN_SHIFT: u32 = 5;
 const RED_BLUE_MASK_5_BITS: u64 = 0b1_1111;
 const GREEN_MASK_6_BITS: u64 = 0b11_1111;
 
-const RED_BITS_MAX: f64 = 31.0;
-const GREEN_BITS_MAX: f64 = 63.0;
-const BLUE_BITS_MAX: f64 = 31.0;
-const CHANNEL_MAX: f64 = 255.0;
+const RED_BITS_MAX: f32 = 31.0;
+const GREEN_BITS_MAX: f32 = 63.0;
+const BLUE_BITS_MAX: f32 = 31.0;
+const CHANNEL_MAX: f32 = 255.0;
+const OPAQUE: f32 = 1.0;
 
 type Texel = [u8; 4];
-type FloatColour = [f64; 3];
-type FloatTexel = [f64; 4];
+type FloatColour = [f32; 3];
+/// Channels as the DLL holds them between decoding a block and writing pixels: `f32`, 0 to 1.
+type FloatTexel = [f32; 4];
 
 const TRANSPARENT_BLACK: FloatTexel = [0.0, 0.0, 0.0, 0.0];
 
@@ -67,7 +69,7 @@ fn block_array<const BYTES: usize>(block: &[u8]) -> [u8; BYTES] {
 /// Decodes a BC1 colour block (little-endian words) to RGBA texels, row-major within the block.
 #[cfg(test)]
 pub(crate) fn decode_bc1_block(block: &[u8; 8]) -> [Texel; TEXELS_PER_BLOCK] {
-    decode_bc1_block_values(block).map(round_texel)
+    decode_bc1_block_values(block).map(texel_to_bytes)
 }
 
 fn decode_bc1_block_values(block: &[u8; 8]) -> [FloatTexel; TEXELS_PER_BLOCK] {
@@ -77,32 +79,43 @@ fn decode_bc1_block_values(block: &[u8; 8]) -> [FloatTexel; TEXELS_PER_BLOCK] {
 }
 
 fn opaque([red, green, blue]: FloatColour) -> FloatTexel {
-    [red, green, blue, CHANNEL_MAX]
+    [red, green, blue, OPAQUE]
 }
 
-/// The palette of a BC1 block and of the colour half of a BC3 block: four colours when the first endpoint is greater than the second, otherwise
-/// the two endpoints, their midpoint and transparent black.
+/// The palette of a BC1 block and of the colour half of a BC3 block: four colours when the first
+/// endpoint is greater than the second, otherwise the two endpoints, their midpoint and
+/// transparent black.
 fn dxt1_palette(block: &[u8; 8]) -> [FloatTexel; 4] {
     let first_packed = u16::from_le_bytes([block[0], block[1]]);
     let second_packed = u16::from_le_bytes([block[2], block[3]]);
-    if first_packed > second_packed {
-        return four_colour_palette(block).map(opaque);
-    }
     let first = expand_565(first_packed);
     let second = expand_565(second_packed);
-    let midpoint = std::array::from_fn(|channel| (first[channel] + second[channel]) / 2.0);
-    [
-        opaque(first),
-        opaque(second),
-        opaque(midpoint),
-        TRANSPARENT_BLACK,
-    ]
+    if first_packed > second_packed {
+        [
+            opaque(first),
+            opaque(second),
+            opaque(step_between(first, second, 1.0 / 3.0)),
+            opaque(step_between(first, second, 2.0 / 3.0)),
+        ]
+    } else {
+        [
+            opaque(first),
+            opaque(second),
+            opaque(step_between(first, second, 0.5)),
+            TRANSPARENT_BLACK,
+        ]
+    }
+}
+
+// Derived from AuroraAsset.dll for interoperability: SSE `f32` `first + (second - first) * weight`.
+fn step_between(first: FloatColour, second: FloatColour, weight: f32) -> FloatColour {
+    std::array::from_fn(|channel| first[channel] + (second[channel] - first[channel]) * weight)
 }
 
 /// Decodes a BC3 block to RGBA texels, row-major within the block.
 #[cfg(test)]
 pub(crate) fn decode_bc3_block(block: &[u8; 16], divide_alpha: bool) -> [Texel; TEXELS_PER_BLOCK] {
-    decode_bc3_block_values(block, divide_alpha).map(round_texel)
+    decode_bc3_block_values(block, divide_alpha).map(texel_to_bytes)
 }
 
 fn decode_bc3_block_values(block: &[u8; 16], divide_alpha: bool) -> [FloatTexel; TEXELS_PER_BLOCK] {
@@ -112,70 +125,48 @@ fn decode_bc3_block_values(block: &[u8; 16], divide_alpha: bool) -> [FloatTexel;
     let alphas = alpha_ramp(block[ALPHA_ENDPOINTS][0], block[ALPHA_ENDPOINTS][1]);
     let alpha_indices = alpha_indices(block);
     std::array::from_fn(|texel| {
-        texel_values(
-            colours[colour_indices[texel]],
-            alphas[alpha_indices[texel]],
-            divide_alpha,
-        )
+        let colour = colours[colour_indices[texel]];
+        let alpha = alphas[alpha_indices[texel]];
+        let [red, green, blue] = if divide_alpha {
+            colour.map(|channel| divide_by_alpha(channel, alpha))
+        } else {
+            colour
+        };
+        [red, green, blue, alpha]
     })
 }
 
-/// Per-texel arithmetic before rounding, in `f64`: the alpha divide and clamp. This is the single
-/// place to change when matching the DLL's float precision exactly.
-fn texel_values(colour: FloatColour, alpha: f64, divide_alpha: bool) -> FloatTexel {
-    let [red, green, blue] = colour.map(|channel| {
-        if !divide_alpha {
-            channel
-        } else if alpha > 0.0 {
-            (channel * CHANNEL_MAX / alpha).min(CHANNEL_MAX)
-        } else {
-            0.0
-        }
-    });
-    [red, green, blue, alpha]
+/// Colour divided by alpha, at most 1; transparent texels become black.
+// Derived from AuroraAsset.dll for interoperability: SSE `f32` `min((1 / alpha) * colour, 1)`.
+fn divide_by_alpha(channel: f32, alpha: f32) -> f32 {
+    if alpha == 0.0 {
+        return 0.0;
+    }
+    ((1.0 / alpha) * channel).min(OPAQUE)
 }
 
-fn round_texel(values: FloatTexel) -> Texel {
-    values.map(round_to_channel)
+fn texel_to_bytes(values: FloatTexel) -> Texel {
+    values.map(channel_to_byte)
 }
 
-fn round_to_channel(value: f64) -> u8 {
-    value.round_ties_even().clamp(0.0, CHANNEL_MAX) as u8
+/// A channel from 0 to 1 as an 8-bit value, rounded to nearest with ties to even.
+// Derived from AuroraAsset.dll for interoperability: SSE `f32` `value * 255`, then `cvtps2dq`.
+fn channel_to_byte(value: f32) -> u8 {
+    (value * CHANNEL_MAX).round_ties_even() as u8
 }
 
-fn four_colour_palette(colour_block: &[u8; 8]) -> [FloatColour; 4] {
-    let first = expand_565(u16::from_le_bytes([colour_block[0], colour_block[1]]));
-    let second = expand_565(u16::from_le_bytes([colour_block[2], colour_block[3]]));
-    [
-        first,
-        second,
-        blend(first, second, 2.0, 1.0),
-        blend(first, second, 1.0, 2.0),
-    ]
-}
-
+/// The three channels of an RGB565 colour, from 0 to 1.
+// Derived from AuroraAsset.dll for interoperability: each field times the `f32` reciprocal of its maximum.
 fn expand_565(packed: u16) -> FloatColour {
     let packed = u64::from(packed);
-    let red = bit_field(packed, RED_SHIFT, RED_BLUE_MASK_5_BITS) as f64;
-    let green = bit_field(packed, GREEN_SHIFT, GREEN_MASK_6_BITS) as f64;
-    let blue = bit_field(packed, 0, RED_BLUE_MASK_5_BITS) as f64;
+    let red = bit_field(packed, RED_SHIFT, RED_BLUE_MASK_5_BITS) as f32;
+    let green = bit_field(packed, GREEN_SHIFT, GREEN_MASK_6_BITS) as f32;
+    let blue = bit_field(packed, 0, RED_BLUE_MASK_5_BITS) as f32;
     [
-        red * CHANNEL_MAX / RED_BITS_MAX,
-        green * CHANNEL_MAX / GREEN_BITS_MAX,
-        blue * CHANNEL_MAX / BLUE_BITS_MAX,
+        red * (1.0 / RED_BITS_MAX),
+        green * (1.0 / GREEN_BITS_MAX),
+        blue * (1.0 / BLUE_BITS_MAX),
     ]
-}
-
-/// `(weight_first * first + weight_second * second) / 3` per channel.
-fn blend(
-    first: FloatColour,
-    second: FloatColour,
-    weight_first: f64,
-    weight_second: f64,
-) -> FloatColour {
-    std::array::from_fn(|channel| {
-        (weight_first * first[channel] + weight_second * second[channel]) / 3.0
-    })
 }
 
 /// The bits of `value` selected by `mask` after shifting right by `shift`.
@@ -206,24 +197,34 @@ fn alpha_indices(block: &[u8; 16]) -> [usize; TEXELS_PER_BLOCK] {
     std::array::from_fn(|texel| index_at(bits, ALPHA_INDEX_BITS, texel))
 }
 
-/// Eight alpha values: the endpoints plus either six or four interpolated steps
+/// Eight alpha values from 0 to 1: the endpoints plus either six or four interpolated steps
 /// (the four-step form adds fully transparent and fully opaque).
-fn alpha_ramp(first: u8, second: u8) -> [f64; 8] {
-    let (first, second) = (f64::from(first), f64::from(second));
-    let steps = |count: u32| -> [f64; 6] {
-        let total = f64::from(count) + 1.0;
-        std::array::from_fn(|step| {
-            let step = step as f64 + 1.0;
-            ((total - step) * first + step * second) / total
-        })
-    };
+fn alpha_ramp(first: u8, second: u8) -> [f32; 8] {
+    let (first, second) = (unit_from_byte(first), unit_from_byte(second));
     if first > second {
-        let [a, b, c, d, e, f] = steps(6);
+        let [a, b, c, d, e, f] = alpha_steps(first, second, 7);
         [first, second, a, b, c, d, e, f]
     } else {
-        let [a, b, c, d, _, _] = steps(4);
-        [first, second, a, b, c, d, 0.0, CHANNEL_MAX]
+        let [a, b, c, d, _, _] = alpha_steps(first, second, 5);
+        [first, second, a, b, c, d, 0.0, OPAQUE]
     }
+}
+
+/// The first six steps from `first` towards `second` in `intervals` equal parts.
+// Derived from AuroraAsset.dll for interoperability: SSE `f32` `first * ((n - i) / n) + second * (i / n)`.
+fn alpha_steps(first: f32, second: f32, intervals: u8) -> [f32; 6] {
+    let intervals = f32::from(intervals);
+    std::array::from_fn(|step| {
+        let step = step as f32 + 1.0;
+        let weight_second = step / intervals;
+        let weight_first = (intervals - step) / intervals;
+        first * weight_first + second * weight_second
+    })
+}
+
+// Derived from AuroraAsset.dll for interoperability: `n * (1 / 255)` in `f32`, not `n / 255`.
+fn unit_from_byte(value: u8) -> f32 {
+    f32::from(value) * (1.0 / CHANNEL_MAX)
 }
 
 /// Decodes the visible `width` x `height` pixels of a block-compressed surface laid out per
@@ -237,48 +238,31 @@ pub(super) fn decode_surface(
     endian: GpuEndian,
     channels: ChannelOrder,
 ) -> RgbaImage {
-    let values = surface_values(surface, width, height, layout, codec, endian, channels);
-    RgbaImage::from_fn(width, height, |x, y| {
-        Rgba(round_texel(
-            values[y as usize * width as usize + x as usize],
-        ))
-    })
-}
-
-/// Channel values before rounding for every visible pixel, row-major.
-pub(super) fn surface_values(
-    surface: &[u8],
-    width: u32,
-    height: u32,
-    layout: &SurfaceLayout,
-    codec: BlockCodec,
-    endian: GpuEndian,
-    channels: ChannelOrder,
-) -> Vec<FloatTexel> {
-    let (width, height) = (width as usize, height as usize);
+    let (visible_width, visible_height) = (width as usize, height as usize);
     let mut unswapped = surface.to_vec();
     endian.to_native(&mut unswapped);
-    let mut values = vec![[0.0; 4]; width * height];
+    let mut image = RgbaImage::new(width, height);
     for (block_y, row) in unswapped
         .chunks_exact(layout.row_pitch)
-        .take(height.div_ceil(BLOCK_SIDE))
+        .take(visible_height.div_ceil(BLOCK_SIDE))
         .enumerate()
     {
         let blocks = row
             .chunks_exact(codec.block_bytes())
-            .take(width.div_ceil(BLOCK_SIDE));
+            .take(visible_width.div_ceil(BLOCK_SIDE));
         for (block_x, block) in blocks.enumerate() {
             let texels = codec.decode_block(block);
-            for (texel, texel_values) in texels.iter().enumerate() {
+            for (texel, values) in texels.iter().enumerate() {
                 let x = block_x * BLOCK_SIDE + texel % BLOCK_SIDE;
                 let y = block_y * BLOCK_SIDE + texel / BLOCK_SIDE;
-                if x < width && y < height {
-                    values[y * width + x] = channels.arrange(*texel_values);
+                if x < visible_width && y < visible_height {
+                    let pixel = Rgba(texel_to_bytes(channels.arrange(*values)));
+                    image.put_pixel(x as u32, y as u32, pixel);
                 }
             }
         }
     }
-    values
+    image
 }
 
 #[cfg(test)]
@@ -306,13 +290,13 @@ mod tests {
     fn four_step_alpha_ramp_adds_transparent_and_opaque() {
         let ramp = alpha_ramp(10, 10);
         assert_eq!(ramp[6], 0.0);
-        assert_eq!(ramp[7], 255.0);
+        assert_eq!(ramp[7], 1.0);
     }
 
     #[test]
     fn six_step_alpha_ramp_interpolates_sevenths() {
-        let ramp = alpha_ramp(7, 0);
-        assert_eq!(ramp, [7.0, 0.0, 6.0, 5.0, 4.0, 3.0, 2.0, 1.0]);
+        let ramp = alpha_ramp(7, 0).map(channel_to_byte);
+        assert_eq!(ramp, [7, 0, 6, 5, 4, 3, 2, 1]);
     }
 
     #[test]
