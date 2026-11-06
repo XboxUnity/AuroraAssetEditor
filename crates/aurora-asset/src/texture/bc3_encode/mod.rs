@@ -48,20 +48,15 @@ const COLOR_HALF: std::ops::Range<usize> = 8..16;
 pub(crate) type Texel = [f32; 4];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct Bc3Options {
-    pub dither_rgb: bool,
-    pub dither_alpha: bool,
-    pub uniform_weighting: bool,
+struct Bc3Options {
+    /// Diffuse the rounding error inside the block, in both the color and the alpha half.
+    // Derived from AuroraAsset.dll for interoperability: its one dither flag covers alpha too.
+    dither: bool,
 }
 
 impl Bc3Options {
-    /// The settings the DLL's encoder was observed to use.
-    pub(crate) const DLL_BASELINE: Self = Self {
-        dither_rgb: true,
-        // Derived from AuroraAsset.dll for interoperability: its one dither flag covers alpha too.
-        dither_alpha: true,
-        uniform_weighting: false,
-    };
+    /// What Aurora's call into the DLL uses.
+    const DLL: Self = Self { dither: true };
 }
 
 /// Encodes the image as BC3 blocks in the DLL's surface layout: padded rows, zero padding, and
@@ -73,7 +68,7 @@ pub(super) fn encode_surface(image: &RgbaImage, layout: &SurfaceLayout) -> Vec<u
     for block_y in 0..blocks_high {
         for block_x in 0..blocks_wide {
             let texels = block_texels(image, block_x, block_y);
-            let block = encode_bc3_block(&texels, &Bc3Options::DLL_BASELINE);
+            let block = encode_bc3_block(&texels, &Bc3Options::DLL);
             let start = block_y * layout.row_pitch + block_x * BLOCK_BYTES;
             surface[start..start + BLOCK_BYTES].copy_from_slice(&block);
         }
@@ -116,10 +111,7 @@ fn channel_to_unit(channel: u8) -> f32 {
 }
 
 /// One 16-byte block in little-endian D3D order: the alpha half, then the color half.
-pub(crate) fn encode_bc3_block(
-    texels: &[Texel; TEXELS_PER_BLOCK],
-    options: &Bc3Options,
-) -> [u8; BLOCK_BYTES] {
+fn encode_bc3_block(texels: &[Texel; TEXELS_PER_BLOCK], options: &Bc3Options) -> [u8; BLOCK_BYTES] {
     let mut block = [0u8; BLOCK_BYTES];
     block[ALPHA_HALF].copy_from_slice(&alpha::encode_alpha_block(texels, options));
     block[COLOR_HALF].copy_from_slice(&color::encode_color_block(texels, options));
@@ -190,13 +182,13 @@ mod tests {
 
     #[test]
     fn opaque_block_stores_full_alpha_with_no_indices() {
-        let block = encode_bc3_block(&solid([0.2, 0.4, 0.6, 1.0]), &Bc3Options::DLL_BASELINE);
+        let block = encode_bc3_block(&solid([0.2, 0.4, 0.6, 1.0]), &Bc3Options::DLL);
         assert_eq!(block[ALPHA_HALF], [0xff, 0xff, 0, 0, 0, 0, 0, 0]);
     }
 
     #[test]
     fn solid_color_block_has_equal_endpoints_and_zero_indices() {
-        let block = encode_bc3_block(&solid([1.0, 1.0, 1.0, 1.0]), &Bc3Options::DLL_BASELINE);
+        let block = encode_bc3_block(&solid([1.0, 1.0, 1.0, 1.0]), &Bc3Options::DLL);
         assert_eq!(block[COLOR_HALF], [0xff, 0xff, 0xff, 0xff, 0, 0, 0, 0]);
     }
 
@@ -206,7 +198,7 @@ mod tests {
         for texel in texels.iter_mut().take(8) {
             texel[3] = channel_to_unit(0x80);
         }
-        let block = encode_bc3_block(&texels, &Bc3Options::DLL_BASELINE);
+        let block = encode_bc3_block(&texels, &Bc3Options::DLL);
         assert_eq!((block[0], block[1]), (0x80, 0xff));
     }
 

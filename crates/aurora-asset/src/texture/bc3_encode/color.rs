@@ -27,7 +27,6 @@ const ROUNDING: f32 = 0.5;
 /// Perceptual importance of each channel, relative to green.
 const LUMINANCE: Rgb = [0.2125 / 0.7154, 1.0, 0.0721 / 0.7154];
 const LUMINANCE_INVERSE: Rgb = [0.7154 / 0.2125, 1.0, 0.7154 / 0.0721];
-const UNIFORM_WEIGHTS: Rgb = [1.0, 1.0, 1.0];
 
 const STEP_COUNT: usize = 4;
 const LAST_POSITION: f32 = (STEP_COUNT - 1) as f32;
@@ -66,18 +65,10 @@ pub(super) fn encode_color_block(
     texels: &[Texel; TEXELS_PER_BLOCK],
     options: &Bc3Options,
 ) -> [u8; COLOR_HALF_BYTES] {
-    let weights = if options.uniform_weighting {
-        UNIFORM_WEIGHTS
-    } else {
-        LUMINANCE
-    };
-    let inverse_weights = if options.uniform_weighting {
-        UNIFORM_WEIGHTS
-    } else {
-        LUMINANCE_INVERSE
-    };
+    let weights = LUMINANCE;
+    let inverse_weights = LUMINANCE_INVERSE;
 
-    let points = prepare_block(texels, weights, options.dither_rgb);
+    let points = prepare_block(texels, weights, options.dither);
     let chosen = choose_endpoints(&points, weights);
     let endpoints = refine_endpoints(&points, chosen);
 
@@ -88,7 +79,7 @@ pub(super) fn encode_color_block(
     }
 
     let palette = build_palette(first, second, weights);
-    let indices = assign_indices(texels, &palette, weights, options.dither_rgb);
+    let indices = assign_indices(texels, &palette, weights, options.dither);
     pack_color_block(palette.stored_first, palette.stored_second, indices)
 }
 

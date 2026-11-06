@@ -46,7 +46,7 @@ pub(super) fn encode_alpha_block(
     options: &Bc3Options,
 ) -> [u8; ALPHA_HALF_BYTES] {
     let alphas: [f32; TEXELS_PER_BLOCK] = std::array::from_fn(|index| texels[index][3]);
-    let quantized = quantize_alpha(&alphas, options.dither_alpha);
+    let quantized = quantize_alpha(&alphas, options.dither);
 
     let mut block = [0u8; ALPHA_HALF_BYTES];
     if quantized.min == ALPHA_MAX {
@@ -84,7 +84,7 @@ pub(super) fn encode_alpha_block(
     block[1] = second_byte;
 
     let steps = alpha_steps(first, second, step_count);
-    assign_alpha_indices(&mut block, texels, &steps, step_count, options.dither_alpha);
+    assign_alpha_indices(&mut block, texels, &steps, step_count, options.dither);
     block
 }
 

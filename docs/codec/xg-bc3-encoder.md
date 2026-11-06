@@ -27,7 +27,9 @@ with the differences below. Addresses are virtual addresses in the DLL.
 
 The block loop passes one flag to the block encoder: 1 when the copy dithers (it does for
 Aurora's call), else 0. The alpha half reads the same flag as the colour half, so alpha is
-dithered too. DirectXTex keeps `BC_FLAGS_DITHER_A` separate; the port turns it on.
+dithered too. DirectXTex keeps `BC_FLAGS_DITHER_A` separate; the port has one `dither`
+option, and no uniform-weighting option, since the DLL's colour half always uses the
+luminance weights (`0x1001c110`).
 
 - Measured: whole-block match on `alphagrad` went from 0% to 92.6% (equal to its colour rate),
   `alphanoise` 41% to 96%, `ph_banner` 94.4% to 96.6%, `ph_icon` 97.3% to 99.6%.
