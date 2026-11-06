@@ -294,28 +294,48 @@ impl AssetFile {
 
     /// Packs the screenshots into slots 1, 2, 3, ... keeping their order and stored bytes.
     pub fn compact_screenshots(&mut self) {
-        let screenshots = &mut self.entries[FIRST_SCREENSHOT_INDEX..];
-        let mut next_free = 0;
-        for position in 0..screenshots.len() {
-            if screenshots[position].texture.is_some() {
-                screenshots.swap(next_free, position);
-                next_free += 1;
+        self.rearrange_screenshots(|textures| {
+            let mut next_free = 0;
+            for position in 0..textures.len() {
+                if textures[position].is_some() {
+                    textures.swap(next_free, position);
+                    next_free += 1;
+                }
             }
-        }
+        });
     }
 
     /// Drag-reorder: the screenshot leaves `from` and lands at `to`, shifting those in between.
     /// An empty `from` has nothing to move and changes nothing.
     pub fn move_screenshot(&mut self, from: ScreenshotNumber, to: ScreenshotNumber) {
-        let screenshots = &mut self.entries[FIRST_SCREENSHOT_INDEX..];
         let (from, to) = (from.position(), to.position());
-        if screenshots[from].texture.is_none() {
+        if self.entries[FIRST_SCREENSHOT_INDEX + from]
+            .texture
+            .is_none()
+        {
             return;
         }
-        if from < to {
-            screenshots[from..=to].rotate_left(1);
-        } else {
-            screenshots[to..=from].rotate_right(1);
+        self.rearrange_screenshots(|textures| {
+            if from < to {
+                textures[from..=to].rotate_left(1);
+            } else {
+                textures[to..=from].rotate_right(1);
+            }
+        });
+    }
+
+    /// Moves only the textures between screenshot slots. Each slot keeps its own offset, and a
+    /// slot left empty gets a zero header, as the old app's `SetScreenshot(null)` did.
+    fn rearrange_screenshots(&mut self, rearrange: impl FnOnce(&mut [Option<EncodedTexture>])) {
+        let screenshots = &mut self.entries[FIRST_SCREENSHOT_INDEX..];
+        let mut textures: Vec<Option<EncodedTexture>> = screenshots
+            .iter_mut()
+            .map(|entry| entry.texture.take())
+            .collect();
+        rearrange(&mut textures);
+        for (entry, texture) in screenshots.iter_mut().zip(textures) {
+            entry.texture = texture;
+            entry.empty_header = [0; TEXTURE_HEADER_LEN];
         }
     }
 

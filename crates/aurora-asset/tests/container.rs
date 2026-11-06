@@ -387,3 +387,64 @@ fn truncated_files_never_panic() {
     }
     assert!(AssetFile::parse(&bytes).is_ok());
 }
+
+#[test]
+fn compact_after_removal_matches_old_app_bytes() {
+    let mut file = AssetFile::new();
+    for number in 1..=3 {
+        file.set(shot(number), Some(texture(number, 8 * usize::from(number))));
+    }
+    let mut bytes = file.to_bytes();
+    patch_entry(&mut bytes, shot(4).index(), 0x44, 0x7e);
+    patch_entry(&mut bytes, shot(5).index(), 0x55, 0x7f);
+    let mut loaded = AssetFile::parse(&bytes).unwrap();
+
+    loaded.set(shot(2), None);
+    loaded.compact_screenshots();
+    let saved = loaded.to_bytes();
+
+    for (number, offset) in [(1, 0), (2, 8)] {
+        assert_eq!(entry_field(&saved, shot(number).index(), 0), offset);
+    }
+    let emptied = entry_bytes(&saved, shot(3).index());
+    assert_eq!(be_u32(emptied, 0), 24, "slot 3 keeps its own stored offset");
+    assert!(emptied[12..].iter().all(|byte| *byte == 0));
+    for (number, offset) in [(4, 0x44), (5, 0x55)] {
+        let slot = entry_bytes(&saved, shot(number).index());
+        assert_eq!(be_u32(slot, 0), offset, "slot {number}");
+        assert!(slot[12..].iter().all(|byte| *byte == 0), "slot {number}");
+    }
+}
+
+#[test]
+fn compact_keeps_each_slots_offset_across_saves() {
+    let mut file = AssetFile::new();
+    for number in 1..=3 {
+        file.set(shot(number), Some(texture(number, 8 * usize::from(number))));
+    }
+    file.to_bytes();
+    file.set(shot(2), None);
+    file.to_bytes();
+    file.compact_screenshots();
+    let saved = file.to_bytes();
+
+    assert_eq!(entry_field(&saved, shot(3).index(), 0), 8);
+    assert_eq!(entry_field(&saved, shot(3).index(), 4), 0);
+}
+
+#[test]
+fn move_screenshot_zeroes_header_of_emptied_slot() {
+    let mut file = AssetFile::new();
+    file.set(shot(1), Some(texture(1, 8)));
+    file.set(shot(2), Some(texture(2, 8)));
+    let mut bytes = file.to_bytes();
+    patch_entry(&mut bytes, shot(3).index(), 0x33, 0x7e);
+    let mut loaded = AssetFile::parse(&bytes).unwrap();
+
+    loaded.move_screenshot(number(1), number(3));
+    let saved = loaded.to_bytes();
+
+    let slot3 = entry_bytes(&saved, shot(3).index());
+    assert_eq!(be_u32(slot3, 4), 8, "texture moved to slot 3");
+    assert_eq!(loaded.get(shot(1)).unwrap().data, vec![2; 8]);
+}
