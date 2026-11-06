@@ -32,11 +32,6 @@ impl Fpu {
     }
 }
 
-/// Loads an `f32` for round-to-nearest code.
-pub(super) fn x87(value: f32) -> X87 {
-    Fpu::RoundToNearest.load(value)
-}
-
 impl X87 {
     /// Rounds the result to `f32`, as the DLL does when it stores it to memory.
     pub(super) fn store(self) -> f32 {
@@ -53,7 +48,8 @@ impl X87 {
     /// The result of an operation whose correctly rounded value is `nearest` and whose exact value
     /// is `nearest + error`.
     fn rounded(self, nearest: f64, error: f64) -> X87 {
-        let rounded_away_from_zero = error != 0.0 && (error < 0.0) != (nearest < 0.0);
+        let rounded_away_from_zero =
+            nearest != 0.0 && error != 0.0 && (error < 0.0) != (nearest < 0.0);
         let value = if self.fpu == Fpu::RoundTowardZero && rounded_away_from_zero {
             step_toward_zero_f64(nearest)
         } else {
@@ -156,13 +152,14 @@ mod tests {
     use super::*;
 
     const CHOP: Fpu = Fpu::RoundTowardZero;
+    const NEAREST: Fpu = Fpu::RoundToNearest;
 
     #[test]
     fn rounds_once_at_the_store_not_after_every_operation() {
         let value = f32::from_bits(0x3cf2_4732);
         assert_eq!(value * 255.0 + 0.5, f32::from_bits(0x4100_aa76));
         assert_eq!(
-            (x87(value) * 255.0 + 0.5).store(),
+            (NEAREST.load(value) * 255.0 + 0.5).store(),
             f32::from_bits(0x4100_aa75)
         );
     }
@@ -170,7 +167,7 @@ mod tests {
     #[test]
     fn truncating_store_never_rounds_up() {
         let two_thirds = 2.0f32 / 3.0;
-        assert_eq!((x87(2.0) / 3.0).store(), two_thirds);
+        assert_eq!((NEAREST.load(2.0) / 3.0).store(), two_thirds);
         assert_eq!((CHOP.load(2.0) / 3.0).store(), two_thirds.next_down());
         assert_eq!((CHOP.load(-2.0) / 3.0).store(), -two_thirds.next_down());
     }
@@ -180,7 +177,7 @@ mod tests {
         let tenth = CHOP.load(1.0) / 10.0;
         assert_eq!(tenth.value, 0.1f64.next_down());
         assert_eq!((tenth * 10.0).value, 1.0f64.next_down());
-        assert_eq!((x87(1.0) / 10.0 * 10.0).value, 1.0);
+        assert_eq!((NEAREST.load(1.0) / 10.0 * 10.0).value, 1.0);
         let tiny = f64::from(f32::EPSILON) * f64::EPSILON;
         let sum = CHOP.load(1.0)
             + X87 {

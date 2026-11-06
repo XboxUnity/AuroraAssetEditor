@@ -1,8 +1,10 @@
 //! The color half of a BC3 block: two RGB565 endpoints and sixteen 2-bit indices (BC1 four-color
 //! mode). Endpoints are searched in a perceptually weighted color space.
 
-use super::x87::{Fpu, X87, x87};
+use super::x87::{Fpu, X87};
 use super::{Bc3Options, TEXELS_PER_BLOCK, Texel, diffuse_error, end_weights, spread_error};
+
+mod underrun;
 
 const COLOR_HALF_BYTES: usize = 8;
 const INDEX_BITS: u32 = 2;
@@ -47,6 +49,9 @@ const PREPARE_FPU: Fpu = Fpu::RoundTowardZero;
 const REFINE_FPU: Fpu = Fpu::RoundTowardZero;
 const QUANTIZE_FPU: Fpu = Fpu::RoundTowardZero;
 const INDEX_FPU: Fpu = Fpu::RoundTowardZero;
+// Derived from AuroraAsset.dll for interoperability: the endpoint search setup and the index scale round to nearest.
+const SEARCH_FPU: Fpu = Fpu::RoundToNearest;
+const INDEX_SCALE_FPU: Fpu = Fpu::RoundToNearest;
 
 /// The two ends of the color axis, in the weighted color space.
 struct Endpoints {
@@ -148,7 +153,8 @@ fn choose_endpoints(points: &[Rgb; TEXELS_PER_BLOCK], weights: Rgb) -> Endpoints
     }
 
     let axis = subtract(high, low);
-    let axis_length_squared = wide_dot(axis, axis, Fpu::RoundToNearest).store();
+    let fpu = SEARCH_FPU;
+    let axis_length_squared = wide_dot(axis, axis, fpu).store();
     if axis_length_squared < MIN_AXIS_LENGTH_SQUARED {
         return Endpoints {
             first: low,
@@ -164,8 +170,11 @@ fn choose_endpoints(points: &[Rgb; TEXELS_PER_BLOCK], weights: Rgb) -> Endpoints
     let mut diagonal_fit = [0.0f32; 4];
     for point in points {
         let [red, green, blue] = CHANNELS
-            .map(|channel| ((x87(point[channel]) - middle[channel]) * direction[channel]).store())
-            .map(x87);
+            .map(|channel| {
+                ((fpu.load(point[channel]) - middle[channel]) * direction[channel]).store()
+            })
+            .map(|along| fpu.load(along));
+        // Derived from AuroraAsset.dll for interoperability: green is added to red before blue comes in.
         let sums = [
             green + red + blue,
             green + red - blue,
@@ -174,7 +183,7 @@ fn choose_endpoints(points: &[Rgb; TEXELS_PER_BLOCK], weights: Rgb) -> Endpoints
         ];
         for (fit, sum) in diagonal_fit.iter_mut().zip(sums) {
             let sum = sum.store();
-            *fit = (x87(sum) * sum + *fit).store();
+            *fit = (fpu.load(sum) * sum + *fit).store();
         }
     }
 
@@ -211,7 +220,7 @@ fn refine_endpoints(points: &[Rgb; TEXELS_PER_BLOCK], start: Endpoints) -> Endpo
     } = start;
 
     let start_axis = subtract(high, low);
-    let start_length_squared = wide_dot(start_axis, start_axis, Fpu::RoundToNearest).store();
+    let start_length_squared = wide_dot(start_axis, start_axis, SEARCH_FPU).store();
     if start_length_squared < TWO_COLOR_AXIS_LENGTH_SQUARED {
         return Endpoints {
             first: low,
@@ -221,9 +230,10 @@ fn refine_endpoints(points: &[Rgb; TEXELS_PER_BLOCK], start: Endpoints) -> Endpo
 
     let fpu = REFINE_FPU;
     let (first_end_weight, second_end_weight) = end_weights::<STEP_COUNT>(STEP_COUNT);
-    for _ in 0..REFINE_ITERATIONS {
+    for iteration in 0..REFINE_ITERATIONS {
         let palette: [Rgb; STEP_COUNT] = std::array::from_fn(|step| {
             CHANNELS.map(|channel| {
+                // Derived from AuroraAsset.dll for interoperability: the high endpoint's share comes first.
                 let from_high = fpu.load(second_end_weight[step]) * high[channel];
                 (from_high + fpu.load(first_end_weight[step]) * low[channel]).store()
             })
@@ -238,41 +248,34 @@ fn refine_endpoints(points: &[Rgb; TEXELS_PER_BLOCK], start: Endpoints) -> Endpo
         let scale = (fpu.load(LAST_POSITION) / length_squared).store();
         direction = direction.map(|component| (fpu.load(scale) * component).store());
 
-        let mut low_curvature = 0.0f32;
-        let mut high_curvature = 0.0f32;
-        let mut low_gradient = [0.0f32; 3];
-        let mut high_gradient = [0.0f32; 3];
-
+        let palette_step = |step: usize| StepRead {
+            color: palette[step],
+            low_weight: first_end_weight[step],
+            high_weight: second_end_weight[step],
+        };
+        let mut sums = NewtonSums::default();
         for point in points {
             let position = projection(*point, low, direction, fpu);
-            let step = refine_step(position, fpu);
-            let difference =
-                CHANNELS.map(|channel| (fpu.load(palette[step][channel]) - point[channel]).store());
-
-            let low_weight = (fpu.load(first_end_weight[step]) * WEIGHT_SCALE).store();
-            let high_weight = (fpu.load(second_end_weight[step]) * WEIGHT_SCALE).store();
-
-            low_curvature = (fpu.load(low_weight) * first_end_weight[step] + low_curvature).store();
-            high_curvature =
-                (fpu.load(high_weight) * second_end_weight[step] + high_curvature).store();
-            for channel in CHANNELS {
-                low_gradient[channel] =
-                    (fpu.load(low_weight) * difference[channel] + low_gradient[channel]).store();
-                high_gradient[channel] =
-                    (fpu.load(high_weight) * difference[channel] + high_gradient[channel]).store();
-            }
+            let step = match refine_step(position, fpu) {
+                Ok(step) => palette_step(step),
+                // Deeper steps read stack residue or load addresses in the DLL; step 0 stands in.
+                Err(step) => underrun::read_before_palette(step, &low, &high, &sums, iteration)
+                    .unwrap_or_else(|| palette_step(0)),
+            };
+            sums.add(*point, &step, fpu);
         }
 
-        if low_curvature > 0.0 {
-            move_endpoint(&mut low, low_gradient, low_curvature, fpu);
+        if sums.low_curvature > 0.0 {
+            move_endpoint(&mut low, sums.low_gradient, sums.low_curvature, fpu);
         }
-        if high_curvature > 0.0 {
-            move_endpoint(&mut high, high_gradient, high_curvature, fpu);
+        if sums.high_curvature > 0.0 {
+            move_endpoint(&mut high, sums.high_gradient, sums.high_curvature, fpu);
         }
 
-        let converged = low_gradient
+        let converged = sums
+            .low_gradient
             .iter()
-            .chain(high_gradient.iter())
+            .chain(sums.high_gradient.iter())
             .all(|&gradient| fpu.load(gradient) * gradient < REFINE_CONVERGED_SQUARED_STEP);
         if converged {
             break;
@@ -285,6 +288,41 @@ fn refine_endpoints(points: &[Rgb; TEXELS_PER_BLOCK], start: Endpoints) -> Endpo
     }
 }
 
+/// The palette entry a point is compared with and how much each endpoint contributes to it.
+struct StepRead {
+    color: Rgb,
+    low_weight: f32,
+    high_weight: f32,
+}
+
+/// The gradient and curvature of the squared error, per endpoint, summed over the points.
+#[derive(Default)]
+struct NewtonSums {
+    low_curvature: f32,
+    high_curvature: f32,
+    low_gradient: Rgb,
+    high_gradient: Rgb,
+}
+
+impl NewtonSums {
+    fn add(&mut self, point: Rgb, step: &StepRead, fpu: Fpu) {
+        let difference =
+            CHANNELS.map(|channel| (fpu.load(step.color[channel]) - point[channel]).store());
+        let low_share = (fpu.load(step.low_weight) * WEIGHT_SCALE).store();
+        let high_share = (fpu.load(step.high_weight) * WEIGHT_SCALE).store();
+
+        self.low_curvature = (fpu.load(low_share) * step.low_weight + self.low_curvature).store();
+        self.high_curvature =
+            (fpu.load(high_share) * step.high_weight + self.high_curvature).store();
+        for channel in CHANNELS {
+            self.low_gradient[channel] =
+                (fpu.load(low_share) * difference[channel] + self.low_gradient[channel]).store();
+            self.high_gradient[channel] =
+                (fpu.load(high_share) * difference[channel] + self.high_gradient[channel]).store();
+        }
+    }
+}
+
 /// One Newton step: moves the endpoint against its gradient, scaled by the curvature.
 fn move_endpoint(endpoint: &mut Rgb, gradient: Rgb, curvature: f32, fpu: Fpu) {
     let move_scale = (fpu.load(-1.0) / curvature).store();
@@ -293,20 +331,20 @@ fn move_endpoint(endpoint: &mut Rgb, gradient: Rgb, curvature: f32, fpu: Fpu) {
     }
 }
 
-/// The palette position nearest a point's projection onto the endpoint axis. The DLL has no
-/// `position <= 0` test here and reads before its palette below -1.5; no golden block gets there
-/// (see docs/codec/xg-bc3-encoder.md), so this keeps DirectXTex's step 0.
-fn refine_step(position: f32, fpu: Fpu) -> usize {
-    if position <= 0.0 {
-        0
-    } else if position >= LAST_POSITION {
-        STEP_COUNT - 1
+/// The palette position nearest a point's projection onto the endpoint axis, or the negative
+/// step a point far before the low endpoint rounds to.
+// Derived from AuroraAsset.dll for interoperability: there is no lower bound on the step here.
+fn refine_step(position: f32, fpu: Fpu) -> Result<usize, i32> {
+    if position >= LAST_POSITION {
+        Ok(STEP_COUNT - 1)
     } else {
-        (fpu.load(position) + ROUNDING).store() as u32 as usize
+        let step = (fpu.load(position) + ROUNDING).store() as i32;
+        usize::try_from(step).map_err(|_| step)
     }
 }
 
 /// `(point - origin) . direction`, with the differences kept on the FPU stack.
+// Derived from AuroraAsset.dll for interoperability: the terms are summed green, red, blue.
 fn projection(point: Rgb, origin: Rgb, direction: Rgb, fpu: Fpu) -> f32 {
     let along = |channel: usize| (fpu.load(point[channel]) - origin[channel]) * direction[channel];
     (along(GREEN) + along(RED) + along(BLUE)).store()
@@ -354,7 +392,9 @@ fn assign_indices(
     let start = palette.colors[0];
     let axis = subtract(palette.colors[1], start);
     let scale = if palette.stored_first != palette.stored_second {
-        (x87(LAST_POSITION) / wide_dot(axis, axis, Fpu::RoundToNearest)).store()
+        // Derived from AuroraAsset.dll for interoperability: one expression, with no store between the dot and the division.
+        let scale_fpu = INDEX_SCALE_FPU;
+        (scale_fpu.load(LAST_POSITION) / wide_dot(axis, axis, scale_fpu)).store()
     } else {
         0.0
     };

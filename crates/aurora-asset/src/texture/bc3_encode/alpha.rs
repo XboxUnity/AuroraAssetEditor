@@ -1,6 +1,6 @@
 //! The alpha half of a BC3 block: two 8-bit endpoints and sixteen 3-bit indices.
 
-use super::x87::{Fpu, x87};
+use super::x87::Fpu;
 use super::{Bc3Options, TEXELS_PER_BLOCK, Texel, diffuse_error, end_weights, spread_error};
 
 const ALPHA_HALF_BYTES: usize = 8;
@@ -34,6 +34,8 @@ const QUANTIZE_FPU: Fpu = Fpu::RoundTowardZero;
 const REFINE_FPU: Fpu = Fpu::RoundTowardZero;
 const ENDPOINT_FPU: Fpu = Fpu::RoundTowardZero;
 const INDEX_FPU: Fpu = Fpu::RoundTowardZero;
+// Derived from AuroraAsset.dll for interoperability: step interpolation and index scale round to nearest.
+const STEP_FPU: Fpu = Fpu::RoundToNearest;
 
 struct QuantizedAlpha {
     levels: [f32; TEXELS_PER_BLOCK],
@@ -141,6 +143,7 @@ fn refine_alpha_endpoints(points: &[f32; TEXELS_PER_BLOCK], step_count: usize) -
 
         let mut steps = [0.0f32; EIGHT_STEP_COUNT];
         for step in 0..step_count {
+            // Derived from AuroraAsset.dll for interoperability: the high endpoint's share comes first.
             let from_high = fpu.load(other_end_weights[step]) * high;
             steps[step] = (from_high + fpu.load(end_weights[step]) * low).store();
         }
@@ -250,10 +253,12 @@ fn alpha_steps(first: f32, second: f32, step_count: usize) -> [f32; EIGHT_STEP_C
     steps[0] = first;
     steps[1] = second;
     let interpolated = step_count - 1;
+    let fpu = STEP_FPU;
+    // Derived from AuroraAsset.dll for interoperability: multiplies by an `f32` reciprocal instead of dividing.
     let reciprocal = 1.0 / interpolated as f32;
     for index in 1..interpolated {
-        let first_share = x87(steps[0]) * (interpolated - index) as f32;
-        let second_share = x87(steps[1]) * index as f32;
+        let first_share = fpu.load(steps[0]) * (interpolated - index) as f32;
+        let second_share = fpu.load(steps[1]) * index as f32;
         steps[index + 1] = ((first_share + second_share) * reciprocal).store();
     }
     if step_count == SIX_STEP_COUNT {
@@ -280,7 +285,8 @@ fn assign_alpha_indices(
     let last_position = (step_count - 1) as f32;
     let is_six_step = step_count == SIX_STEP_COUNT;
     let scale = if steps[0] != steps[1] {
-        (x87(last_position) / (x87(steps[1]) - steps[0])).store()
+        let scale_fpu = STEP_FPU;
+        (scale_fpu.load(last_position) / (scale_fpu.load(steps[1]) - steps[0])).store()
     } else {
         0.0
     };

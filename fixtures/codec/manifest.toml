@@ -64,6 +64,19 @@ argb_video_stored = true
 dxt_decoded_stored = false
 
 [[fixture]]
+name = "color_underrun_step_1"
+width = 4
+height = 4
+dxt_header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000540000600300000d100000000000000a00"
+dxt_video_sha256 = "50f5be3480f87c35d9732640843413d7192bafc4ff98047380376fbb1480843d"
+dxt_decoded_sha256 = "b53663626ca0c5da3fb7758e83aeece52d284c570073c58bfc16d8135224195a"
+argb_header = "0000000300000001000000000000000000000000ffff0000ffff000000800002000000860000600300000c140000000000000a00"
+argb_video_sha256 = "0ff7733c61c96c5f8f9a0476e7a51067db9613ea59e6681e3852cb717d3cb89b"
+argb_decoded_sha256 = "8857c62bdf2bf8b8a3d2e356bf055210c11e386b96efa55adeb72cba30fd3dc3"
+argb_video_stored = true
+dxt_decoded_stored = false
+
+[[fixture]]
 name = "grad"
 width = 256
 height = 256

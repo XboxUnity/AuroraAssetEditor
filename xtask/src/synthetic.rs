@@ -15,6 +15,8 @@ const TOP_BYTE_SHIFT: u32 = 56;
 const OPAQUE: u8 = 255;
 const SYNTHETIC_SIZE: u32 = 256;
 const NEAR_EXTREME_RANGE: u8 = 8;
+const BLOCK_SIDE: u32 = 4;
+const BLOCK_TEXELS: usize = (BLOCK_SIDE * BLOCK_SIDE) as usize;
 const TWO_TONE_CELL_PIXELS: u32 = 4;
 const TWO_TONE_FIRST: [u8; 4] = [0x20, 0x60, 0xA0, OPAQUE];
 const TWO_TONE_SECOND: [u8; 4] = [0xE0, 0x90, 0x10, OPAQUE];
@@ -175,6 +177,32 @@ fn checker_1px() -> RgbaImage {
     })
 }
 
+/// One opaque block whose colour endpoint optimizer sees a point at step -1, before its palette
+/// (see docs/codec/xg-bc3-encoder.md). Found by a hill-climbing search.
+const COLOR_UNDERRUN_STEP_1_BLOCK: [[u8; 4]; BLOCK_TEXELS] = [
+    [30, 248, 96, OPAQUE],
+    [171, 249, 18, OPAQUE],
+    [28, 245, 93, OPAQUE],
+    [56, 227, 68, OPAQUE],
+    [35, 227, 75, OPAQUE],
+    [29, 248, 53, OPAQUE],
+    [28, 230, 81, OPAQUE],
+    [39, 240, 86, OPAQUE],
+    [27, 246, 59, OPAQUE],
+    [148, 247, 18, OPAQUE],
+    [28, 245, 46, OPAQUE],
+    [41, 230, 15, OPAQUE],
+    [29, 248, 42, OPAQUE],
+    [132, 246, 0, OPAQUE],
+    [0, 212, 194, OPAQUE],
+    [37, 238, 103, OPAQUE],
+];
+fn single_block(texels: &[[u8; 4]; BLOCK_TEXELS]) -> RgbaImage {
+    image_of_size(BLOCK_SIDE, BLOCK_SIDE, |x, y| {
+        texels[(y * BLOCK_SIDE + x) as usize]
+    })
+}
+
 fn odd_size_noise(prng: &mut Prng, width: u32, height: u32) -> RgbaImage {
     image_of_size(width, height, |_, _| random_rgba(prng))
 }
@@ -199,5 +227,9 @@ pub fn all_synthetic_images() -> Vec<(String, RgbaImage)> {
     for (name, width, height) in ODD_SIZES {
         images.push((name.to_string(), odd_size_noise(&mut prng, width, height)));
     }
+    images.push((
+        "color_underrun_step_1".to_string(),
+        single_block(&COLOR_UNDERRUN_STEP_1_BLOCK),
+    ));
     images
 }
