@@ -10,10 +10,11 @@ use image::{Rgba, RgbaImage};
 use tempfile::TempDir;
 
 const IMAGE: &str = "cover-loaded-dark";
+const REMEDY: &str = "delete it and run `cargo xtask ui-screenshots update` to recreate it";
 
 /// A store over `references/` and `output/` folders of its own temporary folder.
 struct Fixture {
-    _folder: TempDir,
+    folder: TempDir,
     store: ReferenceStore,
 }
 
@@ -26,7 +27,7 @@ impl Fixture {
         fs::create_dir(&output).expect("the output folder is created");
         Fixture {
             store: ReferenceStore::new(references, output),
-            _folder: folder,
+            folder,
         }
     }
 
@@ -63,7 +64,7 @@ fn one_changed_pixel() -> PixelComparison {
     })
 }
 
-fn is_empty_folder(path: &Path) -> bool {
+fn is_emptyfolder(path: &Path) -> bool {
     fs::read_dir(path)
         .expect("the folder is readable")
         .next()
@@ -159,7 +160,7 @@ fn missing_reference_fails_in_check_mode_and_is_never_created() {
 
     assert_eq!(status, ImageStatus::Missing);
     assert!(status.is_failure());
-    assert!(is_empty_folder(fixture.store.references()));
+    assert!(is_emptyfolder(fixture.store.references()));
     assert!(fixture.store.actual_path(IMAGE).exists());
 }
 
@@ -263,10 +264,76 @@ fn unreadable_reference_is_an_error_and_is_not_overwritten_in_update_mode() {
         panic!("an unreadable reference is an error, got {status:?}");
     };
     assert!(text.contains(&reference_path.display().to_string()));
+    assert!(text.contains(REMEDY));
     assert_eq!(
         fs::read(&reference_path).expect("the reference is readable"),
         b"not a png"
     );
+}
+
+#[test]
+fn unreadable_reference_is_an_error_in_check_mode() {
+    let fixture = Fixture::new();
+    let reference_path = fixture.store.reference_path(IMAGE);
+    fs::write(&reference_path, b"not a png").expect("the broken reference is written");
+
+    let status = fixture.check(&plain_image(), ReferenceMode::Check);
+
+    let ImageStatus::Error(text) = &status else {
+        panic!("an unreadable reference is an error, got {status:?}");
+    };
+    assert!(text.contains(&reference_path.display().to_string()));
+    assert!(text.contains(REMEDY));
+    assert_eq!(
+        fs::read(&reference_path).expect("the reference is readable"),
+        b"not a png"
+    );
+}
+
+#[test]
+fn translucent_reference_is_an_error_before_any_diff() {
+    let fixture = Fixture::new();
+    let reference_path = fixture.store.reference_path(IMAGE);
+    let mut reference = plain_image();
+    reference.put_pixel(0, 2, Rgba([10, 20, 30, 100]));
+    reference
+        .save(&reference_path)
+        .expect("the translucent reference is saved");
+
+    let status = fixture.check(&image_with_one_changed_pixel(), ReferenceMode::Update);
+
+    let ImageStatus::Error(text) = &status else {
+        panic!("a translucent reference is an error, got {status:?}");
+    };
+    assert!(text.contains(&reference_path.display().to_string()));
+    assert!(text.contains("(0, 2)"));
+    assert!(text.contains(REMEDY));
+    assert!(!fixture.store.diff_path(IMAGE).exists());
+    assert!(!fixture.store.reference_copy_path(IMAGE).exists());
+}
+
+#[test]
+fn image_names_that_are_not_kebab_case_are_refused() {
+    let fixture = Fixture::new();
+
+    let status = fixture
+        .store
+        .check("../x", &plain_image(), ReferenceMode::Update);
+
+    let ImageStatus::Error(text) = &status else {
+        panic!("a bad name is an error, got {status:?}");
+    };
+    assert!(text.contains("../x"));
+    for result in [
+        fixture.store.remove_reference("../x"),
+        fixture.store.clear_outputs("../x"),
+    ] {
+        let error = result.expect_err("a bad name is refused");
+        assert_eq!(error.kind(), std::io::ErrorKind::InvalidInput);
+        assert!(error.to_string().contains("../x"));
+    }
+    assert!(!fixture.folder.path().join("x.png").exists());
+    assert!(!fixture.store.output().join("actual").exists());
 }
 
 #[test]
@@ -285,7 +352,7 @@ fn reference_names_lists_png_stems() {
 }
 
 #[test]
-fn reference_names_of_a_missing_folder_is_empty() {
+fn reference_names_of_a_missingfolder_is_empty() {
     let folder = tempfile::tempdir().expect("a temporary folder is needed for the store");
     let store = ReferenceStore::new(
         folder.path().join("references"),

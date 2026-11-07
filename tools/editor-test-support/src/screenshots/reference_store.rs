@@ -9,9 +9,11 @@ use image::RgbaImage;
 
 use super::diff_image::diff_image;
 use super::pixel_comparison::{PixelComparison, compare_pixels};
-use super::png_file::{PngFileError, read_png, write_opaque_png};
+use super::png_file::{PngFileError, first_translucent_pixel, read_png, write_opaque_png};
 use super::reference_mode::ReferenceMode;
 
+const UNUSABLE_REFERENCE_REMEDY: &str =
+    "delete it and run `cargo xtask ui-screenshots update` to recreate it";
 const PNG_EXTENSION: &str = "png";
 const ACTUAL_FOLDER: &str = "actual";
 const DIFF_FOLDER: &str = "diff";
@@ -92,12 +94,14 @@ impl ReferenceStore {
     }
 
     pub fn remove_reference(&self, image: &str) -> io::Result<()> {
+        validate_image_name(image)?;
         remove_file_with_path(&self.reference_path(image))
     }
 
     /// Removes what an earlier run left for this image, so an old diff can never describe the
     /// current result. Files that are not there are fine.
     pub fn clear_outputs(&self, image: &str) -> io::Result<()> {
+        validate_image_name(image)?;
         let outputs = [
             self.actual_path(image),
             self.diff_path(image),
@@ -128,6 +132,7 @@ impl ReferenceStore {
         actual: &RgbaImage,
         mode: ReferenceMode,
     ) -> Result<ImageStatus, String> {
+        validate_image_name(image).map_err(|error| error.to_string())?;
         self.clear_outputs(image).map_err(|error| {
             format!("The earlier outputs of {image} could not be removed: {error}")
         })?;
@@ -142,8 +147,15 @@ impl ReferenceStore {
             Err(PngFileError::Io(error)) if error.kind() == io::ErrorKind::NotFound => {
                 return self.missing_reference(image, actual, mode);
             }
+            Err(error @ PngFileError::Decode(_)) => {
+                return Err(unusable_reference(&reference_path, error));
+            }
             Err(error) => return Err(failure("read the reference", &reference_path, error)),
         };
+        if let Some((x, y)) = first_translucent_pixel(&reference) {
+            let error = PngFileError::NotOpaque { x, y };
+            return Err(unusable_reference(&reference_path, error));
+        }
 
         let comparison = compare_pixels(&reference, actual);
         if comparison == PixelComparison::Same {
@@ -209,6 +221,28 @@ impl ImageStatus {
             ImageStatus::Differs(_) | ImageStatus::Missing | ImageStatus::Error(_)
         )
     }
+}
+
+/// Image names are lowercase kebab-case, so a name can never reach outside the two folders.
+fn validate_image_name(image: &str) -> io::Result<()> {
+    let is_kebab_case = !image.is_empty()
+        && image
+            .chars()
+            .all(|letter| letter.is_ascii_lowercase() || letter.is_ascii_digit() || letter == '-');
+    if is_kebab_case {
+        return Ok(());
+    }
+    Err(io::Error::new(
+        io::ErrorKind::InvalidInput,
+        format!("the image name \"{image}\" is not lowercase kebab-case (a-z, 0-9 and -)"),
+    ))
+}
+
+fn unusable_reference(path: &Path, error: PngFileError) -> String {
+    format!(
+        "Could not use the reference {}: {error}; {UNUSABLE_REFERENCE_REMEDY}",
+        path.display()
+    )
 }
 
 fn png_path(folder: &Path, image: &str) -> PathBuf {

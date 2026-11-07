@@ -80,7 +80,7 @@ fn remove_temporary_file(temporary_path: &Path, failure: io::Error) -> PngFileEr
 }
 
 /// Row by row, the first pixel whose alpha is below 255.
-fn first_translucent_pixel(image: &RgbaImage) -> Option<(u32, u32)> {
+pub(super) fn first_translucent_pixel(image: &RgbaImage) -> Option<(u32, u32)> {
     image
         .enumerate_pixels()
         .find(|(_, _, pixel)| pixel.0[3] < u8::MAX)
