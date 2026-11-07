@@ -1,3 +1,4 @@
+mod editor_view;
 mod image_cache;
 mod main_window_view;
 mod shell_view;

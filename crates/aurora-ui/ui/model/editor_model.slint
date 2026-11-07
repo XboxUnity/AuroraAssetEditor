@@ -1,0 +1,20 @@
+import { ScreenshotTile } from "screenshot_tile.slint";
+import { SlotView } from "slot_view.slint";
+
+export global EditorModel {
+    in property <SlotView> cover;
+    in property <SlotView> background;
+    in property <SlotView> icon;
+    in property <SlotView> banner;
+    // The selected screenshot position.
+    in property <SlotView> screenshot;
+    in property <[ScreenshotTile]> screenshot-tiles;
+    in property <bool> drop-hover;
+
+    callback replace(slot-index: int);
+    callback export(slot-index: int);
+    callback remove(slot-index: int);
+    callback add-screenshots();
+    callback select-screenshot(number: int);
+    callback move-screenshot(from: int, to: int);
+}

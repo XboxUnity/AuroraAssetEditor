@@ -1,19 +1,40 @@
+import { EditorModel } from "../model/editor_model.slint";
 import { PageId } from "../model/page_id.slint";
 import { ShellModel } from "../model/shell_model.slint";
+import { AssetPage } from "../pages/asset_page.slint";
+import { IconBannerPage } from "../pages/icon_banner_page.slint";
+import { ScreenshotsPage } from "../pages/screenshots_page.slint";
 import { Theme } from "../theme/theme.slint";
 
-// The page area. Until the pages exist, it shows the page's title where the page header goes.
+// The page area. Until the Online and Console pages exist, they show their title where the header goes.
 export component PageHost inherits Rectangle {
-    VerticalLayout {
+    if ShellModel.page == PageId.cover: cover-page := AssetPage {
+        width: 100%;
+        height: 100%;
+        view: EditorModel.cover;
+        placeholder: @image-url("../placeholders/cover.png");
+    }
+    if ShellModel.page == PageId.background: background-page := AssetPage {
+        width: 100%;
+        height: 100%;
+        view: EditorModel.background;
+        placeholder: @image-url("../placeholders/background.png");
+    }
+    if ShellModel.page == PageId.icon-banner: icon-banner-page := IconBannerPage {
+        width: 100%;
+        height: 100%;
+    }
+    if ShellModel.page == PageId.screenshots: screenshots-page := ScreenshotsPage {
+        width: 100%;
+        height: 100%;
+    }
+    if ShellModel.page == PageId.online || ShellModel.page == PageId.console: VerticalLayout {
+        width: 100%;
+        height: 100%;
         padding: Theme.body-padding;
         alignment: start;
         page-title := Text {
-            text: ShellModel.page == PageId.cover ? "Cover"
-                : ShellModel.page == PageId.background ? "Background"
-                : ShellModel.page == PageId.icon-banner ? "Icon & Banner"
-                : ShellModel.page == PageId.screenshots ? "Screenshots"
-                : ShellModel.page == PageId.online ? "Online"
-                : "Console";
+            text: ShellModel.page == PageId.online ? "Online" : "Console";
             color: Theme.text-strong;
             font-size: Theme.page-title-font-size;
             font-weight: Theme.semibold-font-weight;

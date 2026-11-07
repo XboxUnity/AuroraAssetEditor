@@ -1,0 +1,18 @@
+import { EditorModel } from "../model/editor_model.slint";
+import { Theme } from "../theme/theme.slint";
+import { ImagePanel } from "image_panel.slint";
+import { ScreenshotStrip } from "screenshot_strip.slint";
+
+export component ScreenshotsPage inherits VerticalLayout {
+    padding: Theme.body-padding;
+    spacing: Theme.body-gap;
+
+    panel := ImagePanel {
+        view: EditorModel.screenshot;
+        placeholder: @image-url("../placeholders/screenshot.png");
+        has-add-button: true;
+    }
+    strip := ScreenshotStrip {
+        vertical-stretch: 0;
+    }
+}

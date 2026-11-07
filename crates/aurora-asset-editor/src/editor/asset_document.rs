@@ -105,6 +105,15 @@ impl AssetDocument {
         self.bump_all_screenshots();
     }
 
+    /// Empties the page. Revisions keep counting up, so a view never mistakes new content for what it shows.
+    pub fn clear(&mut self) {
+        self.file = AssetFile::new();
+        self.previews = std::array::from_fn(|_| SlotPreview::Empty);
+        for revision in &mut self.revisions {
+            *revision += 1;
+        }
+    }
+
     /// Drag-reorder: the screenshot at `from` lands at `to`, shifting those in between.
     pub fn move_screenshot(&mut self, from: ScreenshotNumber, to: ScreenshotNumber) {
         if self.file.get(AssetSlot::Screenshot(from)).is_none() {

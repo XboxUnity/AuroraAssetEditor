@@ -1,9 +1,12 @@
 import "fonts/Inter-Regular.ttf";
 import "fonts/Inter-SemiBold.ttf";
+import { EditorModel } from "model/editor_model.slint";
 import { MenuAction } from "model/menu_action.slint";
 import { MenuId } from "model/menu_id.slint";
 import { PageId } from "model/page_id.slint";
+import { ScreenshotTile } from "model/screenshot_tile.slint";
 import { ShellModel } from "model/shell_model.slint";
+import { SlotView } from "model/slot_view.slint";
 import { ThemeOption } from "model/theme_option.slint";
 import { MenuOverlay } from "shell/menu_overlay.slint";
 import { PageHost } from "shell/page_host.slint";
@@ -12,7 +15,7 @@ import { StatusLine } from "shell/status_line.slint";
 import { TopBar } from "shell/top_bar.slint";
 import { Theme } from "theme/theme.slint";
 
-export { MenuAction, MenuId, PageId, ShellModel, Theme, ThemeOption }
+export { EditorModel, MenuAction, MenuId, PageId, ScreenshotTile, ShellModel, SlotView, Theme, ThemeOption }
 
 export component MainWindow inherits Window {
     title: ShellModel.window-title;

@@ -167,6 +167,27 @@ fn load_three_screenshots(harness: &mut AppHarness) {
     harness.run_jobs();
 }
 
+/// The headers the body shows: the asset pages' panel titles, or the title Online and Console still show.
+fn body_titles(shell: &Shell) -> Vec<String> {
+    ["ImagePanel::title", "PageHost::page-title"]
+        .into_iter()
+        .flat_map(|id| ElementHandle::find_by_element_id(shell.view.window(), id))
+        .filter_map(|title| title.accessible_label())
+        .map(|title| title.to_string())
+        .collect()
+}
+
+fn page_titles(page: Page) -> Vec<&'static str> {
+    match page {
+        Page::Cover => vec!["Cover"],
+        Page::Background => vec!["Background"],
+        Page::IconBanner => vec!["Icon", "Banner"],
+        Page::Screenshots => vec!["Screenshot 1"],
+        Page::Online => vec!["Online"],
+        Page::Console => vec!["Console"],
+    }
+}
+
 #[test]
 fn shell_renders_every_page_in_both_themes() {
     for (theme, bar, name) in [
@@ -189,6 +210,11 @@ fn shell_renders_every_page_in_both_themes() {
             );
             let (x, y) = TOP_BAR_PROBE;
             assert_eq!(*snapshot.get_pixel(x, y), bar, "{name} top bar");
+            assert_eq!(
+                body_titles(&shell),
+                page_titles(page),
+                "{name} {page:?} shows its own page"
+            );
             bodies.push(crop(&snapshot, BODY_AREA));
         }
         for (index, body) in bodies.iter().enumerate() {
@@ -386,12 +412,64 @@ fn build_pill_and_gear_about_ask_for_the_about_dialog() {
 }
 
 #[test]
-fn image_cache_reports_only_changed_revisions() {
+fn image_cache_converts_only_changed_revisions() {
+    let image = |colour: [u8; 4]| {
+        slint::Image::from_rgba8(
+            slint::SharedPixelBuffer::<slint::Rgba8Pixel>::clone_from_slice(&colour[..], 1, 1),
+        )
+    };
+    let first_pixel = |image: &slint::Image| image.to_rgba8().map(|buffer| buffer.as_slice()[0]);
+    let red = image([255, 0, 0, 255]);
+    let blue = image([0, 0, 255, 255]);
     let mut cache = ImageCache::default();
-    assert!(cache.needs_update(AssetSlot::Cover, 1));
-    assert!(!cache.needs_update(AssetSlot::Cover, 1));
-    assert!(cache.needs_update(AssetSlot::Background, 1));
-    assert!(cache.needs_update(AssetSlot::Cover, 2));
+
+    let shown = cache.image(AssetSlot::Cover, 1, || red.clone());
+    assert_eq!(first_pixel(&shown), first_pixel(&red));
+    let again = cache.image(AssetSlot::Cover, 1, || {
+        panic!("revision 1 is converted once")
+    });
+    assert_eq!(first_pixel(&again), first_pixel(&red));
+    let other_slot = cache.image(AssetSlot::Background, 1, || blue.clone());
+    assert_eq!(first_pixel(&other_slot), first_pixel(&blue));
+    let changed = cache.image(AssetSlot::Cover, 2, || blue.clone());
+    assert_eq!(first_pixel(&changed), first_pixel(&blue));
+}
+
+#[test]
+fn render_converts_only_slots_whose_revision_changed() {
+    let mut harness = AppHarness::new();
+    load_three_screenshots(&mut harness);
+    let shell = Shell::start(&mut harness);
+    let editor = shell.view.window().global::<aurora_ui::EditorModel>();
+    let first_tile = || {
+        use slint::Model;
+        editor
+            .get_screenshot_tiles()
+            .row_data(0)
+            .expect("tile 1 is shown")
+            .image
+    };
+    let shown = first_tile();
+
+    // Images compare by buffer, so an equal image was not converted again.
+    shell.act(|app| app.set_drop_hover(true));
+    assert_eq!(
+        first_tile(),
+        shown,
+        "an unrelated change reuses the converted image"
+    );
+
+    shell.act(|app| {
+        app.move_screenshot(
+            ScreenshotNumber::new(1).expect("position 1"),
+            ScreenshotNumber::new(2).expect("position 2"),
+        )
+    });
+    assert_ne!(
+        first_tile(),
+        shown,
+        "the moved positions are converted again"
+    );
 }
 
 #[test]

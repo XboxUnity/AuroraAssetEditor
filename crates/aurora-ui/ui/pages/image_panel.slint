@@ -1,0 +1,74 @@
+import { DropSlot } from "../controls/drop_slot.slint";
+import { PillButton } from "../controls/pill_button.slint";
+import { EditorModel } from "../model/editor_model.slint";
+import { ShellModel } from "../model/shell_model.slint";
+import { SlotView } from "../model/slot_view.slint";
+import { Theme } from "../theme/theme.slint";
+
+// A page header (title, caption, buttons) over the slot it acts on.
+export component ImagePanel inherits VerticalLayout {
+    in property <SlotView> view;
+    in property <image> placeholder;
+    // Only the Screenshots page has Add.
+    in property <bool> has-add-button;
+
+    spacing: Theme.body-gap;
+
+    HorizontalLayout {
+        vertical-stretch: 0;
+        spacing: Theme.header-gap;
+        title := Text {
+            horizontal-stretch: 0;
+            text: view.title;
+            color: Theme.text-strong;
+            font-size: Theme.page-title-font-size;
+            font-weight: Theme.semibold-font-weight;
+            vertical-alignment: center;
+        }
+        caption := Text {
+            horizontal-stretch: 1;
+            text: view.caption;
+            color: Theme.text-muted;
+            font-size: Theme.caption-font-size;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+        if has-add-button: add-button := PillButton {
+            text: "Add…";
+            enabled: !ShellModel.editor-locked;
+            clicked => {
+                EditorModel.add-screenshots();
+            }
+        }
+        replace-button := PillButton {
+            text: "Replace…";
+            enabled: !ShellModel.editor-locked;
+            clicked => {
+                EditorModel.replace(view.slot-index);
+            }
+        }
+        export-button := PillButton {
+            text: "Export…";
+            enabled: view.can-export && !ShellModel.editor-locked;
+            clicked => {
+                EditorModel.export(view.slot-index);
+            }
+        }
+        remove-button := PillButton {
+            text: "Remove";
+            enabled: view.can-remove && !ShellModel.editor-locked;
+            clicked => {
+                EditorModel.remove(view.slot-index);
+            }
+        }
+    }
+
+    slot := DropSlot {
+        vertical-stretch: 1;
+        image: view.image;
+        has-image: view.has-image;
+        unsupported: view.unsupported;
+        placeholder: placeholder;
+        highlighted: EditorModel.drop-hover;
+    }
+}

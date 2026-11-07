@@ -1,0 +1,97 @@
+import { DashedBorder } from "../controls/dashed_border.slint";
+import { Icon } from "../controls/icon.slint";
+import { EditorModel } from "../model/editor_model.slint";
+import { ScreenshotTile } from "../model/screenshot_tile.slint";
+import { ShellModel } from "../model/shell_model.slint";
+import { Theme } from "../theme/theme.slint";
+
+export component ScreenshotThumb inherits Rectangle {
+    in property <ScreenshotTile> tile;
+    // The pointer's x relative to this thumbnail, while a filled thumbnail is dragged.
+    callback drag-moved(length);
+    callback drag-ended(length);
+
+    property <bool> dragging;
+
+    width: Theme.thumb-width;
+    height: Theme.thumb-height;
+    border-radius: Theme.slot-radius;
+    background: tile.filled ? Theme.slot-filled-gradient : Theme.slot-background;
+    border-width: tile.filled ? Theme.border-width : 0;
+    border-color: Theme.slot-filled-border;
+    accessible-role: list-item;
+    accessible-label: tile.is-next-free ? "Add…" : "Screenshot \{tile.number}";
+    accessible-item-selected: tile.selected;
+    accessible-action-default => {
+        activate();
+    }
+
+    function activate() {
+        if !tile.is-next-free {
+            EditorModel.select-screenshot(tile.number);
+        } else if !ShellModel.editor-locked {
+            EditorModel.add-screenshots();
+        }
+    }
+
+    if !tile.filled: DashedBorder {
+        width: 100%;
+        height: 100%;
+        dash-color: Theme.slot-border;
+    }
+    if tile.filled: Image {
+        x: Theme.border-width;
+        y: Theme.border-width;
+        width: parent.width - 2 * Theme.border-width;
+        height: parent.height - 2 * Theme.border-width;
+        source: tile.image;
+        image-fit: contain;
+    }
+    if !tile.filled && !tile.is-next-free: Text {
+        width: 100%;
+        height: 100%;
+        text: tile.number;
+        color: Theme.text-muted;
+        font-size: Theme.caption-font-size;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+    if tile.is-next-free: Icon {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        source: @image-url("../icons/plus.svg");
+        colorize: Theme.text-muted;
+    }
+    if tile.selected: Rectangle {
+        x: -Theme.thumb-selected-outline-width;
+        y: -Theme.thumb-selected-outline-width;
+        width: parent.width + 2 * Theme.thumb-selected-outline-width;
+        height: parent.height + 2 * Theme.thumb-selected-outline-width;
+        border-width: Theme.thumb-selected-outline-width;
+        border-color: Theme.thumb-selected-outline;
+        border-radius: Theme.slot-radius + Theme.thumb-selected-outline-width;
+    }
+
+    TouchArea {
+        moved => {
+            if tile.filled && self.pressed
+                && (abs(self.mouse-x - self.pressed-x) > Theme.drag-threshold
+                || abs(self.mouse-y - self.pressed-y) > Theme.drag-threshold) {
+                dragging = true;
+            }
+            if dragging {
+                drag-moved(self.mouse-x);
+            }
+        }
+        pointer-event(event) => {
+            if event.kind == PointerEventKind.up && event.button == PointerEventButton.left {
+                if dragging {
+                    dragging = false;
+                    drag-ended(self.mouse-x);
+                } else {
+                    activate();
+                }
+            }
+        }
+    }
+}

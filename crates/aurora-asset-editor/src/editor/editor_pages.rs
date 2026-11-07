@@ -53,9 +53,11 @@ impl EditorPages {
         Some(self.get_mut(kind))
     }
 
-    /// Fresh documents, as the old `Reset()`.
+    /// Empty documents, as the old `Reset()`.
     pub fn reset(&mut self) {
-        *self = Self::new();
+        for kind in AssetKind::ALL {
+            self.get_mut(kind).clear();
+        }
     }
 
     /// How many of cover, background, icon, banner and screenshots hold something (0 to 5).

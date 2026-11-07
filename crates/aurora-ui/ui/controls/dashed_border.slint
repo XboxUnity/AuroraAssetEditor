@@ -1,0 +1,42 @@
+import { Theme } from "../theme/theme.slint";
+
+// A 1 px dashed outline (Slint borders are solid only). The dashes leave the rounded corners open.
+export component DashedBorder {
+    in property <color> dash-color;
+
+    property <length> corner: Theme.slot-radius;
+    property <length> step: Theme.slot-dash-length + Theme.slot-dash-gap;
+    property <int> across-count: max(0, floor((self.width - 2 * corner + Theme.slot-dash-gap) / step));
+    property <int> down-count: max(0, floor((self.height - 2 * corner + Theme.slot-dash-gap) / step));
+    property <length> across-start: (self.width - across-count * step + Theme.slot-dash-gap) / 2;
+    property <length> down-start: (self.height - down-count * step + Theme.slot-dash-gap) / 2;
+
+    for index in across-count: Rectangle {
+        x: across-start + index * step;
+        y: 0;
+        width: Theme.slot-dash-length;
+        height: Theme.border-width;
+        background: dash-color;
+    }
+    for index in across-count: Rectangle {
+        x: across-start + index * step;
+        y: root.height - Theme.border-width;
+        width: Theme.slot-dash-length;
+        height: Theme.border-width;
+        background: dash-color;
+    }
+    for index in down-count: Rectangle {
+        x: 0;
+        y: down-start + index * step;
+        width: Theme.border-width;
+        height: Theme.slot-dash-length;
+        background: dash-color;
+    }
+    for index in down-count: Rectangle {
+        x: root.width - Theme.border-width;
+        y: down-start + index * step;
+        width: Theme.border-width;
+        height: Theme.slot-dash-length;
+        background: dash-color;
+    }
+}

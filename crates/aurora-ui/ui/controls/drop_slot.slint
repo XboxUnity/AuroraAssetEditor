@@ -1,0 +1,65 @@
+import { Theme } from "../theme/theme.slint";
+import { DashedBorder } from "dashed_border.slint";
+
+// The preview area of an asset page: the image scaled to fit, or the placeholder art with the drop hint.
+export component DropSlot inherits Rectangle {
+    in property <image> image;
+    in property <bool> has-image;
+    in property <bool> unsupported;
+    in property <image> placeholder;
+    in property <bool> highlighted;
+
+    property <bool> filled: has-image || unsupported;
+
+    border-radius: Theme.slot-radius;
+    background: filled ? Theme.slot-filled-gradient : Theme.slot-background;
+    border-width: filled || highlighted ? Theme.border-width : 0;
+    border-color: Theme.slot-filled-border;
+
+    if !filled && !highlighted: DashedBorder {
+        width: 100%;
+        height: 100%;
+        dash-color: Theme.slot-border;
+    }
+
+    if has-image: preview := Image {
+        x: Theme.border-width;
+        y: Theme.border-width;
+        width: parent.width - 2 * Theme.border-width;
+        height: parent.height - 2 * Theme.border-width;
+        source: image;
+        image-fit: contain;
+    }
+
+    if unsupported: unsupported-label := Text {
+        width: 100%;
+        height: 100%;
+        text: "Unsupported texture format (kept as is)";
+        color: Theme.chip-text;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        wrap: word-wrap;
+    }
+
+    if !filled: VerticalLayout {
+        padding: Theme.slot-content-padding;
+        spacing: Theme.drop-hint-gap;
+        placeholder-art := Image {
+            vertical-stretch: 1;
+            // The art's own size would otherwise become the page's minimum size.
+            preferred-width: 0;
+            preferred-height: 0;
+            source: placeholder;
+            image-fit: contain;
+            opacity: Theme.placeholder-opacity;
+        }
+        drop-hint := Text {
+            vertical-stretch: 0;
+            text: "Drop PNG / JPG / WebP / BMP / DDS / .asset here";
+            color: Theme.text-muted;
+            font-size: Theme.caption-font-size;
+            horizontal-alignment: center;
+            overflow: elide;
+        }
+    }
+}

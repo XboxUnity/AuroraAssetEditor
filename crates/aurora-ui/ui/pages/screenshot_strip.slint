@@ -1,0 +1,58 @@
+import { EditorModel } from "../model/editor_model.slint";
+import { Theme } from "../theme/theme.slint";
+import { ScreenshotThumb } from "screenshot_thumb.slint";
+
+// Positions 1 to the last filled one, the "+" tile, and drag to reorder: a dragged thumbnail lands on the
+// position under the pointer, which the insertion bar marks.
+export component ScreenshotStrip inherits Rectangle {
+    property <length> inset: Theme.thumb-selected-outline-width;
+    property <length> pitch: Theme.thumb-width + Theme.thumb-gap;
+    property <int> tile-count: EditorModel.screenshot-tiles.length;
+    property <int> numbered-count: tile-count
+        - (EditorModel.screenshot-tiles[tile-count - 1].is-next-free ? 1 : 0);
+    // 0 while nothing is dragged.
+    property <int> drag-from;
+    property <int> drag-to;
+
+    height: Theme.thumb-height + 2 * inset;
+
+    function position-under(strip-x: length) -> int {
+        return clamp(floor((strip-x - inset) / pitch), 0, numbered-count - 1) + 1;
+    }
+
+    HorizontalLayout {
+        padding: inset;
+        spacing: Theme.thumb-gap;
+        alignment: start;
+        for tile in EditorModel.screenshot-tiles: thumb := ScreenshotThumb {
+            tile: tile;
+            drag-moved(pointer-x) => {
+                drag-from = tile.number;
+                drag-to = position-under(self.x + pointer-x);
+            }
+            drag-ended(pointer-x) => {
+                let to = position-under(self.x + pointer-x);
+                drag-from = 0;
+                if to != tile.number {
+                    EditorModel.move-screenshot(tile.number, to);
+                }
+            }
+        }
+        if numbered-count > 0: hint := Text {
+            text: "drag to reorder";
+            color: Theme.text-muted;
+            font-size: Theme.caption-font-size;
+            vertical-alignment: center;
+        }
+    }
+
+    if drag-from != 0 && drag-to != drag-from: insertion-bar := Rectangle {
+        // After the target when moving right, before it when moving left: where the dragged one lands.
+        x: max(0px, inset + (drag-to > drag-from ? drag-to : drag-to - 1) * pitch
+            - Theme.thumb-gap / 2 - Theme.insertion-bar-width / 2);
+        y: inset;
+        width: Theme.insertion-bar-width;
+        height: Theme.thumb-height;
+        background: Theme.accent;
+    }
+}

@@ -44,7 +44,7 @@ pub(super) fn connect_shell(window: &MainWindow, app: &Rc<RefCell<App>>, refresh
 }
 
 /// Runs an action on the app, then renders the result.
-fn action_runner(
+pub(super) fn action_runner(
     app: &Rc<RefCell<App>>,
     refresh: &Refresh,
 ) -> impl Fn(&mut dyn FnMut(&mut App)) + use<> {
