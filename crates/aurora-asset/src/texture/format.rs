@@ -1,4 +1,7 @@
+use std::fmt;
+
 use super::block_decode::BlockCodec;
+
 /// The app's "Use Compression" toggle.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Compression {
@@ -135,6 +138,25 @@ pub(super) fn classify(fields: &FetchFields) -> TextureFormat {
     }
 }
 
+impl fmt::Display for TextureFormat {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::LinearArgb8888 => write!(formatter, "linear ARGB8888"),
+            Self::LinearDxt1 => write!(formatter, "linear DXT1"),
+            Self::LinearDxt4 => write!(formatter, "linear DXT4"),
+            Self::LinearDxt5 => write!(formatter, "linear DXT5"),
+            Self::Unsupported {
+                data_format,
+                tiled: false,
+            } => write!(formatter, "format {data_format:#04x}"),
+            Self::Unsupported {
+                data_format,
+                tiled: true,
+            } => write!(formatter, "tiled format {data_format:#04x}"),
+        }
+    }
+}
+
 impl TextureFormat {
     pub(super) fn block_codec(self) -> Option<BlockCodec> {
         match self {
@@ -145,5 +167,23 @@ impl TextureFormat {
             }),
             Self::LinearArgb8888 | Self::Unsupported { .. } => None,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::texture::DecodeError;
+
+    #[test]
+    fn formats_display_as_plain_words() {
+        let unsupported = |data_format, tiled| TextureFormat::Unsupported { data_format, tiled };
+        assert_eq!(TextureFormat::LinearDxt1.to_string(), "linear DXT1");
+        assert_eq!(unsupported(0x13, false).to_string(), "format 0x13");
+        assert_eq!(unsupported(0x14, true).to_string(), "tiled format 0x14");
+        assert_eq!(
+            DecodeError::UnsupportedFormat(unsupported(0x13, false)).to_string(),
+            "a texture in format 0x13 cannot be decoded"
+        );
     }
 }

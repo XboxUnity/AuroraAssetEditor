@@ -54,7 +54,7 @@ impl fmt::Display for DecodeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::UnsupportedFormat(format) => {
-                write!(f, "texture format {format:?} cannot be decoded")
+                write!(f, "a texture in {format} cannot be decoded")
             }
             Self::TruncatedData { expected, actual } => write!(
                 f,
