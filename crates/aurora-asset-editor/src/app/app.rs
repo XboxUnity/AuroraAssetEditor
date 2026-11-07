@@ -1,0 +1,185 @@
+use std::error::Error;
+use std::path::{Path, PathBuf};
+
+use crate::dialogs::{Modal, ModalAnswer, ModalField, ModalQueue};
+use crate::editor::EditorPages;
+use crate::jobs::JobOutcome;
+use crate::logging::error_chain;
+use crate::platform::{DialogError, OpenRequest, SaveRequest};
+use crate::status::{ActiveWork, Locks, StatusLine};
+
+use super::{AppEnvironment, CurrentGame, Page, StartupProblem};
+
+pub const LOG_WRITE_FAILED: &str = "Could not write error.log";
+pub const DIALOG_FAILED_TITLE: &str = "Could not open the file dialog";
+const STATUS_SEPARATOR: &str = " · ";
+
+/// The app's state and every action the window offers. It holds no UI: the view reads it and calls its
+/// methods, and work that may take a while goes to the job runner.
+pub struct App {
+    pub(super) environment: AppEnvironment,
+    pub(super) page: Page,
+    pub(super) pages: EditorPages,
+    pub(super) current_game: Option<CurrentGame>,
+    pub(super) status: StatusLine,
+    pub(super) active_work: ActiveWork,
+    pub(super) modals: ModalQueue,
+}
+
+impl App {
+    pub fn new(mut environment: AppEnvironment) -> App {
+        let startup_problems = std::mem::take(&mut environment.startup_problems);
+        let mut app = App {
+            environment,
+            page: Page::Cover,
+            pages: EditorPages::new(),
+            current_game: None,
+            status: StatusLine::ready(),
+            active_work: ActiveWork::default(),
+            modals: ModalQueue::new(),
+        };
+        app.report_startup_problems(&startup_problems);
+        app
+    }
+
+    pub fn config_dir(&self) -> &Path {
+        &self.environment.config_dir
+    }
+
+    pub fn page(&self) -> Page {
+        self.page
+    }
+
+    pub fn show_page(&mut self, page: Page) {
+        self.page = page;
+    }
+
+    pub fn pages(&self) -> &EditorPages {
+        &self.pages
+    }
+
+    pub fn status(&self) -> &StatusLine {
+        &self.status
+    }
+
+    pub fn locks(&self) -> Locks {
+        self.active_work.locks()
+    }
+
+    pub fn modal(&self) -> Option<&Modal> {
+        self.modals.current()
+    }
+
+    pub fn answer_modal(&mut self, answer: ModalAnswer) {
+        let Some(modal) = self.modals.close_current() else {
+            return;
+        };
+        match (modal, answer) {
+            (Modal::Message { .. }, ModalAnswer::Accept | ModalAnswer::Cancel) => {}
+        }
+    }
+
+    pub fn edit_modal_field(&mut self, field: ModalField, text: &str) {
+        match (field, text) {}
+    }
+
+    pub fn on_job_outcome(&mut self, outcome: JobOutcome) {
+        match outcome {}
+    }
+
+    /// Logs the error and shows it in the status line.
+    pub(super) fn report_error(&mut self, context: &str, error: &(dyn Error + 'static)) {
+        let log_failure = self.record_error(context, error);
+        self.set_error_status(format!("{context}: {error}"), log_failure);
+    }
+
+    /// Logs the error and shows `text` in a message dialog titled `title`.
+    pub(super) fn show_error(&mut self, title: &str, text: String, error: &(dyn Error + 'static)) {
+        if let Some(log_failure) = self.record_error(title, error) {
+            self.status = StatusLine::error(log_failure);
+        }
+        self.modals.push(Modal::Message {
+            title: title.to_owned(),
+            text,
+        });
+    }
+
+    /// The picked files; none when the user cancelled or the dialog failed, which is shown.
+    #[expect(dead_code, reason = "first used by the file actions")]
+    pub(super) fn ask_open_files(&mut self, request: &OpenRequest) -> Vec<PathBuf> {
+        let answer = self.environment.dialogs.open_files(request);
+        self.dialog_answer(&request.title, answer)
+            .unwrap_or_default()
+    }
+
+    /// The picked file; `None` when the user cancelled or the dialog failed, which is shown.
+    #[expect(dead_code, reason = "first used by the image actions")]
+    pub(super) fn ask_open_file(&mut self, request: &OpenRequest) -> Option<PathBuf> {
+        let answer = self.environment.dialogs.open_file(request);
+        self.dialog_answer(&request.title, answer).flatten()
+    }
+
+    /// The chosen file; `None` when the user cancelled or the dialog failed, which is shown.
+    #[expect(dead_code, reason = "first used by the save actions")]
+    pub(super) fn ask_save_file(&mut self, request: &SaveRequest) -> Option<PathBuf> {
+        let answer = self.environment.dialogs.save_file(request);
+        self.dialog_answer(&request.title, answer).flatten()
+    }
+
+    /// The chosen folder; `None` when the user cancelled or the dialog failed, which is shown.
+    #[expect(dead_code, reason = "first used by the save actions")]
+    pub(super) fn ask_folder(&mut self, title: &str) -> Option<PathBuf> {
+        let answer = self.environment.dialogs.pick_folder(title);
+        self.dialog_answer(title, answer).flatten()
+    }
+
+    fn dialog_answer<T>(
+        &mut self,
+        dialog_title: &str,
+        answer: Result<T, DialogError>,
+    ) -> Option<T> {
+        match answer {
+            Ok(answer) => Some(answer),
+            Err(error) => {
+                let reason = error_chain(error.source.as_ref()).join(": ");
+                let text = format!("The \"{dialog_title}\" dialog could not be shown: {reason}");
+                self.show_error(DIALOG_FAILED_TITLE, text, &error);
+                None
+            }
+        }
+    }
+
+    /// Every problem goes to `error.log`; the status line shows the first one.
+    fn report_startup_problems(&mut self, problems: &[StartupProblem]) {
+        let log_failures: Vec<String> = problems
+            .iter()
+            .filter_map(|problem| self.record_error(&problem.context, problem.error.as_ref()))
+            .collect();
+        let Some(first) = problems.first() else {
+            return;
+        };
+        let mut text = format!("{}: {}", first.context, first.error);
+        let more = problems.len() - 1;
+        if more > 0 {
+            text.push_str(&format!(" ({more} more in error.log)"));
+        }
+        self.set_error_status(text, log_failures.into_iter().next());
+    }
+
+    /// Writes the error to `error.log`. When that fails, the failure is returned for the status line.
+    fn record_error(&self, context: &str, error: &(dyn Error + 'static)) -> Option<String> {
+        self.environment
+            .error_log
+            .record(context, error)
+            .err()
+            .map(|log_error| format!("{LOG_WRITE_FAILED}: {log_error}"))
+    }
+
+    fn set_error_status(&mut self, text: String, log_failure: Option<String>) {
+        let text = match log_failure {
+            Some(log_failure) => format!("{text}{STATUS_SEPARATOR}{log_failure}"),
+            None => text,
+        };
+        self.status = StatusLine::error(text);
+    }
+}
