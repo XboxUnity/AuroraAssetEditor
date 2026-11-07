@@ -7,7 +7,7 @@ use anyhow::{Context, Result, ensure};
 use serde::{Deserialize, Serialize};
 
 use crate::golden::{Paths, bgra_to_rgba, os, run_harness_allowing_refusal, sha256_hex};
-use crate::synthetic::Prng;
+use crate::prng::Prng;
 
 pub const DDS_DIRECTORY: &str = "dds";
 

@@ -1,24 +1,8 @@
-//! Crafted texture headers for the golden corpus.
-//!
-//! Aurora writes linear DXT1 and DXT5 textures that AuroraAsset.dll never produces itself, so
-//! their header signatures are found by decoding crafted headers with the DLL and recording
-//! what it accepts. The video bytes are random: any bytes are valid BC blocks.
+use super::HEADER_BYTE_LENGTH;
+use crate::minimum_read::SurfaceUnit;
+use crate::prng::Prng;
 
-use std::path::Path;
-
-use anyhow::Result;
-use aurora_asset::{TextureFormat, TextureHeader};
-use serde::{Deserialize, Serialize};
-
-use crate::golden::{Paths, dll_decode, os, run_harness, sha256_hex};
-use crate::minimum_read::{self, LinearTexture, SurfaceUnit};
-use crate::synthetic::Prng;
-
-pub const CRAFTED_DIRECTORY: &str = "crafted";
-
-const HEADER_BYTE_LENGTH: usize = 52;
 const DWORD_BYTES: usize = 4;
-const BYTES_PER_PIXEL: usize = 4;
 const PRNG_SEED_BASE: u64 = 0x5EED_0000;
 const VIDEO_SEED_BLOCK_STRIDE: u64 = 10_000;
 
@@ -103,37 +87,6 @@ const BORDER_PROBE: (&str, &[(usize, u32)]) = ("border", &[(10, 0x8000_0000)]);
 const SWIZZLE_SELECTORS: [u32; 4] = [0, 1, 2, 3];
 const SWIZZLE_CONSTANT_ZERO: u32 = 4;
 
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
-pub struct Crafted {
-    name: String,
-    header: String,
-    video: String,
-    decoded_sha256: String,
-    dll_accepted: bool,
-    /// The case whose decoded pixels this one equals, so no pixels are stored for it.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    same_as: Option<String>,
-    /// For a header the port decodes: whether the DLL decodes the video cut to the bytes it reads
-    /// to the same pixels.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    decodes_at_minimum_len: Option<bool>,
-}
-
-impl Crafted {
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-
-    pub fn video_file(&self) -> &str {
-        &self.video
-    }
-
-    pub fn decoded_file(&self) -> Option<String> {
-        (self.dll_accepted && self.same_as.is_none())
-            .then(|| format!("{CRAFTED_DIRECTORY}/{}.rgba", self.name))
-    }
-}
-
 #[derive(Clone, Copy)]
 enum VideoPattern {
     Random,
@@ -144,7 +97,7 @@ enum VideoPattern {
 
 /// How a surface is divided into the units its rows are made of.
 #[derive(Clone, Copy, PartialEq)]
-enum Surface {
+pub(super) enum Surface {
     Bc1,
     Bc3,
     Argb,
@@ -166,7 +119,7 @@ impl Surface {
         }
     }
 
-    fn unit(self) -> SurfaceUnit {
+    pub(super) fn unit(self) -> SurfaceUnit {
         SurfaceUnit {
             texels_per_side: self.texels_per_side(),
             bytes: self.unit_bytes(),
@@ -183,9 +136,9 @@ impl Surface {
 }
 
 #[derive(Clone)]
-struct Case {
-    name: String,
-    surface: Surface,
+pub(super) struct Case {
+    pub(super) name: String,
+    pub(super) surface: Surface,
     data_format: u32,
     endian: u32,
     swizzle: [u32; 4],
@@ -195,9 +148,9 @@ struct Case {
     pitch_units: Option<u32>,
     flips: Vec<(usize, u32)>,
     /// The case whose decode this one is compared with: equal output is stored as a reference.
-    baseline: Option<String>,
-    width: u32,
-    height: u32,
+    pub(super) baseline: Option<String>,
+    pub(super) width: u32,
+    pub(super) height: u32,
     pattern: VideoPattern,
 }
 
@@ -311,7 +264,7 @@ impl Case {
     }
 
     /// Cases with the same bytes share one video file.
-    fn video_file_name(&self) -> String {
+    pub(super) fn video_file_name(&self) -> String {
         let pattern = match self.pattern {
             VideoPattern::Random => "random",
             VideoPattern::EqualColorEndpoints => "equal_endpoints",
@@ -336,7 +289,7 @@ impl Case {
             + u64::from(self.width)
     }
 
-    fn video(&self) -> Vec<u8> {
+    pub(super) fn video(&self) -> Vec<u8> {
         let mut prng = Prng::with_seed(self.video_seed());
         let mut video: Vec<u8> = (0..self.video_len()).map(|_| prng.next_byte()).collect();
         match self.pattern {
@@ -376,7 +329,7 @@ fn swizzle_permutations() -> Vec<[u32; 4]> {
     permutations
 }
 
-fn cases() -> Vec<Case> {
+pub(super) fn cases() -> Vec<Case> {
     let mut cases = Vec::new();
     for (size, endians) in [(SMALL_SIZE, ENDIANS.as_slice()), (ODD_SIZE, [1].as_slice())] {
         for format in [DXT1, DXT2_3, DXT4_5] {
@@ -450,48 +403,10 @@ fn patch_dword(header: &mut [u8; HEADER_BYTE_LENGTH], index: usize, patch: impl 
     header[range].copy_from_slice(&patch(word).to_be_bytes());
 }
 
-/// The header the DLL writes for a texture of this size and compression, used as the base to patch.
-fn dll_header(
-    paths: &Paths,
-    work_dir: &Path,
-    (width, height): (u32, u32),
-    compression: &str,
-) -> Result<[u8; HEADER_BYTE_LENGTH]> {
-    let pixels = work_dir.join("base.argb");
-    let header_path = work_dir.join("base.header");
-    let video_path = work_dir.join("base.video");
-    std::fs::write(
-        &pixels,
-        vec![0u8; width as usize * height as usize * BYTES_PER_PIXEL],
-    )?;
-    run_harness(
-        paths,
-        &[
-            os("encode"),
-            os("--dll"),
-            paths.dll().into(),
-            os("--input"),
-            pixels.into(),
-            os("--width"),
-            width.to_string().into(),
-            os("--height"),
-            height.to_string().into(),
-            os("--compression"),
-            os(compression),
-            os("--header-out"),
-            header_path.clone().into(),
-            os("--video-out"),
-            video_path.into(),
-        ],
-    )?;
-    let bytes = std::fs::read(&header_path)?;
-    let length = bytes.len();
-    bytes.try_into().map_err(|_| {
-        anyhow::anyhow!("base header is {length} bytes, expected {HEADER_BYTE_LENGTH}")
-    })
-}
-
-fn crafted_header(base: [u8; HEADER_BYTE_LENGTH], case: &Case) -> [u8; HEADER_BYTE_LENGTH] {
+pub(super) fn crafted_header(
+    base: [u8; HEADER_BYTE_LENGTH],
+    case: &Case,
+) -> [u8; HEADER_BYTE_LENGTH] {
     let mut header = base;
     patch_dword(&mut header, FETCH_0_DWORD, |word| {
         let word = set_bits(word, TILED_SHIFT, 1, u32::from(case.tiled));
@@ -518,66 +433,4 @@ fn crafted_header(base: [u8; HEADER_BYTE_LENGTH], case: &Case) -> [u8; HEADER_BY
         patch_dword(&mut header, *dword, |word| word ^ mask);
     }
     header
-}
-
-/// Decodes every crafted case with the DLL and writes the videos and decoded pixels.
-pub fn write_crafted(paths: &Paths, work_dir: &Path, out_dir: &Path) -> Result<Vec<Crafted>> {
-    let crafted_dir = out_dir.join(CRAFTED_DIRECTORY);
-    std::fs::create_dir_all(&crafted_dir)?;
-
-    let mut crafted: Vec<Crafted> = Vec::new();
-    for case in &cases() {
-        let compression = match case.surface {
-            Surface::Argb => "none",
-            Surface::Bc1 | Surface::Bc3 => "dxt",
-        };
-        let base = dll_header(paths, work_dir, (case.width, case.height), compression)?;
-        let header = crafted_header(base, case);
-        let video = case.video();
-        let video_file = format!("{CRAFTED_DIRECTORY}/{}", case.video_file_name());
-        std::fs::write(out_dir.join(&video_file), &video)?;
-
-        let decoded = dll_decode(paths, work_dir, &case.name, &header, &video)?;
-        let decoded_sha256 = decoded.as_deref().map(sha256_hex).unwrap_or_default();
-        let port_decodes = !matches!(
-            TextureHeader::from_bytes(header).format(),
-            TextureFormat::Unsupported { .. }
-        );
-        let decodes_at_minimum_len = if decoded.is_some() && port_decodes {
-            let texture = LinearTexture {
-                header: &header,
-                video: &video,
-                size: (case.width, case.height),
-                unit: case.surface.unit(),
-            };
-            Some(minimum_read::decodes_at_minimum_len(
-                paths,
-                work_dir,
-                &case.name,
-                &texture,
-                &decoded_sha256,
-            )?)
-        } else {
-            None
-        };
-        let same_as = case
-            .baseline
-            .as_ref()
-            .and_then(|name| crafted.iter().find(|other| other.name == *name))
-            .filter(|baseline| baseline.dll_accepted && baseline.decoded_sha256 == decoded_sha256)
-            .map(|baseline| baseline.name.clone());
-        if let (Some(rgba), None) = (&decoded, &same_as) {
-            std::fs::write(crafted_dir.join(format!("{}.rgba", case.name)), rgba)?;
-        }
-        crafted.push(Crafted {
-            name: case.name.clone(),
-            header: hex::encode(header),
-            video: video_file,
-            dll_accepted: decoded.is_some(),
-            decoded_sha256,
-            same_as,
-            decodes_at_minimum_len,
-        });
-    }
-    Ok(crafted)
 }

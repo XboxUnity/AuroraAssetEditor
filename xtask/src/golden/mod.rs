@@ -1,22 +1,32 @@
 //! Generates and verifies the golden codec corpus produced by the original AuroraAsset.dll.
 
+mod compression;
+mod encoded;
+mod harness;
+mod manifest;
+mod paths;
+
 use std::collections::BTreeSet;
-use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use anyhow::{Context, Result, bail, ensure};
 use image::imageops::FilterType;
 use image::{ImageFormat, RgbaImage};
-use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::crafted::{self, CRAFTED_DIRECTORY, Crafted};
 use crate::dds_corpus::{self, DDS_DIRECTORY, DdsSample};
-use crate::minimum_read::{self, LinearTexture, SurfaceUnit};
 use crate::synthetic;
+use compression::Compression;
+use encoded::encode_and_decode;
+use manifest::{Fixture, Manifest};
 
-const HARNESS_TARGET: &str = "i686-pc-windows-msvc";
+pub(crate) use harness::{
+    build_harness, dll_decode, os, run_harness, run_harness_allowing_refusal,
+};
+pub(crate) use paths::{Paths, absolute};
+
 const DXT_DIRECTORY: &str = "dxt";
 const ARGB_DIRECTORY: &str = "argb";
 const DECODED_DIRECTORY: &str = "decoded";
@@ -28,20 +38,12 @@ const GENERATED_DIRECTORIES: [&str; 5] = [
     CRAFTED_DIRECTORY,
     DDS_DIRECTORY,
 ];
-const HARNESS_PACKAGE: &str = "golden-harness";
 const MASTER_PLACEHOLDER_DIRECTORY: &str = "AuroraAssetEditor/Resources/Placeholders";
 /// ARGB videos of larger fixtures are checked by hash only, keeping the corpus under 10 MB.
 const MAX_STORED_ARGB_PIXELS: u32 = 65_536;
 const DXT_DECODED_STORED_NAMES: [&str; 2] = ["alphagrad", "alphanoise"];
 const DXT_DECODED_STORED_PREFIX: &str = "odd_";
 const BYTES_PER_PIXEL: usize = 4;
-const BC3_BLOCK_SIDE: usize = 4;
-const BC3_BLOCK_BYTES: usize = 16;
-const HEADER_BYTE_LENGTH: usize = 52;
-const HARNESS_ENCODE_REFUSED_EXIT_CODE: i32 = 4;
-const HARNESS_DECODE_REFUSED_EXIT_CODE: i32 = 5;
-const VERBATIM_PATH_PREFIX: &str = r"\\?\";
-const UNC_PATH_MARKER: &str = "UNC";
 
 /// Placeholder name on `master`, fixture name, and the size the app resizes it to.
 const PLACEHOLDERS: [(&str, &str, u32, u32); 5] = [
@@ -52,124 +54,10 @@ const PLACEHOLDERS: [(&str, &str, u32, u32); 5] = [
     ("screenshot", "ph_screenshot", 1000, 562),
 ];
 
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
-struct Manifest {
-    fixture: Vec<Fixture>,
-    #[serde(default)]
-    crafted: Vec<Crafted>,
-    #[serde(default)]
-    dds: Vec<DdsSample>,
-}
-
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
-struct Fixture {
-    name: String,
-    width: u32,
-    height: u32,
-    dxt_header: String,
-    dxt_video_sha256: String,
-    dxt_decoded_sha256: String,
-    argb_header: String,
-    argb_video_sha256: String,
-    argb_decoded_sha256: String,
-    argb_video_stored: bool,
-    dxt_decoded_stored: bool,
-    /// Whether the DLL decodes the video cut to the bytes it reads to the same pixels.
-    dxt_decodes_at_minimum_len: bool,
-    argb_decodes_at_minimum_len: bool,
-}
-
-#[derive(Clone, Copy)]
-enum Compression {
-    Dxt,
-    None,
-}
-
-impl Compression {
-    fn harness_name(self) -> &'static str {
-        match self {
-            Compression::Dxt => "dxt",
-            Compression::None => "none",
-        }
-    }
-
-    fn surface_unit(self) -> SurfaceUnit {
-        match self {
-            Compression::Dxt => SurfaceUnit {
-                texels_per_side: BC3_BLOCK_SIDE,
-                bytes: BC3_BLOCK_BYTES,
-            },
-            Compression::None => SurfaceUnit {
-                texels_per_side: 1,
-                bytes: BYTES_PER_PIXEL,
-            },
-        }
-    }
-}
-
-struct Encoded {
-    header: [u8; HEADER_BYTE_LENGTH],
-    video: Vec<u8>,
-    decoded_rgba: Vec<u8>,
-    decodes_at_minimum_len: bool,
-}
-
 /// The DLL's DXT decode is stored for the fixtures where our decode is compared pixel by pixel:
 /// the ones with known rounding ties and the odd-sized ones.
 fn dxt_decoded_is_stored(name: &str) -> bool {
     DXT_DECODED_STORED_NAMES.contains(&name) || name.starts_with(DXT_DECODED_STORED_PREFIX)
-}
-
-pub(crate) struct Paths {
-    root: PathBuf,
-}
-
-impl Paths {
-    pub(crate) fn new() -> Result<Self> {
-        let xtask_directory = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let root = xtask_directory
-            .parent()
-            .context("xtask has no parent directory")?;
-        Ok(Self {
-            root: absolute(root)?,
-        })
-    }
-
-    pub(crate) fn corpus(&self) -> PathBuf {
-        self.root.join("fixtures").join("codec")
-    }
-
-    pub(crate) fn inputs(&self) -> PathBuf {
-        self.corpus().join("inputs")
-    }
-
-    pub(crate) fn dll(&self) -> PathBuf {
-        self.root
-            .join("tools")
-            .join("golden")
-            .join("dll")
-            .join("AuroraAsset.dll")
-    }
-
-    fn harness(&self) -> PathBuf {
-        self.root
-            .join("target")
-            .join(HARNESS_TARGET)
-            .join("release")
-            .join("golden-harness.exe")
-    }
-}
-
-/// Canonical path without the `\\?\` prefix, which the DLL loader's altered search path mishandles.
-pub(crate) fn absolute(path: &Path) -> Result<PathBuf> {
-    let canonical = path
-        .canonicalize()
-        .with_context(|| format!("cannot resolve {}", path.display()))?;
-    let text = canonical.to_string_lossy();
-    match text.strip_prefix(VERBATIM_PATH_PREFIX) {
-        Some(plain) if !plain.starts_with(UNC_PATH_MARKER) => Ok(PathBuf::from(plain)),
-        _ => Ok(canonical),
-    }
 }
 
 pub(crate) fn require_windows() -> Result<()> {
@@ -178,64 +66,6 @@ pub(crate) fn require_windows() -> Result<()> {
         "the golden corpus can only be generated or checked on Windows"
     );
     Ok(())
-}
-
-fn cargo_command() -> Command {
-    Command::new(std::env::var_os("CARGO").unwrap_or_else(|| OsString::from("cargo")))
-}
-
-pub(crate) fn build_harness(paths: &Paths) -> Result<()> {
-    let status = cargo_command()
-        .current_dir(&paths.root)
-        .args([
-            "build",
-            "-p",
-            HARNESS_PACKAGE,
-            "--release",
-            "--target",
-            HARNESS_TARGET,
-        ])
-        .status()
-        .context("cannot start cargo to build the harness")?;
-    ensure!(
-        status.success(),
-        "building the golden harness failed: {status}"
-    );
-    Ok(())
-}
-
-/// Runs the harness; `None` means the DLL refused the input, any other failure is an error.
-pub(crate) fn run_harness_allowing_refusal(
-    paths: &Paths,
-    arguments: &[OsString],
-) -> Result<Option<String>> {
-    let output = Command::new(paths.harness())
-        .args(arguments)
-        .output()
-        .context("cannot start the golden harness")?;
-    if output.status.success() {
-        return Ok(Some(String::from_utf8_lossy(&output.stdout).into_owned()));
-    }
-    let refused = matches!(
-        output.status.code(),
-        Some(HARNESS_ENCODE_REFUSED_EXIT_CODE | HARNESS_DECODE_REFUSED_EXIT_CODE)
-    );
-    if refused {
-        return Ok(None);
-    }
-    bail!(
-        "golden harness failed (exit status {}): {}",
-        output.status,
-        String::from_utf8_lossy(&output.stderr).trim()
-    )
-}
-
-pub(crate) fn run_harness(paths: &Paths, arguments: &[OsString]) -> Result<String> {
-    run_harness_allowing_refusal(paths, arguments)?.context("the DLL refused the input")
-}
-
-pub(crate) fn os(text: &str) -> OsString {
-    OsString::from(text)
 }
 
 pub(crate) fn sha256_hex(bytes: &[u8]) -> String {
@@ -256,138 +86,6 @@ fn rgba_to_argb(rgba: &[u8]) -> Vec<u8> {
         argb.extend_from_slice(&[pixel[3], pixel[0], pixel[1], pixel[2]]);
     }
     argb
-}
-
-fn encode_and_decode(
-    paths: &Paths,
-    work_dir: &Path,
-    image: &RgbaImage,
-    compression: Compression,
-) -> Result<Encoded> {
-    let (width, height) = image.dimensions();
-    let argb_path = work_dir.join("input.argb");
-    let header_path = work_dir.join("out.header");
-    let video_path = work_dir.join("out.video");
-    let decoded_path = work_dir.join("out.bgra");
-    std::fs::write(&argb_path, rgba_to_argb(image.as_raw()))?;
-
-    run_harness(
-        paths,
-        &[
-            os("encode"),
-            os("--dll"),
-            paths.dll().into(),
-            os("--input"),
-            argb_path.into(),
-            os("--width"),
-            width.to_string().into(),
-            os("--height"),
-            height.to_string().into(),
-            os("--compression"),
-            os(compression.harness_name()),
-            os("--header-out"),
-            header_path.clone().into(),
-            os("--video-out"),
-            video_path.clone().into(),
-        ],
-    )?;
-    let decode_report = run_harness(
-        paths,
-        &[
-            os("decode"),
-            os("--dll"),
-            paths.dll().into(),
-            os("--header"),
-            header_path.clone().into(),
-            os("--video"),
-            video_path.clone().into(),
-            os("--out"),
-            decoded_path.clone().into(),
-        ],
-    )?;
-    ensure!(
-        decode_report.trim() == format!("{width} {height}"),
-        "decoded size {:?} differs from the input size {width}x{height}",
-        decode_report.trim()
-    );
-
-    let header = std::fs::read(&header_path)?;
-    let header: [u8; HEADER_BYTE_LENGTH] = header.try_into().map_err(|header: Vec<u8>| {
-        anyhow::anyhow!(
-            "header is {} bytes, expected {HEADER_BYTE_LENGTH}",
-            header.len()
-        )
-    })?;
-    let video = std::fs::read(&video_path)?;
-    let decoded_rgba = bgra_to_rgba(&std::fs::read(&decoded_path)?);
-    let texture = LinearTexture {
-        header: &header,
-        video: &video,
-        size: (width, height),
-        unit: compression.surface_unit(),
-    };
-    let decodes_at_minimum_len = minimum_read::decodes_at_minimum_len(
-        paths,
-        work_dir,
-        compression.harness_name(),
-        &texture,
-        &sha256_hex(&decoded_rgba),
-    )?;
-    Ok(Encoded {
-        header,
-        video,
-        decoded_rgba,
-        decodes_at_minimum_len,
-    })
-}
-
-/// The DLL's RGBA decode of a texture, or `None` when it refuses it.
-pub(crate) fn dll_decode(
-    paths: &Paths,
-    work_dir: &Path,
-    label: &str,
-    header: &[u8],
-    video: &[u8],
-) -> Result<Option<Vec<u8>>> {
-    let header_path = work_dir.join("decode.header");
-    let video_path = work_dir.join("decode.video");
-    let decoded_path = work_dir.join("decode.bgra");
-    std::fs::write(&header_path, header)?;
-    std::fs::write(&video_path, video)?;
-    if decoded_path.exists() {
-        std::fs::remove_file(&decoded_path)?;
-    }
-    let report = run_harness_allowing_refusal(
-        paths,
-        &[
-            os("decode"),
-            os("--dll"),
-            paths.dll().into(),
-            os("--header"),
-            header_path.into(),
-            os("--video"),
-            video_path.into(),
-            os("--out"),
-            decoded_path.clone().into(),
-        ],
-    )
-    .with_context(|| format!("decoding {label}"))?;
-    let Some(report) = report else {
-        return Ok(None);
-    };
-    let bgra = std::fs::read(&decoded_path)?;
-    let reported_pixels = report
-        .split_whitespace()
-        .map(str::parse::<usize>)
-        .product::<Result<usize, _>>()
-        .with_context(|| format!("{label}: unreadable decode report {:?}", report.trim()))?;
-    ensure!(
-        bgra.len() == reported_pixels * BYTES_PER_PIXEL,
-        "{label}: decode report {:?} does not match {} output bytes",
-        report.trim(),
-        bgra.len()
-    );
-    Ok(Some(bgra_to_rgba(&bgra)))
 }
 
 fn sorted_input_pngs(inputs_dir: &Path) -> Result<Vec<PathBuf>> {

@@ -6,6 +6,7 @@ mod cross_decode;
 mod dds_corpus;
 mod golden;
 mod minimum_read;
+mod prng;
 mod synthetic;
 
 use std::path::PathBuf;
