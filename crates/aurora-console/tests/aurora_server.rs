@@ -7,7 +7,8 @@ use aurora_asset::{
     AssetFile, AssetKind, AssetSlot, Compression, EncodedTexture, RgbaImage, encode,
 };
 use aurora_console::{
-    AssetPresence, ConsoleClient, FtpSettings, GameIds, HexId, Timeouts, read_content_db,
+    AssetPresence, ConsoleClient, ConsoleError, FtpSettings, GameIds, HexId, Timeouts,
+    read_content_db,
 };
 use test_servers::{FakeConsole, FakeConsoleConfig};
 
@@ -157,4 +158,24 @@ fn download_upload_and_remove_round_trip() {
             .unwrap()
             .has(AssetKind::Cover)
     );
+}
+
+#[test]
+fn a_425_from_the_console_is_a_typed_error() {
+    let console = FakeConsole::start(FakeConsoleConfig {
+        data_connect_timeout: Duration::from_millis(100),
+        ..FakeConsoleConfig::default()
+    });
+    add_aurora_empty_packs(&console);
+    console.refuse_data_connections();
+
+    let error = client_for(&console)
+        .download_asset(&game(), AssetKind::Cover)
+        .unwrap_err();
+
+    assert!(
+        matches!(&error, ConsoleError::DataConnectionFailed { action } if action.starts_with("list ")),
+        "{error:?}"
+    );
+    assert!(error.to_string().contains("data connection"), "{error}");
 }

@@ -24,6 +24,10 @@ pub enum ConsoleError {
     /// Only the reply code is kept: Aurora's reply to a wrong password echoes the stored password hash.
     /// Aurora's FTP server serves six connections at once and greets the next with 421.
     TooManyConnections,
+    /// A 425: the console could not open the data connection for a transfer.
+    DataConnectionFailed {
+        action: String,
+    },
     LoginRejected {
         code: u32,
     },
@@ -86,6 +90,10 @@ impl fmt::Display for ConsoleError {
                 f,
                 "the console allows no more FTP connections right now, close other FTP clients and try again"
             ),
+            Self::DataConnectionFailed { action } => write!(
+                f,
+                "could not {action}: the console could not open the data connection"
+            ),
             Self::NotAurora { reply } => {
                 write!(f, "the console does not look like it runs Aurora: {reply}")
             }
@@ -138,6 +146,7 @@ impl std::error::Error for ConsoleError {
             Self::TempFile(source) => Some(source),
             Self::InvalidTimeout { .. }
             | Self::TooManyConnections
+            | Self::DataConnectionFailed { .. }
             | Self::LoginRejected { .. }
             | Self::NotAurora { .. }
             | Self::MissingFolder { .. }

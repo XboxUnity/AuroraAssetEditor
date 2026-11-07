@@ -90,6 +90,14 @@ impl ConsoleConnection {
         let bytes = self.read_data(&mut transfer, listed.saturating_add(1), &action)?;
         let received = bytes.len() as u64;
         if received != listed {
+            // A data stream that ends early is followed by the console's final reply, which can
+            // say why (425).
+            if received < listed
+                && let Err(error) = transfer.finish()
+            {
+                self.abandon_control_connection();
+                return Err(protocol_error(action)(error));
+            }
             self.abandon_control_connection();
             return Err(ConsoleError::SizeMismatch {
                 file: name.to_owned(),
@@ -227,9 +235,18 @@ fn greeting_error(error: FtpError) -> ConsoleError {
 }
 
 fn protocol_error(action: impl Into<String>) -> impl FnOnce(FtpError) -> ConsoleError {
-    move |source| ConsoleError::Protocol {
-        action: action.into(),
-        source,
+    move |source| match source {
+        FtpError::UnexpectedResponse(response)
+            if response.status == Status::CannotOpenDataConnection =>
+        {
+            ConsoleError::DataConnectionFailed {
+                action: action.into(),
+            }
+        }
+        source => ConsoleError::Protocol {
+            action: action.into(),
+            source,
+        },
     }
 }
 
