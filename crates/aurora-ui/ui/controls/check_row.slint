@@ -1,0 +1,70 @@
+import { Theme } from "../theme/theme.slint";
+import { Icon } from "icon.slint";
+
+// A check box with its label; clicking either, or Space while it has the focus, asks for the other state.
+export component CheckRow inherits Rectangle {
+    in property <string> text;
+    in property <bool> checked;
+    callback toggled(bool);
+
+    height: Theme.pill-height;
+    horizontal-stretch: 0;
+    accessible-role: checkbox;
+    accessible-label: text;
+    accessible-checkable: true;
+    accessible-checked: checked;
+    accessible-action-default => {
+        toggled(!checked);
+    }
+
+    keys := FocusScope {
+        key-pressed(event) => {
+            if event.text == " " {
+                toggled(!checked);
+                return accept;
+            }
+            reject
+        }
+    }
+
+    if keys.has-focus: Rectangle {
+        x: -Theme.check-focus-inset;
+        width: parent.width + 2 * Theme.check-focus-inset;
+        border-radius: Theme.pill-radius;
+        border-width: Theme.focus-outline-width;
+        border-color: Theme.focus-outline;
+    }
+
+    HorizontalLayout {
+        spacing: Theme.check-label-gap;
+        alignment: start;
+
+        box := Rectangle {
+            y: (parent.height - self.height) / 2;
+            width: Theme.check-box-size;
+            height: Theme.check-box-size;
+            border-radius: Theme.check-box-radius;
+            border-width: Theme.border-width;
+            border-color: checked ? Theme.accent : Theme.field-border;
+            background: checked ? Theme.accent : Theme.field-background;
+
+            if checked: Icon {
+                source: @image-url("../icons/check.svg");
+                colorize: Theme.accent-text;
+            }
+        }
+
+        Text {
+            text: text;
+            color: Theme.text;
+            vertical-alignment: center;
+        }
+    }
+
+    TouchArea {
+        clicked => {
+            keys.focus();
+            toggled(!checked);
+        }
+    }
+}

@@ -1,0 +1,28 @@
+import { ChoiceView } from "choice_view.slint";
+import { DialogKind } from "dialog_kind.slint";
+
+export global DialogModel {
+    in property <DialogKind> kind: DialogKind.none;
+    in property <string> title;
+    in property <string> text;
+    in property <string> confirm-label;
+    in property <bool> danger;
+    in property <[ChoiceView]> choices;
+    // The form's boxes in the order the dialog draws them; each edit comes back through `edit-field`.
+    in property <[string]> fields;
+    in property <bool> accept-enabled;
+    in property <string> test-status;
+    in property <bool> test-status-is-error;
+    // 0 XboxUnity, 1 Internet Archive.
+    in property <int> bulk-source-index;
+    in property <bool> bulk-replace;
+
+    callback accept();
+    callback cancel();
+    // The index into `choices`.
+    callback choose(int);
+    callback edit-field(int, string);
+    callback test-connection();
+    callback set-bulk-source(int);
+    callback set-bulk-replace(bool);
+}

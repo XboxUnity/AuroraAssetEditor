@@ -1,0 +1,58 @@
+import { Theme } from "../theme/theme.slint";
+import { DialogModel } from "../model/dialog_model.slint";
+import { PillButton } from "../controls/pill_button.slint";
+import { TextField } from "../controls/text_field.slint";
+import { DialogFrame } from "dialog_frame.slint";
+
+// The Save all TitleID prompt: the label above one box, OK once the box holds a whole TitleID.
+export component TitleIdDialog inherits DialogFrame {
+    title: DialogModel.title;
+
+    init => {
+        title-id-field.focus-and-select-all();
+    }
+
+    VerticalLayout {
+        spacing: Theme.dialog-row-gap;
+
+        Text {
+            text: DialogModel.text;
+            color: Theme.text;
+            wrap: word-wrap;
+        }
+
+        title-id-field := TextField {
+            value: DialogModel.fields[0];
+            accessible-label: DialogModel.text;
+            edited(text) => {
+                DialogModel.edit-field(0, text);
+            }
+            accepted => {
+                root.submit();
+            }
+        }
+    }
+
+    HorizontalLayout {
+        alignment: end;
+        spacing: Theme.dialog-button-gap;
+
+        ok-button := PillButton {
+            text: "OK";
+            accent: true;
+            enabled: DialogModel.accept-enabled;
+            focusable: true;
+            clicked => {
+                DialogModel.accept();
+            }
+        }
+
+        cancel-button := PillButton {
+            text: "Cancel";
+            focusable: true;
+            clicked => {
+                DialogModel.cancel();
+            }
+        }
+    }
+}

@@ -1,0 +1,20 @@
+import { DialogKind } from "../model/dialog_kind.slint";
+import { DialogModel } from "../model/dialog_model.slint";
+import { BulkDialog } from "bulk_dialog.slint";
+import { ChoiceDialog } from "choice_dialog.slint";
+import { ConfirmDialog } from "confirm_dialog.slint";
+import { ConnectionDialog } from "connection_dialog.slint";
+import { MessageDialog } from "message_dialog.slint";
+import { TitleIdDialog } from "title_id_dialog.slint";
+import { UploadTargetDialog } from "upload_target_dialog.slint";
+
+// The dialog on screen, over the whole window.
+export component DialogHost inherits Rectangle {
+    if DialogModel.kind == DialogKind.message: MessageDialog { }
+    if DialogModel.kind == DialogKind.confirm: ConfirmDialog { }
+    if DialogModel.kind == DialogKind.choice: ChoiceDialog { }
+    if DialogModel.kind == DialogKind.title-id: TitleIdDialog { }
+    if DialogModel.kind == DialogKind.upload-target: UploadTargetDialog { }
+    if DialogModel.kind == DialogKind.connection: ConnectionDialog { }
+    if DialogModel.kind == DialogKind.bulk: BulkDialog { }
+}

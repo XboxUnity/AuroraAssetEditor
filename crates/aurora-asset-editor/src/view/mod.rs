@@ -1,4 +1,5 @@
 mod console_view;
+mod dialog_view;
 mod editor_view;
 mod image_cache;
 mod main_window_view;

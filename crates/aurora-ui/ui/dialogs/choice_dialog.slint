@@ -1,0 +1,39 @@
+import { Theme } from "../theme/theme.slint";
+import { DialogModel } from "../model/dialog_model.slint";
+import { PillButton } from "../controls/pill_button.slint";
+import { DialogFrame } from "dialog_frame.slint";
+import { DialogText } from "dialog_text.slint";
+
+// A question with one button per choice, and Cancel. Return cancels too, since no choice is the default.
+export component ChoiceDialog inherits DialogFrame {
+    title: DialogModel.title;
+
+    init => {
+        self.take-focus();
+    }
+
+    DialogText {
+        text: DialogModel.text;
+    }
+
+    HorizontalLayout {
+        alignment: end;
+        spacing: Theme.dialog-button-gap;
+
+        for choice[index] in DialogModel.choices: PillButton {
+            text: choice.label;
+            focusable: true;
+            clicked => {
+                DialogModel.choose(index);
+            }
+        }
+
+        cancel-button := PillButton {
+            text: "Cancel";
+            focusable: true;
+            clicked => {
+                DialogModel.cancel();
+            }
+        }
+    }
+}

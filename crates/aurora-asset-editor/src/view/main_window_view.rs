@@ -8,6 +8,7 @@ use crate::app::App;
 use crate::platform::SystemTheme;
 
 use super::console_view::{connect_console, render_console};
+use super::dialog_view::{connect_dialogs, render_dialogs};
 use super::editor_view::{connect_editor, render_editor};
 use super::online_view::{connect_online, render_online};
 use super::shell_view::{Refresh, connect_shell, render_shell};
@@ -59,6 +60,7 @@ impl MainWindowView {
         connect_editor(&self.window, &app, &refresh);
         connect_online(&self.window, &app, &refresh);
         connect_console(&self.window, &app, &refresh);
+        connect_dialogs(&self.window, &app, &refresh);
     }
 
     pub fn render(&self, app: &App) {
@@ -81,4 +83,5 @@ fn render_window(window: &MainWindow, app: &App, system_theme: SystemTheme, cach
     render_editor(window, app, caches.editor);
     render_online(window, app, caches.online);
     render_console(window, app);
+    render_dialogs(window, app);
 }

@@ -1,0 +1,18 @@
+import { Theme } from "../theme/theme.slint";
+
+// A dialog's message. Above the card's limit it scrolls, so a long list of failed files keeps the buttons on
+// screen.
+export component DialogText inherits Flickable {
+    in property <string> text;
+
+    height: min(body.preferred-height, Theme.dialog-text-max-height);
+    content-width: self.width;
+    content-height: body.preferred-height;
+
+    body := Text {
+        width: root.width;
+        text: root.text;
+        color: Theme.text;
+        wrap: word-wrap;
+    }
+}

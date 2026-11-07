@@ -5,25 +5,51 @@ export component PillButton inherits Rectangle {
     in property <string> text;
     in property <image> icon;
     in property <bool> accent;
+    // Drawn in the danger colour, for a confirmation that removes something.
+    in property <bool> danger;
     in property <bool> has-chevron;
     in property <bool> enabled: true;
     // Status line size: caption font, the line's height.
     in property <bool> compact;
+    // Reachable with Tab; Space or Return clicks it then. Dialog buttons use it.
+    in property <bool> focusable;
     callback clicked();
 
+    public function focus-button() {
+        keys.focus();
+    }
+
     property <bool> accent-look: accent && enabled;
-    property <color> foreground: accent-look ? Theme.accent-text : enabled ? Theme.pill-text : Theme.disabled-button-text;
+    property <bool> danger-look: danger && enabled;
+    property <color> foreground: danger-look ? Theme.danger-text : accent-look ? Theme.accent-text : enabled ? Theme.pill-text : Theme.disabled-button-text;
 
     horizontal-stretch: 0;
     height: compact ? self.preferred-height : Theme.pill-height;
     border-radius: Theme.pill-radius;
-    background: accent-look ? Theme.accent : enabled ? Theme.pill-background : Theme.disabled-button-background;
+    background: danger-look ? Theme.danger : accent-look ? Theme.accent : enabled ? Theme.pill-background : Theme.disabled-button-background;
     opacity: enabled ? 1 : Theme.disabled-opacity;
     accessible-role: button;
     accessible-label: text;
     accessible-enabled: enabled;
     accessible-action-default => {
         clicked();
+    }
+
+    keys := FocusScope {
+        enabled: focusable && enabled;
+        key-pressed(event) => {
+            if event.text == " " || event.text == Key.Return {
+                clicked();
+                return accept;
+            }
+            reject
+        }
+    }
+
+    if keys.has-focus: Rectangle {
+        border-radius: Theme.pill-radius;
+        border-width: Theme.focus-outline-width;
+        border-color: Theme.focus-outline;
     }
 
     HorizontalLayout {

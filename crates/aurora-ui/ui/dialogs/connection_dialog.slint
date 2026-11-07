@@ -1,0 +1,104 @@
+import { Theme } from "../theme/theme.slint";
+import { DialogModel } from "../model/dialog_model.slint";
+import { PillButton } from "../controls/pill_button.slint";
+import { DialogFrame } from "dialog_frame.slint";
+import { FormFieldRow } from "form_field_row.slint";
+
+// The console connection: four boxes, the last test's result, Test Connection, Save and Cancel.
+export component ConnectionDialog inherits DialogFrame {
+    title: DialogModel.title;
+    card-width: Theme.connection-dialog-width;
+
+    init => {
+        host-row.focus-and-select-all();
+    }
+
+    VerticalLayout {
+        spacing: Theme.dialog-row-gap;
+
+        host-row := FormFieldRow {
+            label: "IP Address:";
+            value: DialogModel.fields[0];
+            edited(text) => {
+                DialogModel.edit-field(0, text);
+            }
+            accepted => {
+                root.submit();
+            }
+        }
+
+        port-row := FormFieldRow {
+            label: "Port:";
+            value: DialogModel.fields[1];
+            edited(text) => {
+                DialogModel.edit-field(1, text);
+            }
+            accepted => {
+                root.submit();
+            }
+        }
+
+        username-row := FormFieldRow {
+            label: "Username:";
+            value: DialogModel.fields[2];
+            edited(text) => {
+                DialogModel.edit-field(2, text);
+            }
+            accepted => {
+                root.submit();
+            }
+        }
+
+        password-row := FormFieldRow {
+            label: "Password:";
+            value: DialogModel.fields[3];
+            input-type: InputType.password;
+            edited(text) => {
+                DialogModel.edit-field(3, text);
+            }
+            accepted => {
+                root.submit();
+            }
+        }
+    }
+
+    if DialogModel.test-status != "": test-status := Text {
+        text: DialogModel.test-status;
+        color: DialogModel.test-status-is-error ? Theme.error-text : Theme.text-muted;
+        font-size: Theme.caption-font-size;
+        wrap: word-wrap;
+    }
+
+    HorizontalLayout {
+        spacing: Theme.dialog-button-gap;
+
+        test-button := PillButton {
+            text: "Test Connection";
+            focusable: true;
+            clicked => {
+                DialogModel.test-connection();
+            }
+        }
+
+        Rectangle {
+            horizontal-stretch: 1;
+        }
+
+        save-button := PillButton {
+            text: "Save";
+            accent: true;
+            focusable: true;
+            clicked => {
+                DialogModel.accept();
+            }
+        }
+
+        cancel-button := PillButton {
+            text: "Cancel";
+            focusable: true;
+            clicked => {
+                DialogModel.cancel();
+            }
+        }
+    }
+}

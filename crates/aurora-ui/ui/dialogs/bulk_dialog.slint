@@ -1,0 +1,77 @@
+import { Theme } from "../theme/theme.slint";
+import { DialogModel } from "../model/dialog_model.slint";
+import { CheckRow } from "../controls/check_row.slint";
+import { PillButton } from "../controls/pill_button.slint";
+import { SegmentedChoice } from "../controls/segmented_choice.slint";
+import { DialogFrame } from "dialog_frame.slint";
+import { DialogText } from "dialog_text.slint";
+
+// Bulk covers: the source, whether covers on the console are replaced, Start and Cancel. The dialog closes on
+// Start; the run's progress is in the status line and its Stop button on the Console page.
+export component BulkDialog inherits DialogFrame {
+    title: DialogModel.title;
+
+    init => {
+        self.take-focus();
+    }
+
+    HorizontalLayout {
+        spacing: Theme.dialog-row-gap;
+
+        Text {
+            text: "Source:";
+            color: Theme.text;
+            vertical-alignment: center;
+        }
+
+        source-choice := SegmentedChoice {
+            options: ["XboxUnity", "Internet Archive"];
+            selected: DialogModel.bulk-source-index;
+            chosen(index) => {
+                DialogModel.set-bulk-source(index);
+            }
+        }
+
+        Rectangle {
+            horizontal-stretch: 1;
+        }
+    }
+
+    HorizontalLayout {
+        alignment: start;
+
+        replace-check := CheckRow {
+            text: "Replace existing covers";
+            checked: DialogModel.bulk-replace;
+            toggled(checked) => {
+                DialogModel.set-bulk-replace(checked);
+            }
+        }
+    }
+
+    DialogText {
+        text: DialogModel.text;
+    }
+
+    HorizontalLayout {
+        alignment: end;
+        spacing: Theme.dialog-button-gap;
+
+        start-button := PillButton {
+            text: "Start";
+            accent: true;
+            focusable: true;
+            clicked => {
+                DialogModel.accept();
+            }
+        }
+
+        cancel-button := PillButton {
+            text: "Cancel";
+            focusable: true;
+            clicked => {
+                DialogModel.cancel();
+            }
+        }
+    }
+}

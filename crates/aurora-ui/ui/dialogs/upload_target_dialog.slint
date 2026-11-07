@@ -1,0 +1,63 @@
+import { Theme } from "../theme/theme.slint";
+import { DialogModel } from "../model/dialog_model.slint";
+import { PillButton } from "../controls/pill_button.slint";
+import { DialogFrame } from "dialog_frame.slint";
+import { FormFieldRow } from "form_field_row.slint";
+
+// Save all to console: the game to upload to, OK once both IDs are whole.
+export component UploadTargetDialog inherits DialogFrame {
+    title: DialogModel.title;
+
+    init => {
+        title-id-row.focus-and-select-all();
+    }
+
+    VerticalLayout {
+        spacing: Theme.dialog-row-gap;
+
+        title-id-row := FormFieldRow {
+            label: "TitleID:";
+            value: DialogModel.fields[0];
+            edited(text) => {
+                DialogModel.edit-field(0, text);
+            }
+            accepted => {
+                root.submit();
+            }
+        }
+
+        database-id-row := FormFieldRow {
+            label: "DatabaseID:";
+            value: DialogModel.fields[1];
+            edited(text) => {
+                DialogModel.edit-field(1, text);
+            }
+            accepted => {
+                root.submit();
+            }
+        }
+    }
+
+    HorizontalLayout {
+        alignment: end;
+        spacing: Theme.dialog-button-gap;
+
+        ok-button := PillButton {
+            text: "OK";
+            accent: true;
+            enabled: DialogModel.accept-enabled;
+            focusable: true;
+            clicked => {
+                DialogModel.accept();
+            }
+        }
+
+        cancel-button := PillButton {
+            text: "Cancel";
+            focusable: true;
+            clicked => {
+                DialogModel.cancel();
+            }
+        }
+    }
+}

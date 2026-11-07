@@ -1,0 +1,37 @@
+import { Theme } from "../theme/theme.slint";
+import { TextField } from "../controls/text_field.slint";
+
+// A label and its text box, one row of a dialog's form.
+export component FormFieldRow inherits HorizontalLayout {
+    in property <string> label;
+    in property <string> value;
+    in property <InputType> input-type: InputType.text;
+    callback edited(string);
+    callback accepted();
+
+    spacing: Theme.dialog-row-gap;
+
+    public function focus-and-select-all() {
+        field.focus-and-select-all();
+    }
+
+    Text {
+        width: Theme.dialog-label-width;
+        text: root.label;
+        color: Theme.text;
+        vertical-alignment: center;
+    }
+
+    field := TextField {
+        horizontal-stretch: 1;
+        value: root.value;
+        input-type: root.input-type;
+        accessible-label: root.label;
+        edited(text) => {
+            root.edited(text);
+        }
+        accepted => {
+            root.accepted();
+        }
+    }
+}

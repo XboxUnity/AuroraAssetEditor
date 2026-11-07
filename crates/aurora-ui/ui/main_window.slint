@@ -1,6 +1,9 @@
 import "fonts/Inter-Regular.ttf";
 import "fonts/Inter-SemiBold.ttf";
+import { ChoiceView } from "model/choice_view.slint";
 import { ConsoleModel } from "model/console_model.slint";
+import { DialogKind } from "model/dialog_kind.slint";
+import { DialogModel } from "model/dialog_model.slint";
 import { EditorModel } from "model/editor_model.slint";
 import { GameRowView } from "model/game_row_view.slint";
 import { KindMarks } from "model/kind_marks.slint";
@@ -13,6 +16,7 @@ import { ScreenshotTile } from "model/screenshot_tile.slint";
 import { ShellModel } from "model/shell_model.slint";
 import { SlotView } from "model/slot_view.slint";
 import { ThemeOption } from "model/theme_option.slint";
+import { DialogHost } from "dialogs/dialog_host.slint";
 import { MenuOverlay } from "shell/menu_overlay.slint";
 import { PageHost } from "shell/page_host.slint";
 import { SideBar } from "shell/side_bar.slint";
@@ -21,7 +25,10 @@ import { TopBar } from "shell/top_bar.slint";
 import { Theme } from "theme/theme.slint";
 
 export {
+    ChoiceView,
     ConsoleModel,
+    DialogKind,
+    DialogModel,
     EditorModel,
     GameRowView,
     KindMarks,
@@ -72,5 +79,10 @@ export component MainWindow inherits Window {
         save-button-x: top-bar.save-button-x;
         game-chip-right: top-bar.game-chip-right;
         gear-button-right: top-bar.gear-button-right;
+    }
+
+    DialogHost {
+        width: 100%;
+        height: 100%;
     }
 }

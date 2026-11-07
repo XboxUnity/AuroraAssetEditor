@@ -1,0 +1,72 @@
+import { Theme } from "../theme/theme.slint";
+import { DialogModel } from "../model/dialog_model.slint";
+
+// The dimmed backdrop and the card every dialog sits on. Return accepts while the dialog allows it and Escape
+// cancels, wherever the focus is inside the card.
+export component DialogFrame inherits Rectangle {
+    in property <string> title;
+    in property <length> card-width: Theme.dialog-width;
+
+    background: Theme.dialog-backdrop;
+
+    // For a dialog without a text box: the card's keys work without a click first.
+    public function take-focus() {
+        keys.focus();
+    }
+
+    // A box's Return ends here, since the box keeps the key to itself.
+    public function submit() {
+        if DialogModel.accept-enabled {
+            DialogModel.accept();
+        }
+    }
+
+    // The window below takes no clicks while a dialog is open.
+    TouchArea { }
+
+    keys := FocusScope {
+        x: (root.width - self.width) / 2;
+        y: (root.height - self.height) / 2;
+        width: root.card-width;
+        height: card.preferred-height;
+        focus-on-tab-navigation: false;
+        key-pressed(event) => {
+            if event.text == Key.Escape {
+                DialogModel.cancel();
+                return accept;
+            }
+            if event.text == Key.Return {
+                root.submit();
+                return accept;
+            }
+            reject
+        }
+
+        card := Rectangle {
+            background: Theme.dialog-background;
+            border-radius: Theme.dialog-radius;
+            border-width: Theme.border-width;
+            border-color: Theme.border;
+            drop-shadow-blur: Theme.menu-shadow-blur;
+            drop-shadow-offset-y: Theme.menu-shadow-offset;
+            drop-shadow-color: Theme.menu-shadow;
+            accessible-role: groupbox;
+            accessible-label: root.title;
+
+            VerticalLayout {
+                padding: Theme.dialog-padding;
+                spacing: Theme.dialog-gap;
+
+                Text {
+                    text: root.title;
+                    color: Theme.text-strong;
+                    font-size: Theme.dialog-title-font-size;
+                    font-weight: Theme.semibold-font-weight;
+                    wrap: word-wrap;
+                }
+
+                @children
+            }
+        }
+    }
+}

@@ -1,0 +1,31 @@
+import { Theme } from "../theme/theme.slint";
+import { DialogModel } from "../model/dialog_model.slint";
+import { PillButton } from "../controls/pill_button.slint";
+import { DialogFrame } from "dialog_frame.slint";
+import { DialogText } from "dialog_text.slint";
+
+// A message with OK: errors, notices and the bulk summary.
+export component MessageDialog inherits DialogFrame {
+    title: DialogModel.title;
+
+    init => {
+        self.take-focus();
+    }
+
+    DialogText {
+        text: DialogModel.text;
+    }
+
+    HorizontalLayout {
+        alignment: end;
+
+        ok-button := PillButton {
+            text: "OK";
+            accent: true;
+            focusable: true;
+            clicked => {
+                DialogModel.accept();
+            }
+        }
+    }
+}

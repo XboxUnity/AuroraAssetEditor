@@ -6,11 +6,18 @@ export component TextField inherits Rectangle {
     in property <string> value;
     in property <string> placeholder;
     in property <bool> enabled: true;
+    in property <InputType> input-type: InputType.text;
     out property <bool> has-focus: input.has-focus;
     callback edited(string);
     callback accepted();
 
     forward-focus: input;
+
+    // A dialog's first box takes the focus with its text selected, so typing replaces the prefill.
+    public function focus-and-select-all() {
+        input.focus();
+        input.select-all();
+    }
     height: Theme.pill-height;
     border-radius: Theme.pill-radius;
     border-width: Theme.border-width;
@@ -49,6 +56,7 @@ export component TextField inherits Rectangle {
             text: value;
             enabled: enabled;
             single-line: true;
+            input-type: root.input-type;
             color: Theme.text;
             selection-background-color: Theme.chip-background;
             selection-foreground-color: Theme.chip-text;

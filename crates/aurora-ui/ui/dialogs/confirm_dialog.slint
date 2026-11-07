@@ -1,0 +1,41 @@
+import { Theme } from "../theme/theme.slint";
+import { DialogModel } from "../model/dialog_model.slint";
+import { PillButton } from "../controls/pill_button.slint";
+import { DialogFrame } from "dialog_frame.slint";
+import { DialogText } from "dialog_text.slint";
+
+// A question whose confirm button runs the action; Cancel leaves everything as it is.
+export component ConfirmDialog inherits DialogFrame {
+    title: DialogModel.title;
+
+    init => {
+        self.take-focus();
+    }
+
+    DialogText {
+        text: DialogModel.text;
+    }
+
+    HorizontalLayout {
+        alignment: end;
+        spacing: Theme.dialog-button-gap;
+
+        confirm-button := PillButton {
+            text: DialogModel.confirm-label;
+            accent: !DialogModel.danger;
+            danger: DialogModel.danger;
+            focusable: true;
+            clicked => {
+                DialogModel.accept();
+            }
+        }
+
+        cancel-button := PillButton {
+            text: "Cancel";
+            focusable: true;
+            clicked => {
+                DialogModel.cancel();
+            }
+        }
+    }
+}
