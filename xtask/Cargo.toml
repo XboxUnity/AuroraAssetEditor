@@ -11,6 +11,6 @@ aurora-asset = { path = "../crates/aurora-asset" }
 hex = "0.4"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp"] }
 serde = { version = "1", features = ["derive"] }
-sha2 = "0.10"
+sha2 = "0.11.1"
 tempfile = "3"
-toml = "0.8"
+toml = "1.2.1"
