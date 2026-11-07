@@ -4,7 +4,7 @@ use std::rc::Rc;
 
 use aurora_asset::{AssetSlot, ScreenshotNumber};
 use aurora_asset_editor::app::{App, CurrentGame, KindChoice, Page};
-use aurora_asset_editor::dialogs::Modal;
+use aurora_asset_editor::dialogs::{BulkForm, Modal};
 use aurora_asset_editor::editor::SlotPreview;
 use aurora_asset_editor::jobs::{ConsoleOutcome, JobOutcome};
 use aurora_asset_editor::settings::ThemeChoice;
@@ -784,6 +784,55 @@ fn bulk_controls_reach_the_form_and_start_runs() {
     ui.click("BulkDialog::start-button");
     assert_eq!(ui.app.borrow().modal(), None, "Start closes the dialog");
     assert_eq!(harness.queued_jobs(), queued + 1, "Start queues the run");
+}
+
+fn bulk_form(ui: &Ui) -> BulkForm {
+    match ui.app.borrow().modal() {
+        Some(Modal::Bulk { form }) => form.clone(),
+        other => panic!("expected the bulk dialog, got {other:?}"),
+    }
+}
+
+#[test]
+fn bulk_source_switch_works_from_the_keyboard() {
+    let (harness, ui) = open_flow(&FLOWS[6], ThemeChoice::Dark);
+    let queued = harness.queued_jobs();
+
+    ui.press(Key::Tab);
+    keep_snapshot(&ui.snapshot(), "dialogs-dark-bulk-source-focused");
+    ui.press(Key::Space);
+    assert_eq!(bulk_form(&ui).source, CoverSource::InternetArchive, "Space");
+    assert_eq!(ui.dialog().get_bulk_source_index(), 1);
+    ui.press(Key::RightArrow);
+    assert_eq!(bulk_form(&ui).source, CoverSource::XboxUnity, "Right wraps");
+    ui.press(Key::LeftArrow);
+    assert_eq!(bulk_form(&ui).source, CoverSource::InternetArchive, "Left");
+
+    ui.press(Key::Tab);
+    ui.press(Key::Space);
+    let form = bulk_form(&ui);
+    assert!(form.replace_existing, "Tab moved on to the check box");
+    assert_eq!(form.source, CoverSource::InternetArchive);
+
+    ui.press(Key::Backtab);
+    ui.press(Key::LeftArrow);
+    assert_eq!(
+        bulk_form(&ui).source,
+        CoverSource::XboxUnity,
+        "Shift+Tab came back to the switch"
+    );
+    ui.press(Key::Backtab);
+    ui.press(Key::Return);
+    assert_eq!(
+        ui.app.borrow().modal(),
+        None,
+        "Shift+Tab from the switch wrapped to Cancel"
+    );
+    assert_eq!(
+        harness.queued_jobs(),
+        queued,
+        "Cancel, not Start, was clicked"
+    );
 }
 
 #[test]

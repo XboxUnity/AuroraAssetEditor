@@ -11,10 +11,10 @@ import { DialogText } from "dialog_text.slint";
 export component BulkDialog inherits DialogFrame {
     title: DialogModel.title;
 
-    first-has-focus: replace-check.has-focus;
+    first-has-focus: source-choice.has-focus;
     last-has-focus: cancel-button.has-focus;
     focus-first => {
-        replace-check.focus();
+        source-choice.focus();
     }
     focus-last => {
         cancel-button.focus();
@@ -36,6 +36,7 @@ export component BulkDialog inherits DialogFrame {
         source-choice := SegmentedChoice {
             options: ["XboxUnity", "Internet Archive"];
             selected: DialogModel.bulk-source-index;
+            focusable: true;
             chosen(index) => {
                 DialogModel.set-bulk-source(index);
             }

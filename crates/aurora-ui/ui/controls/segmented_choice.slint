@@ -6,12 +6,47 @@ export component SegmentedChoice inherits Rectangle {
     in property <int> selected;
     // An option that cannot be chosen at the moment; -1 for none.
     in property <int> disabled-option: -1;
+    // Reachable with Tab; Space and the arrow keys choose another option then. Dialogs use it.
+    in property <bool> focusable;
+    out property <bool> has-focus: keys.has-focus;
     callback chosen(int);
 
+    // The option `step` places away from the chosen one, around the ends and past the disabled one.
+    function neighbour(step: int) -> int {
+        let next = mod(selected + step + options.length, options.length);
+        if next == disabled-option {
+            return mod(next + step + options.length, options.length);
+        }
+        next
+    }
+
+    function choose-neighbour(step: int) {
+        let next = neighbour(step);
+        if next != selected {
+            chosen(next);
+        }
+    }
+
     horizontal-stretch: 0;
+    forward-focus: keys;
     height: Theme.pill-height;
     border-radius: Theme.pill-radius;
     background: Theme.pill-background;
+
+    keys := FocusScope {
+        enabled: focusable;
+        key-pressed(event) => {
+            if event.text == " " || event.text == Key.RightArrow || event.text == Key.DownArrow {
+                choose-neighbour(1);
+                return accept;
+            }
+            if event.text == Key.LeftArrow || event.text == Key.UpArrow {
+                choose-neighbour(-1);
+                return accept;
+            }
+            reject
+        }
+    }
 
     HorizontalLayout {
         for option[index] in options: segment := Rectangle {
@@ -49,5 +84,12 @@ export component SegmentedChoice inherits Rectangle {
                 }
             }
         }
+    }
+
+    // Over the segments, whose backgrounds would hide it.
+    if keys.has-focus: focus-outline := Rectangle {
+        border-radius: Theme.pill-radius;
+        border-width: Theme.focus-outline-width;
+        border-color: Theme.focus-outline;
     }
 }
