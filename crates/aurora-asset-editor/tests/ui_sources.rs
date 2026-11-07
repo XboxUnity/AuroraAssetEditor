@@ -649,6 +649,42 @@ fn transfers_that_touch_the_editor_wait_while_it_is_busy() {
 }
 
 #[test]
+fn game_actions_need_the_selected_row_on_screen() {
+    let mut harness = console_harness(ThemeChoice::Dark);
+    let ui = Ui::start(&mut harness);
+    ui.act(|app| show_games(app, mixed_games()));
+    let game_buttons = [
+        "ConsolePage::open-in-editor-button",
+        "ConsolePage::download-button",
+        "ConsolePage::upload-button",
+        "ConsolePage::remove-button",
+    ];
+    ui.click_label_in("banana", "ConsolePage::game-table");
+    for button in game_buttons {
+        assert!(ui.enabled(button), "{button} is enabled");
+    }
+
+    ui.act(|app| app.set_game_filter("cherry", ""));
+    for button in game_buttons {
+        assert!(
+            !ui.enabled(button),
+            "{button}: the selected row is filtered out"
+        );
+    }
+    assert_eq!(ui.console().get_actions_reason(), SELECT_A_GAME_REASON);
+    assert!(
+        harness.app().current_game().is_some(),
+        "the game chip still names the game"
+    );
+
+    ui.act(|app| app.set_game_filter("", ""));
+    ui.click_label_in("banana", "ConsolePage::game-table");
+    for button in game_buttons {
+        assert!(ui.enabled(button), "{button} is enabled again");
+    }
+}
+
+#[test]
 fn presence_marks_follow_the_presence_cells() {
     let mut harness = console_harness(ThemeChoice::Dark);
     let ui = Ui::start(&mut harness);

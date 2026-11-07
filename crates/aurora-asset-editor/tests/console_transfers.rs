@@ -13,11 +13,11 @@ use aurora_asset_editor::app::{
 use aurora_asset_editor::console::PresenceCell;
 use aurora_asset_editor::dialogs::{Modal, ModalAnswer, ModalField};
 use aurora_asset_editor::editor::SlotPreview;
-use aurora_asset_editor::jobs::Progress;
+use aurora_asset_editor::jobs::{ConsoleOutcome, JobOutcome, Progress};
 use aurora_asset_editor::status::Severity;
 use aurora_console::{
-    AssetPresence, ConsoleStatus, FtpSettings, GameIds, HexId, asset_file_name, asset_folder,
-    read_content_db,
+    AssetPresence, ConsoleStatus, FtpSettings, Game, GameIds, GameListing, HexId, asset_file_name,
+    asset_folder, read_content_db,
 };
 use editor_test_support::{AppHarness, OutcomeStage, asset_file_with};
 use test_servers::{FakeConsole, FakeConsoleConfig};
@@ -579,7 +579,28 @@ fn console_actions_need_a_selected_game() {
     assert_eq!(harness.app().status().text, SELECT_A_GAME_REASON);
 
     select_halo(&mut harness);
-    assert_eq!(harness.app().console_actions_disabled_reason(), None);
+    assert_eq!(
+        harness.app().console_actions_disabled_reason(),
+        Some(SELECT_A_GAME_REASON),
+        "the game has no row in the table"
+    );
+
+    let app = &mut *harness.app();
+    let generation = app.console().refresh_generation();
+    app.on_job_outcome(JobOutcome::Console(ConsoleOutcome::Refreshed {
+        generation,
+        result: Ok(GameListing {
+            games: vec![Game {
+                title_name: GAME_TITLE.to_owned(),
+                ids: halo(),
+                media_id: HexId::parse("00000000").unwrap(),
+                disc: 1,
+            }],
+            cleanup_error: None,
+        }),
+    }));
+    app.select_game(0);
+    assert_eq!(app.console_actions_disabled_reason(), None);
 }
 
 #[test]

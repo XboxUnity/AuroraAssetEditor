@@ -36,11 +36,13 @@ impl App {
         }
     }
 
-    /// Why the console page's per-game actions are disabled, if they are.
+    /// Why the console page's per-game actions are disabled, if they are. They act on the current game, so
+    /// its row must be selected and shown: a filter that hides it, or a refresh, disables them.
     pub fn console_actions_disabled_reason(&self) -> Option<&'static str> {
+        let row_shown = self.console.table.selected_visible_row().is_some();
         match self.current_game {
-            Some(_) => None,
-            None => Some(SELECT_A_GAME_REASON),
+            Some(_) if row_shown => None,
+            Some(_) | None => Some(SELECT_A_GAME_REASON),
         }
     }
 
