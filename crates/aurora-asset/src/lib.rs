@@ -2,6 +2,7 @@
 
 mod container;
 pub mod dds;
+pub mod fsd;
 mod texture;
 
 pub use container::{AssetError, AssetFile, AssetKind, AssetSlot, ScreenshotNumber};
