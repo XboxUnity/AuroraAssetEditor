@@ -11,6 +11,7 @@ use std::path::Path;
 use std::ptr::null_mut;
 
 const DLL_SUCCESS: c_int = 1;
+const BGRA_BYTES_PER_PIXEL: usize = 4;
 
 type ImageToAssetFn = unsafe extern "C" fn(
     image: *const u8,
@@ -171,8 +172,9 @@ impl AuroraAssetDll {
         Some((image, width as u32, height as u32))
     }
 
-    /// Returns `(bgra, width, height)`, or `None` if the DLL refuses the input.
-    pub fn dds_to_image(&self, dds: &[u8]) -> Option<(Vec<u8>, u32, u32)> {
+    /// Returns `(buffer, width, height, reported_len)`, or `None` if the DLL refuses the input.
+    /// The buffer holds the full `width * height * 4` bytes the DLL writes.
+    pub fn dds_to_image(&self, dds: &[u8]) -> Option<(Vec<u8>, u32, u32, u32)> {
         let dds_len = dds.len() as c_int;
         let mut image_len: c_int = 0;
         let mut width: c_int = 0;
@@ -192,8 +194,11 @@ impl AuroraAssetDll {
             return None;
         }
 
-        let mut image = vec![0u8; image_len as usize];
-        // SAFETY: the image buffer is allocated to the size the DLL reported.
+        // The DLL reports the header's pitch or linear size as the image length, yet writes the full
+        // `width * height * 4` bytes, so the buffer is sized for what it writes.
+        let written_len = (width as usize) * (height as usize) * BGRA_BYTES_PER_PIXEL;
+        let mut image = vec![0u8; written_len.max(image_len as usize)];
+        // SAFETY: the buffer holds the larger of the reported length and the full decoded image.
         let filled = unsafe {
             (self.dds_to_image)(
                 dds.as_ptr(),
@@ -207,7 +212,7 @@ impl AuroraAssetDll {
         if filled != DLL_SUCCESS {
             return None;
         }
-        image.truncate(image_len as usize);
-        Some((image, width as u32, height as u32))
+        image.truncate(written_len);
+        Some((image, width as u32, height as u32, image_len as u32))
     }
 }

@@ -1230,3 +1230,363 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000000800002000000
 video = "crafted/random_argb_8x8.vid"
 decoded_sha256 = "da398d698b2bee217714643f8e4ff198093d5e630ec2780886fb3d1c9a39f934"
 dll_accepted = true
+
+[[dds]]
+name = "dxt1_16x16"
+file = "dds/dxt1_16x16.dds"
+decoded_sha256 = "38e3e54687477242c4af51528ce288461de124f100b6ca303754b9f152630032"
+dll_accepted = true
+dll_output_unstable = false
+reported_len = 128
+verbatim_sha256 = "5b385a4e277a2119ffe89e5c96765dbed1425ff378d4e882fb5e24ebfc8f814a"
+
+[[dds]]
+name = "dxt1_mips_16x16"
+file = "dds/dxt1_mips_16x16.dds"
+decoded_sha256 = "90847d1cda3d68884c63c6328aba0f899e4eab934ae16776d681d59d1d4e192e"
+dll_accepted = true
+dll_output_unstable = false
+reported_len = 128
+verbatim_sha256 = "e4560514055960222e194086591ecbc471fe3b09893cb55c9d9f297e60b776de"
+
+[[dds]]
+name = "dxt1_18x10"
+file = "dds/dxt1_18x10.dds"
+decoded_sha256 = "3402f513e2e2657301d13fd4669d10ae52c04bc597ff7e36829c1757ee52aaea"
+dll_accepted = true
+dll_output_unstable = false
+reported_len = 120
+verbatim_sha256 = "5642a9f354ec74651da0fbb5d4f701c0d6c017f279a8920c4460a6a2196c09ca"
+
+[[dds]]
+name = "dxt1_mips_18x10"
+file = "dds/dxt1_mips_18x10.dds"
+decoded_sha256 = "3566faba2b7f3506c05911241eaa057dee9d2403d77787474968763f56fa7f86"
+dll_accepted = true
+dll_output_unstable = false
+reported_len = 120
+verbatim_sha256 = "37e07d067977683cceabbcf172c70118d0f3c5d832b117f0be2160eea8394a20"
+
+[[dds]]
+name = "dxt3_16x16"
+file = "dds/dxt3_16x16.dds"
+decoded_sha256 = ""
+dll_accepted = true
+dll_output_unstable = true
+reported_len = 256
+verbatim_sha256 = ""
+
+[[dds]]
+name = "dxt3_mips_16x16"
+file = "dds/dxt3_mips_16x16.dds"
+decoded_sha256 = ""
+dll_accepted = true
+dll_output_unstable = true
+reported_len = 256
+verbatim_sha256 = ""
+
+[[dds]]
+name = "dxt3_18x10"
+file = "dds/dxt3_18x10.dds"
+decoded_sha256 = ""
+dll_accepted = true
+dll_output_unstable = true
+reported_len = 240
+verbatim_sha256 = ""
+
+[[dds]]
+name = "dxt3_mips_18x10"
+file = "dds/dxt3_mips_18x10.dds"
+decoded_sha256 = ""
+dll_accepted = true
+dll_output_unstable = true
+reported_len = 240
+verbatim_sha256 = ""
+
+[[dds]]
+name = "dxt5_16x16"
+file = "dds/dxt5_16x16.dds"
+decoded_sha256 = "db5379c2ea3be7e1f18b2a43048939e6d7a9bea45d939cdf5e6798fc6e40e66f"
+dll_accepted = true
+dll_output_unstable = false
+reported_len = 256
+verbatim_sha256 = "fa9df6724d02af99ccc6be797ab44ebfac55a44cbfc07b9937c7d4eae69eb9ed"
+
+[[dds]]
+name = "dxt5_mips_16x16"
+file = "dds/dxt5_mips_16x16.dds"
+decoded_sha256 = "511665a7574517828adcdfab25d73ca7234a52e1085242ed1472f98ef1f0ac8a"
+dll_accepted = true
+dll_output_unstable = false
+reported_len = 256
+verbatim_sha256 = "46550f6a58a95d46e6c3a34602d6749853ab0e102b79aa1ea2456572d0cfb819"
+
+[[dds]]
+name = "dxt5_18x10"
+file = "dds/dxt5_18x10.dds"
+decoded_sha256 = "cd6555e53480e554da0f7eed061ad3acb1563e8d8f1934fab32b6d273107cb79"
+dll_accepted = true
+dll_output_unstable = false
+reported_len = 240
+verbatim_sha256 = "0df62bfe46549eeeec8660cc290501830ea3f8734190e0b05ca5920a5216659d"
+
+[[dds]]
+name = "dxt5_mips_18x10"
+file = "dds/dxt5_mips_18x10.dds"
+decoded_sha256 = "16b402ac9fa74629f7ec36ca71f32b610b1f03c7a3a3d8be38deacd22fc7c465"
+dll_accepted = true
+dll_output_unstable = false
+reported_len = 240
+verbatim_sha256 = "4e1913a12fdd833ab43344ff016dce8fbd0d34da0ea2410c2afda3409d939ae4"
+
+[[dds]]
+name = "a8r8g8b8_16x16"
+file = "dds/a8r8g8b8_16x16.dds"
+decoded_sha256 = "d4332b0d129f9263beae23def875b46547ed7019c68aa99359812a26cbdc0c52"
+dll_accepted = true
+dll_output_unstable = false
+reported_len = 64
+verbatim_sha256 = "cab39f1df775b2760d6a8a552f280364c720da4281c574609d34fef5b734a55c"
+
+[[dds]]
+name = "a8r8g8b8_mips_16x16"
+file = "dds/a8r8g8b8_mips_16x16.dds"
+decoded_sha256 = "29bcefbd945eb655d58f174581ea58c3c65a5990a2fefa4f22732ede85c58b3a"
+dll_accepted = true
+dll_output_unstable = false
+reported_len = 64
+verbatim_sha256 = "96c209e66fcbb98b3a1357dcf3800cf524de8d4864a217862fd018eff12c53ea"
+
+[[dds]]
+name = "a8r8g8b8_18x10"
+file = "dds/a8r8g8b8_18x10.dds"
+decoded_sha256 = "47ad65b7f3ae242f44317e4fece1d0db0029de16dbf9d1cee169870a4d3adc8d"
+dll_accepted = true
+dll_output_unstable = false
+reported_len = 72
+verbatim_sha256 = "3b759256ba1a8b62e451bb0a359d78fcde933d6477fccb222ef0a6b9cd38e4cb"
+
+[[dds]]
+name = "a8r8g8b8_mips_18x10"
+file = "dds/a8r8g8b8_mips_18x10.dds"
+decoded_sha256 = "cd2bd39db0d75398bc69a2a474ccdef0df3b0c762c163c70ab8980adce682d59"
+dll_accepted = true
+dll_output_unstable = false
+reported_len = 72
+verbatim_sha256 = "f6025ea8a80131917555177ef10b27f141520ffcd83ab521df62cdc8769719ad"
+
+[[dds]]
+name = "x8r8g8b8_16x16"
+file = "dds/x8r8g8b8_16x16.dds"
+decoded_sha256 = "ab921206650a64ca080947aa9313daef7a4a8cf8c2a36cd17fdc8070774881c8"
+dll_accepted = true
+dll_output_unstable = false
+reported_len = 64
+verbatim_sha256 = ""
+
+[[dds]]
+name = "x8r8g8b8_mips_16x16"
+file = "dds/x8r8g8b8_mips_16x16.dds"
+decoded_sha256 = "5ea1536a7347a04fcdc1dfc6b64123f16dca9acf878695c0a49844c4705a83fb"
+dll_accepted = true
+dll_output_unstable = false
+reported_len = 64
+verbatim_sha256 = ""
+
+[[dds]]
+name = "x8r8g8b8_18x10"
+file = "dds/x8r8g8b8_18x10.dds"
+decoded_sha256 = "6d7e8be6bcea490f48f1bc3eea866d2409d85152686bc0c86061c3585215fced"
+dll_accepted = true
+dll_output_unstable = false
+reported_len = 72
+verbatim_sha256 = ""
+
+[[dds]]
+name = "x8r8g8b8_mips_18x10"
+file = "dds/x8r8g8b8_mips_18x10.dds"
+decoded_sha256 = "fdd5f5797eac581e8f6ffc4486ed16727ff0b7b09a837116f1a35b90cdbbd13a"
+dll_accepted = true
+dll_output_unstable = false
+reported_len = 72
+verbatim_sha256 = ""
+
+[[dds]]
+name = "r8g8b8_16x16"
+file = "dds/r8g8b8_16x16.dds"
+decoded_sha256 = ""
+dll_accepted = true
+dll_output_unstable = true
+reported_len = 48
+verbatim_sha256 = ""
+
+[[dds]]
+name = "r8g8b8_mips_16x16"
+file = "dds/r8g8b8_mips_16x16.dds"
+decoded_sha256 = ""
+dll_accepted = true
+dll_output_unstable = true
+reported_len = 48
+verbatim_sha256 = ""
+
+[[dds]]
+name = "r8g8b8_18x10"
+file = "dds/r8g8b8_18x10.dds"
+decoded_sha256 = ""
+dll_accepted = true
+dll_output_unstable = true
+reported_len = 54
+verbatim_sha256 = ""
+
+[[dds]]
+name = "r8g8b8_mips_18x10"
+file = "dds/r8g8b8_mips_18x10.dds"
+decoded_sha256 = ""
+dll_accepted = true
+dll_output_unstable = true
+reported_len = 54
+verbatim_sha256 = ""
+
+[[dds]]
+name = "r5g6b5_16x16"
+file = "dds/r5g6b5_16x16.dds"
+decoded_sha256 = ""
+dll_accepted = true
+dll_output_unstable = true
+reported_len = 32
+verbatim_sha256 = ""
+
+[[dds]]
+name = "r5g6b5_mips_16x16"
+file = "dds/r5g6b5_mips_16x16.dds"
+decoded_sha256 = ""
+dll_accepted = true
+dll_output_unstable = true
+reported_len = 32
+verbatim_sha256 = ""
+
+[[dds]]
+name = "r5g6b5_18x10"
+file = "dds/r5g6b5_18x10.dds"
+decoded_sha256 = ""
+dll_accepted = true
+dll_output_unstable = true
+reported_len = 36
+verbatim_sha256 = ""
+
+[[dds]]
+name = "r5g6b5_mips_18x10"
+file = "dds/r5g6b5_mips_18x10.dds"
+decoded_sha256 = ""
+dll_accepted = true
+dll_output_unstable = true
+reported_len = 36
+verbatim_sha256 = ""
+
+[[dds]]
+name = "a1r5g5b5_16x16"
+file = "dds/a1r5g5b5_16x16.dds"
+decoded_sha256 = ""
+dll_accepted = true
+dll_output_unstable = true
+reported_len = 32
+verbatim_sha256 = ""
+
+[[dds]]
+name = "a1r5g5b5_mips_16x16"
+file = "dds/a1r5g5b5_mips_16x16.dds"
+decoded_sha256 = ""
+dll_accepted = true
+dll_output_unstable = true
+reported_len = 32
+verbatim_sha256 = ""
+
+[[dds]]
+name = "a1r5g5b5_18x10"
+file = "dds/a1r5g5b5_18x10.dds"
+decoded_sha256 = ""
+dll_accepted = true
+dll_output_unstable = true
+reported_len = 36
+verbatim_sha256 = ""
+
+[[dds]]
+name = "a1r5g5b5_mips_18x10"
+file = "dds/a1r5g5b5_mips_18x10.dds"
+decoded_sha256 = ""
+dll_accepted = true
+dll_output_unstable = true
+reported_len = 36
+verbatim_sha256 = ""
+
+[[dds]]
+name = "a4r4g4b4_16x16"
+file = "dds/a4r4g4b4_16x16.dds"
+decoded_sha256 = ""
+dll_accepted = true
+dll_output_unstable = true
+reported_len = 32
+verbatim_sha256 = ""
+
+[[dds]]
+name = "a4r4g4b4_mips_16x16"
+file = "dds/a4r4g4b4_mips_16x16.dds"
+decoded_sha256 = ""
+dll_accepted = true
+dll_output_unstable = true
+reported_len = 32
+verbatim_sha256 = ""
+
+[[dds]]
+name = "a4r4g4b4_18x10"
+file = "dds/a4r4g4b4_18x10.dds"
+decoded_sha256 = ""
+dll_accepted = true
+dll_output_unstable = true
+reported_len = 36
+verbatim_sha256 = ""
+
+[[dds]]
+name = "a4r4g4b4_mips_18x10"
+file = "dds/a4r4g4b4_mips_18x10.dds"
+decoded_sha256 = ""
+dll_accepted = true
+dll_output_unstable = true
+reported_len = 36
+verbatim_sha256 = ""
+
+[[dds]]
+name = "l8_16x16"
+file = "dds/l8_16x16.dds"
+decoded_sha256 = ""
+dll_accepted = true
+dll_output_unstable = true
+reported_len = 16
+verbatim_sha256 = ""
+
+[[dds]]
+name = "l8_mips_16x16"
+file = "dds/l8_mips_16x16.dds"
+decoded_sha256 = ""
+dll_accepted = true
+dll_output_unstable = true
+reported_len = 16
+verbatim_sha256 = ""
+
+[[dds]]
+name = "l8_18x10"
+file = "dds/l8_18x10.dds"
+decoded_sha256 = ""
+dll_accepted = true
+dll_output_unstable = true
+reported_len = 18
+verbatim_sha256 = ""
+
+[[dds]]
+name = "l8_mips_18x10"
+file = "dds/l8_mips_18x10.dds"
+decoded_sha256 = ""
+dll_accepted = true
+dll_output_unstable = true
+reported_len = 18
+verbatim_sha256 = ""

@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::crafted::{self, Crafted};
+use crate::dds_corpus::{self, DdsSample};
 use crate::synthetic;
 
 const HARNESS_TARGET: &str = "i686-pc-windows-msvc";
@@ -40,6 +41,8 @@ struct Manifest {
     fixture: Vec<Fixture>,
     #[serde(default)]
     crafted: Vec<Crafted>,
+    #[serde(default)]
+    dds: Vec<DdsSample>,
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
@@ -359,9 +362,11 @@ fn write_goldens(paths: &Paths, inputs_dir: &Path, out_dir: &Path) -> Result<Man
         });
     }
     let crafted = crafted::write_crafted(paths, &work_path, out_dir)?;
+    let dds = dds_corpus::write_dds_samples(paths, &work_path, out_dir)?;
     let manifest = Manifest {
         fixture: fixtures,
         crafted,
+        dds,
     };
     std::fs::write(out_dir.join("manifest.toml"), toml::to_string(&manifest)?)?;
     Ok(manifest)
@@ -417,9 +422,10 @@ pub fn generate(refresh_inputs: bool) -> Result<()> {
     build_harness(&paths)?;
     let manifest = write_goldens(&paths, &paths.inputs(), &paths.corpus())?;
     println!(
-        "{} fixtures and {} crafted cases written",
+        "{} fixtures, {} crafted cases and {} DDS samples written",
         manifest.fixture.len(),
-        manifest.crafted.len()
+        manifest.crafted.len(),
+        manifest.dds.len()
     );
     Ok(())
 }
@@ -479,6 +485,27 @@ fn compare_manifests(committed: &Manifest, regenerated: &Manifest, mismatches: &
             ));
         }
     }
+    for sample in &regenerated.dds {
+        let committed_entry = committed
+            .dds
+            .iter()
+            .find(|other| other.name() == sample.name());
+        if committed_entry != Some(sample) {
+            mismatches.push(format!("manifest entry for DDS {} differs", sample.name()));
+        }
+    }
+    for sample in &committed.dds {
+        if !regenerated
+            .dds
+            .iter()
+            .any(|other| other.name() == sample.name())
+        {
+            mismatches.push(format!(
+                "manifest entry for DDS {} is no longer generated",
+                sample.name()
+            ));
+        }
+    }
 }
 
 /// Regenerates into a temp directory from the committed inputs and compares with the committed corpus.
@@ -533,11 +560,20 @@ pub fn check() -> Result<()> {
         }
     }
 
+    for sample in &regenerated.dds {
+        compare_file(
+            &paths.corpus().join(sample.file()),
+            &regenerated_dir.join(sample.file()),
+            &mut mismatches,
+        )?;
+    }
+
     if mismatches.is_empty() {
         println!(
-            "golden corpus matches ({} fixtures, {} crafted cases)",
+            "golden corpus matches ({} fixtures, {} crafted cases, {} DDS samples)",
             regenerated.fixture.len(),
-            regenerated.crafted.len()
+            regenerated.crafted.len(),
+            regenerated.dds.len()
         );
         return Ok(());
     }

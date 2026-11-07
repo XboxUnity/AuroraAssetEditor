@@ -1,4 +1,5 @@
 mod crafted;
+mod dds_corpus;
 mod golden;
 mod synthetic;
 

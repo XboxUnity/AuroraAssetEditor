@@ -132,11 +132,11 @@ fn decode_dds(options: &Options) -> CliResult {
     let dds = read_file(&required_path(options, "input")?)?;
     let out = required_path(options, "out")?;
 
-    let Some((bgra, width, height)) = dll.dds_to_image(&dds) else {
+    let Some((bgra, width, height, reported_len)) = dll.dds_to_image(&dds) else {
         eprintln!("the DLL refused to decode the DDS");
         return Ok(EXIT_DDS_REFUSED);
     };
     write_file(&out, &bgra)?;
-    println!("{width} {height}");
+    println!("{width} {height} {reported_len}");
     Ok(EXIT_OK)
 }
