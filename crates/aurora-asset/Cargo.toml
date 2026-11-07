@@ -8,6 +8,7 @@ rust-version.workspace = true
 image = { version = "0.25", default-features = false }
 
 [dev-dependencies]
+asset-fixtures = { path = "../../tools/asset-fixtures" }
 hex = "0.4.3"
 image = { version = "0.25", default-features = false, features = ["png"] }
 serde = { version = "1.0.229", features = ["derive"] }

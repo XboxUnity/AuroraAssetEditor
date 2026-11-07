@@ -8,6 +8,7 @@ members = [
     "crates/aurora-online",
     "crates/aurora-ui",
     "crates/dotnet-number-text",
+    "tools/asset-fixtures",
     "tools/editor-test-support",
     "tools/golden/harness",
     "tools/test-servers",

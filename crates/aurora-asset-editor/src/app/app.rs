@@ -84,7 +84,9 @@ impl App {
     }
 
     pub fn on_job_outcome(&mut self, outcome: JobOutcome) {
-        match outcome {}
+        match outcome {
+            JobOutcome::Loaded(loaded) => self.apply_loaded(loaded),
+        }
     }
 
     /// Logs the error and shows it in the status line.
@@ -94,8 +96,20 @@ impl App {
     }
 
     /// Logs the error and shows `text` in a message dialog titled `title`.
+    #[expect(dead_code, reason = "first used by the save actions")]
     pub(super) fn show_error(&mut self, title: &str, text: String, error: &(dyn Error + 'static)) {
-        if let Some(log_failure) = self.record_error(title, error) {
+        self.show_error_logged_as(title, title, text, error);
+    }
+
+    /// Like `show_error`, with `log_context` in place of the title as the log entry's context.
+    fn show_error_logged_as(
+        &mut self,
+        log_context: &str,
+        title: &str,
+        text: String,
+        error: &(dyn Error + 'static),
+    ) {
+        if let Some(log_failure) = self.record_error(log_context, error) {
             self.status = StatusLine::error(log_failure);
         }
         self.modals.push(Modal::Message {
@@ -105,7 +119,6 @@ impl App {
     }
 
     /// The picked files; none when the user cancelled or the dialog failed, which is shown.
-    #[expect(dead_code, reason = "first used by the file actions")]
     pub(super) fn ask_open_files(&mut self, request: &OpenRequest) -> Vec<PathBuf> {
         let answer = self.environment.dialogs.open_files(request);
         self.dialog_answer(&request.title, answer)
@@ -142,8 +155,9 @@ impl App {
             Ok(answer) => Some(answer),
             Err(error) => {
                 let reason = error_chain(error.source.as_ref()).join(": ");
-                let text = format!("The \"{dialog_title}\" dialog could not be shown: {reason}");
-                self.show_error(DIALOG_FAILED_TITLE, text, &error);
+                let context = format!("The \"{dialog_title}\" dialog could not be shown");
+                let text = format!("{context}: {reason}");
+                self.show_error_logged_as(&context, DIALOG_FAILED_TITLE, text, &error);
                 None
             }
         }
@@ -167,7 +181,11 @@ impl App {
     }
 
     /// Writes the error to `error.log`. When that fails, the failure is returned for the status line.
-    fn record_error(&self, context: &str, error: &(dyn Error + 'static)) -> Option<String> {
+    pub(super) fn record_error(
+        &self,
+        context: &str,
+        error: &(dyn Error + 'static),
+    ) -> Option<String> {
         self.environment
             .error_log
             .record(context, error)

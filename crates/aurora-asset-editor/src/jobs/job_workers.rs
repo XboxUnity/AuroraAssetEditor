@@ -32,7 +32,9 @@ impl JobWorkers {
     }
 
     fn run(&mut self, job: Job) -> JobOutcome {
-        match job {}
+        match job {
+            Job::Load(load) => JobOutcome::Loaded(load.run()),
+        }
     }
 }
 

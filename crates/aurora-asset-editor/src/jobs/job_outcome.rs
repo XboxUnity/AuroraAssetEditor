@@ -1,3 +1,7 @@
+use crate::files::LoadedFiles;
+
 /// What a job hands back to the UI thread: its result, or progress while it runs.
 #[derive(Debug)]
-pub enum JobOutcome {}
+pub enum JobOutcome {
+    Loaded(LoadedFiles),
+}

@@ -6,6 +6,7 @@ mod app;
 mod app_environment;
 mod current_game;
 mod current_game_actions;
+mod file_actions;
 mod kind_choice;
 mod page;
 mod settings_actions;

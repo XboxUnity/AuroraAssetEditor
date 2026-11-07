@@ -10,6 +10,9 @@ mod queued_runner;
 mod sample_assets;
 
 pub use app_harness::{AppHarness, OutcomeStage, TEST_SUBNET_PREFIX, test_build_info};
+pub use asset_fixtures::{
+    BACKGROUND, BANNER, BOXART, COVER, FsdBuilder, ICON, PREVIEW, SCREENSHOT, SLOT,
+};
 pub use fake_clipboard::{FakeClipboard, FakeClipboardHandle};
 pub use fake_dialogs::{DialogRequest, FakeDialogs, FakeDialogsHandle};
 pub use fake_folder_opener::{FakeFolderOpener, FakeFolderOpenerHandle};

@@ -6,6 +6,7 @@ rust-version.workspace = true
 publish = false
 
 [dependencies]
+asset-fixtures = { path = "../asset-fixtures" }
 aurora-asset = { path = "../../crates/aurora-asset" }
 aurora-asset-editor = { path = "../../crates/aurora-asset-editor" }
 aurora-console = { path = "../../crates/aurora-console" }

@@ -22,7 +22,8 @@ use crate::{
 
 pub const TEST_SUBNET_PREFIX: &str = "192.168.1.";
 const TEST_ONLINE_TIMEOUT: Duration = Duration::from_secs(5);
-/// Port 9 (discard) has no listener, so a request that is not routed to a test server is refused at once.
+/// Port 9 (discard) has no listener, so a request that is not routed to a test server is refused (on Windows
+/// a refused connect takes about 2 s).
 const REFUSING_URL: &str = "http://127.0.0.1:9/";
 const FAKE_CONSOLE_HOST: &str = "127.0.0.1";
 

@@ -1,0 +1,248 @@
+use std::error::Error;
+use std::path::{Path, PathBuf};
+
+use aurora_asset::{AssetKind, AssetSlot, Compression};
+
+use crate::dialogs::Modal;
+use crate::editor::{DecodedKind, EditorPages, PreparedImage};
+use crate::files::{
+    ASSET_OPEN_DEFAULT_FILTER, FileProblem, FsdImages, LoadProblem, LoadedFile, LoadedFiles,
+    asset_open_filters, slot_label,
+};
+use crate::jobs::{Job, JobPriority, LoadJob};
+use crate::logging::error_chain;
+use crate::platform::OpenRequest;
+use crate::status::StatusLine;
+
+use super::{App, Page};
+
+pub const OPEN_DIALOG_TITLE: &str = "Select Asset(s) to load";
+pub const LOAD_PROBLEMS_TITLE: &str = "Could not load files";
+pub const NO_ASSETS_TITLE: &str = "No assets";
+pub const UNREAD_IMAGES_TITLE: &str = "Some images could not be read";
+pub const NOT_ENOUGH_SPACE_TITLE: &str = "Not enough space";
+pub const NOT_ENOUGH_SPACE_TEXT: &str = "Not enough space to fit all screenshots, please clear current screenshots and load the FSD asset again...";
+const LOAD_PROBLEMS_FOOTER: &str = "Details are in error.log.";
+const ASSET_TYPE_COUNT: usize = 5;
+const STATUS_SEPARATOR: &str = " · ";
+
+impl App {
+    /// The Open menu's "Open asset files…".
+    pub fn open_files_with_dialog(&mut self) {
+        let request = OpenRequest {
+            title: OPEN_DIALOG_TITLE.to_owned(),
+            filters: asset_open_filters(),
+            default_filter: ASSET_OPEN_DEFAULT_FILTER,
+            default_name: None,
+        };
+        let paths = self.ask_open_files(&request);
+        self.open_paths(paths);
+    }
+
+    /// Loads files given on the command line or dropped on the window. Their content decides what they are.
+    pub fn open_paths(&mut self, paths: Vec<PathBuf>) {
+        if paths.is_empty() {
+            return;
+        }
+        let compression = if self.environment.settings.use_compression {
+            Compression::Dxt
+        } else {
+            Compression::None
+        };
+        let job = Job::Load(LoadJob { paths, compression });
+        self.active_work.loading += 1;
+        self.environment.jobs.submit(job, JobPriority::User);
+    }
+
+    /// The Open menu's "New asset set": empty pages, the current game stays.
+    pub fn new_asset_set(&mut self) {
+        self.pages.reset();
+        self.status = StatusLine::ready();
+    }
+
+    pub(super) fn apply_loaded(&mut self, loaded: LoadedFiles) {
+        self.active_work.loading = self.active_work.loading.saturating_sub(1);
+        let mut unread_images = Vec::new();
+        let mut last_loaded = None;
+        for file in loaded.files {
+            let path = match file {
+                LoadedFile::Asset { path, decoded } => {
+                    self.apply_asset(&path, *decoded, &mut unread_images);
+                    path
+                }
+                LoadedFile::Fsd { path, images } => {
+                    self.apply_fsd(&path, *images, &mut unread_images);
+                    path
+                }
+            };
+            last_loaded = Some(file_name(&path));
+        }
+        if let Some(name) = last_loaded {
+            let present = self.pages.present_types();
+            self.status = StatusLine::info(format!(
+                "Loaded {name}{STATUS_SEPARATOR}{present} of {ASSET_TYPE_COUNT} asset types present"
+            ));
+        }
+        self.show_unread_images(unread_images);
+        self.report_load_problems(loaded.problems);
+    }
+
+    fn apply_asset(&mut self, path: &Path, decoded: DecodedKind, unread_images: &mut Vec<String>) {
+        let kind = decoded.kind;
+        for dropped in &decoded.dropped {
+            let entry = slot_label(dropped.slot);
+            self.note_unread_image(path, &entry, &dropped.error, unread_images);
+        }
+        self.pages.get_mut(kind).replace_with(decoded);
+        self.page = Page::of_kind(kind);
+    }
+
+    fn apply_fsd(&mut self, path: &Path, images: FsdImages, unread_images: &mut Vec<String>) {
+        for (entry, error) in &images.unreadable {
+            self.note_unread_image(path, entry, error, unread_images);
+        }
+        let mut received = FsdReceived::default();
+        received.put(
+            &mut self.pages,
+            AssetKind::Cover,
+            AssetSlot::Cover,
+            images.cover,
+        );
+        received.put(
+            &mut self.pages,
+            AssetKind::Background,
+            AssetSlot::Background,
+            images.background,
+        );
+        received.put(
+            &mut self.pages,
+            AssetKind::IconBanner,
+            AssetSlot::Icon,
+            images.icon,
+        );
+        received.put(
+            &mut self.pages,
+            AssetKind::IconBanner,
+            AssetSlot::Banner,
+            images.banner,
+        );
+
+        let free_slots = self.pages.screenshots.free_screenshots();
+        let mut screenshots = images.screenshots.into_iter();
+        for number in free_slots {
+            let Some(screenshot) = screenshots.next() else {
+                break;
+            };
+            received.put(
+                &mut self.pages,
+                AssetKind::Screenshots,
+                AssetSlot::Screenshot(number),
+                Some(screenshot),
+            );
+        }
+        let did_not_fit = screenshots.next().is_some();
+
+        if let Some(page) = received.first_page() {
+            self.page = page;
+        }
+        if did_not_fit {
+            self.modals.push(Modal::Message {
+                title: NOT_ENOUGH_SPACE_TITLE.to_owned(),
+                text: NOT_ENOUGH_SPACE_TEXT.to_owned(),
+            });
+        }
+    }
+
+    /// Logs the entry and adds its line to the dialog's text.
+    fn note_unread_image(
+        &mut self,
+        path: &Path,
+        entry: &str,
+        error: &(dyn Error + 'static),
+        unread_images: &mut Vec<String>,
+    ) {
+        let file = file_name(path);
+        let context = format!("{entry} in {file} could not be decoded");
+        if let Some(log_failure) = self.record_error(&context, error) {
+            self.status = StatusLine::error(log_failure);
+        }
+        let reason = error_chain(error).join(": ");
+        unread_images.push(format!(
+            "{entry} in {file} could not be decoded and was left out: {reason}"
+        ));
+    }
+
+    fn show_unread_images(&mut self, lines: Vec<String>) {
+        if lines.is_empty() {
+            return;
+        }
+        self.modals.push(Modal::Message {
+            title: UNREAD_IMAGES_TITLE.to_owned(),
+            text: lines.join("\n"),
+        });
+    }
+
+    /// Every problem is logged. Files without assets each get their own dialog; the rest share one.
+    fn report_load_problems(&mut self, problems: Vec<FileProblem>) {
+        let mut lines = Vec::new();
+        for FileProblem { path, problem } in problems {
+            let context = format!("Could not load {}", path.display());
+            if let Some(log_failure) = self.record_error(&context, &problem) {
+                self.status = StatusLine::error(log_failure);
+            }
+            let file = file_name(&path);
+            match problem {
+                LoadProblem::NoAssets => self.modals.push(Modal::Message {
+                    title: NO_ASSETS_TITLE.to_owned(),
+                    text: format!("{file} doesn't contain any assets."),
+                }),
+                problem => lines.push(format!("{file}: {problem}")),
+            }
+        }
+        if lines.is_empty() {
+            return;
+        }
+        let text = format!("{}\n\n{LOAD_PROBLEMS_FOOTER}", lines.join("\n"));
+        self.modals.push(Modal::Message {
+            title: LOAD_PROBLEMS_TITLE.to_owned(),
+            text,
+        });
+    }
+}
+
+/// Which editor pages an FSD file put an image on.
+#[derive(Default)]
+struct FsdReceived {
+    kinds: Vec<AssetKind>,
+}
+
+impl FsdReceived {
+    fn put(
+        &mut self,
+        pages: &mut EditorPages,
+        kind: AssetKind,
+        slot: AssetSlot,
+        image: Option<PreparedImage>,
+    ) {
+        let Some(image) = image else {
+            return;
+        };
+        pages.get_mut(kind).set_prepared(slot, image);
+        self.kinds.push(kind);
+    }
+
+    /// The first page that received an image, in sidebar order (`AssetKind::ALL` follows it).
+    fn first_page(&self) -> Option<Page> {
+        AssetKind::ALL
+            .into_iter()
+            .find(|kind| self.kinds.contains(kind))
+            .map(Page::of_kind)
+    }
+}
+
+fn file_name(path: &Path) -> String {
+    path.file_name()
+        .unwrap_or(path.as_os_str())
+        .to_string_lossy()
+        .into_owned()
+}
