@@ -23,6 +23,8 @@ rust-version = "1.99"
 license = "Unlicense"
 
 [profile.release]
-lto = true
+opt-level = 3
+lto = "fat"
 codegen-units = 1
-strip = "symbols"
+strip = true
+panic = "unwind"
