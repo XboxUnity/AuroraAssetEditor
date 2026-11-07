@@ -28,7 +28,7 @@ impl ConsoleConnection {
         let socket = connect_socket(host, port, timeouts)?;
 
         let stream = FtpStream::connect_with_stream(socket)
-            .map_err(protocol_error("read the greeting"))?
+            .map_err(greeting_error)?
             .passive_stream_builder(move |address| open_data_socket(address, timeouts));
         let mut connection = ConsoleConnection {
             stream,
@@ -211,6 +211,19 @@ fn reply_from(response: Response, action: &dyn Fn() -> String) -> Result<FtpRepl
         action: action(),
         source: FtpError::BadResponse,
     })
+}
+
+/// Aurora greets a connection beyond its sixth with 421 instead of 220.
+fn greeting_error(error: FtpError) -> ConsoleError {
+    match error {
+        FtpError::UnexpectedResponse(response) if response.status == Status::NotAvailable => {
+            ConsoleError::TooManyConnections
+        }
+        source => ConsoleError::Protocol {
+            action: "read the greeting".to_owned(),
+            source,
+        },
+    }
 }
 
 fn protocol_error(action: impl Into<String>) -> impl FnOnce(FtpError) -> ConsoleError {

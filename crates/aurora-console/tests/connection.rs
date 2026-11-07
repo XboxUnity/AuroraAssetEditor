@@ -386,3 +386,23 @@ fn zero_timeout_is_named_in_the_error() {
         }
     }
 }
+
+#[test]
+fn seventh_connection_is_too_many_connections() {
+    let console = FakeConsole::start(FakeConsoleConfig::default());
+    let mut held: Vec<ConsoleClient> = (0..6).map(|_| client_for(&console)).collect();
+    for client in &mut held {
+        client.ensure_connected().unwrap();
+    }
+
+    let error = client_for(&console).test_connection().unwrap_err();
+
+    assert!(
+        matches!(error, ConsoleError::TooManyConnections),
+        "{error:?}"
+    );
+    assert!(
+        error.to_string().contains("no more FTP connections"),
+        "{error}"
+    );
+}

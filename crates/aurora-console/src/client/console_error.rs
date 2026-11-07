@@ -22,6 +22,8 @@ pub enum ConsoleError {
         source: io::Error,
     },
     /// Only the reply code is kept: Aurora's reply to a wrong password echoes the stored password hash.
+    /// Aurora's FTP server serves six connections at once and greets the next with 421.
+    TooManyConnections,
     LoginRejected {
         code: u32,
     },
@@ -80,6 +82,10 @@ impl fmt::Display for ConsoleError {
                 f,
                 "the console rejected the login (reply {code}), check the FTP user name and password"
             ),
+            Self::TooManyConnections => write!(
+                f,
+                "the console allows no more FTP connections right now, close other FTP clients and try again"
+            ),
             Self::NotAurora { reply } => {
                 write!(f, "the console does not look like it runs Aurora: {reply}")
             }
@@ -131,6 +137,7 @@ impl std::error::Error for ConsoleError {
             Self::ContentDb(source) => Some(source),
             Self::TempFile(source) => Some(source),
             Self::InvalidTimeout { .. }
+            | Self::TooManyConnections
             | Self::LoginRejected { .. }
             | Self::NotAurora { .. }
             | Self::MissingFolder { .. }
