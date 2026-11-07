@@ -14,9 +14,11 @@ use std::time::Duration;
 
 use async_channel::Receiver;
 use aurora_asset_editor::about::BuildInfo;
-use aurora_asset_editor::app::{App, AppEnvironment, StartupProblem, StartupSettings};
+use aurora_asset_editor::app::{
+    App, AppEnvironment, LOG_WRITE_FAILED, StartupProblem, StartupSettings,
+};
 use aurora_asset_editor::jobs::{JobOutcome, JobWorkers, ThreadRunner};
-use aurora_asset_editor::logging::{ErrorLog, LogBridge, install_panic_hook};
+use aurora_asset_editor::logging::{ErrorLog, LogBridge, error_chain, install_panic_hook};
 use aurora_asset_editor::platform::{
     DropSignal, FileDropCollector, NativeFileDialogs, SystemClipboard, SystemClock,
     SystemFolderOpener, SystemTheme, window_placement,
@@ -47,6 +49,8 @@ const FTP_SETTINGS_FAILED: &str = "Could not load the console connection setting
 const SUBNET_PREFIX_FAILED: &str = "Could not find the local network to suggest a console address";
 const APP_ICON_FAILED: &str = "Could not load the window icon";
 const WINDOW_SETUP_FAILED: &str = "Could not finish setting up the window";
+const HIDE_FAILED: &str = "Could not close the window";
+const MESSAGE_BOX_FAILED: &str = "Could not show the error in a message box";
 
 /// Everything the window needs once it exists on screen.
 struct WindowSetup {
@@ -72,9 +76,7 @@ fn main() -> ExitCode {
     match run(config_dir, error_log.clone(), paths, problems) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
-            if let Err(write_error) = error_log.record(STARTUP_FAILED, error.as_ref()) {
-                eprintln!("{STARTUP_FAILED}: {error} (error.log: {write_error})");
-            }
+            report_outside_event_loop(&error_log, STARTUP_FAILED, error.as_ref());
             ExitCode::FAILURE
         }
     }
@@ -98,6 +100,7 @@ fn run(
     let timeouts = Timeouts::default();
     let online = OnlineClient::new(Endpoints::live(), DEFAULT_TIMEOUT);
     let runner = ThreadRunner::new(move || JobWorkers::new(timeouts, online.clone()), outcomes)?;
+    let exit_log = error_log.clone();
     let environment = AppEnvironment {
         config_dir,
         settings: startup.settings,
@@ -132,10 +135,25 @@ fn run(
     // A bulk run would otherwise keep the closed app running until its last game.
     app.borrow_mut().stop_bulk();
     if let Err(error) = view.window().hide() {
-        log::error!("Could not hide the window at exit: {error}");
+        report_outside_event_loop(&exit_log, HIDE_FAILED, &error);
     }
     runner.shutdown();
     Ok(())
+}
+
+/// For a failure while no window can show it: it is logged and shown in a message box. When even that fails,
+/// stderr is the last place left.
+fn report_outside_event_loop(error_log: &ErrorLog, context: &str, error: &(dyn Error + 'static)) {
+    let mut text = error_chain(error).join(": ");
+    if let Err(log_error) = error_log.record(context, error) {
+        text.push_str(&format!("\n\n{LOG_WRITE_FAILED}: {log_error}"));
+    }
+    if let Err(box_error) = aurora_file_dialogs::show_startup_error(context, &text) {
+        eprintln!("{context}: {text} ({MESSAGE_BOX_FAILED}: {box_error})");
+        if let Err(log_error) = error_log.record(MESSAGE_BOX_FAILED, &box_error) {
+            eprintln!("{LOG_WRITE_FAILED}: {log_error}");
+        }
+    }
 }
 
 /// Like the old app, which kept `ftp.json` next to itself, the current folder is used when the system has none.
@@ -285,7 +303,9 @@ fn finish_window_setup(
                 winit_window.set_taskbar_icon(setup.icon.clone());
                 winit_window.set_window_icon(setup.icon);
             }
-            Err(error) => log::error!("{WINDOW_SETUP_FAILED}: {error}"),
+            Err(error) => app
+                .borrow_mut()
+                .report_startup_problem(startup_problem(WINDOW_SETUP_FAILED, error)),
         }
         window_placement::restore_position(view.window().window(), setup.geometry.as_ref());
         let initial_theme = SystemTheme::read_initial(view.window());

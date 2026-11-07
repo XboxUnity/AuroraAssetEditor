@@ -293,6 +293,11 @@ impl App {
         }
     }
 
+    /// A problem found once the window is up, reported like the ones found before it.
+    pub fn report_startup_problem(&mut self, problem: StartupProblem) {
+        self.report_startup_problems(&[problem]);
+    }
+
     /// Every problem goes to `error.log`; the status line shows the first one.
     fn report_startup_problems(&mut self, problems: &[StartupProblem]) {
         let log_failures: Vec<String> = problems

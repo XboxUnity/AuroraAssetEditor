@@ -1,6 +1,7 @@
+use std::io;
 use std::path::PathBuf;
 
-use rfd::FileDialog;
+use rfd::{FileDialog, MessageButtons, MessageDialog, MessageLevel};
 
 use super::{DialogError, DialogParent, DialogRequest, extension_filters};
 
@@ -25,6 +26,17 @@ pub fn pick_folder(
     parent: Option<DialogParent>,
 ) -> Result<Option<PathBuf>, DialogError> {
     Ok(with_parent(FileDialog::new().set_title(title), parent).pick_folder())
+}
+
+pub fn show_startup_error(title: &str, text: &str) -> io::Result<()> {
+    // The box has only OK, and rfd reports no failure, so there is nothing to act on.
+    let _answer = MessageDialog::new()
+        .set_level(MessageLevel::Error)
+        .set_title(title)
+        .set_description(text)
+        .set_buttons(MessageButtons::Ok)
+        .show();
+    Ok(())
 }
 
 fn dialog(request: &DialogRequest) -> FileDialog {

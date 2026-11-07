@@ -1,4 +1,5 @@
 use std::ffi::{OsString, c_void};
+use std::io;
 use std::os::windows::ffi::OsStringExt;
 use std::path::PathBuf;
 
@@ -14,6 +15,7 @@ use windows::Win32::UI::Shell::{
     FOS_OVERWRITEPROMPT, FOS_PATHMUSTEXIST, FOS_PICKFOLDERS, FileOpenDialog, FileSaveDialog,
     IFileDialog, IFileOpenDialog, IFileSaveDialog, IShellItem, SIGDN_FILESYSPATH,
 };
+use windows::Win32::UI::WindowsAndMessaging::{MB_ICONERROR, MB_OK, MessageBoxW};
 use windows::core::{GUID, HSTRING, Interface, PCWSTR};
 
 use super::{DialogError, DialogParent, DialogRequest};
@@ -70,6 +72,17 @@ pub fn pick_folder(
 
 fn create<T: Interface>(class: &GUID) -> Result<T, DialogError> {
     unsafe { CoCreateInstance(class, None, CLSCTX_INPROC_SERVER) }.map_err(DialogError::new)
+}
+
+pub fn show_startup_error(title: &str, text: &str) -> io::Result<()> {
+    let title = HSTRING::from(title);
+    let text = HSTRING::from(text);
+    // The box has only OK, so its answer says nothing beyond whether it could be shown.
+    let answer = unsafe { MessageBoxW(None, &text, &title, MB_OK | MB_ICONERROR) };
+    if answer.0 == 0 {
+        return Err(io::Error::last_os_error());
+    }
+    Ok(())
 }
 
 fn prepare(

@@ -14,6 +14,7 @@ windows = { version = "=0.62.2", features = [
     "Win32_System_Com",
     "Win32_UI_Shell",
     "Win32_UI_Shell_Common",
+    "Win32_UI_WindowsAndMessaging",
 ] }
 
 [target.'cfg(target_os = "linux")'.dependencies]

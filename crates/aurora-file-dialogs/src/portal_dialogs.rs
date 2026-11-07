@@ -1,4 +1,5 @@
 use std::ffi::OsString;
+use std::io::{self, Write};
 use std::os::unix::ffi::OsStringExt;
 use std::path::PathBuf;
 
@@ -8,6 +9,10 @@ use ashpd::desktop::file_chooser::{FileFilter, SelectedFiles};
 
 use super::file_uri::file_uri_path_bytes;
 use super::{DialogError, DialogFilter, DialogParent, DialogRequest};
+
+pub fn show_startup_error(title: &str, text: &str) -> io::Result<()> {
+    writeln!(io::stderr(), "{title}: {text}")
+}
 
 pub fn open_files(request: &DialogRequest) -> Result<Vec<PathBuf>, DialogError> {
     async_io::block_on(open(request, true)).map(|picked| picked.unwrap_or_default())

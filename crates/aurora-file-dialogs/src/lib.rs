@@ -1,4 +1,5 @@
-// The Windows file dialogs are COM interfaces, which the `windows` crate only offers as `unsafe` calls.
+// The Windows file dialogs and message box are Win32 APIs, which the `windows` crate only
+// offers as `unsafe` calls.
 #![deny(unsafe_code)]
 
 mod dialog_error;
@@ -16,6 +17,7 @@ mod portal_dialogs;
 #[allow(unsafe_code)]
 mod windows_dialogs;
 
+use std::io;
 use std::path::PathBuf;
 
 pub use dialog_error::DialogError;
@@ -43,6 +45,12 @@ pub fn open_file(request: &DialogRequest) -> Result<Option<PathBuf>, DialogError
 /// Where the user wants the file saved; `None` is the user's cancel.
 pub fn save_file(request: &DialogRequest) -> Result<Option<PathBuf>, DialogError> {
     platform::save_file(request)
+}
+
+/// Shows an error that happens while no window can: before the event loop runs or after it ends. Windows
+/// and macOS show a message box, Linux writes `title: text` to stderr. It returns once the user closed it.
+pub fn show_startup_error(title: &str, text: &str) -> io::Result<()> {
+    platform::show_startup_error(title, text)
 }
 
 /// The folder the user picked; `None` is the user's cancel.
