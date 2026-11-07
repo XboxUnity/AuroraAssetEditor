@@ -3,7 +3,8 @@ use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 use aurora_online::{
-    CoverQuery, CoverSource, DEFAULT_TIMEOUT, Endpoints, OnlineClient, OnlineError, TitleId,
+    ClientOptions, CoverQuery, CoverSource, DEFAULT_TIMEOUT, Endpoints, OnlineClient, OnlineError,
+    TitleId,
 };
 use test_servers::{RecordedHttp, Route, RouteBehaviour};
 
@@ -36,15 +37,16 @@ fn client_for(server: &RecordedHttp) -> OnlineClient {
     client_with_timeout(server, TIMEOUT)
 }
 
-fn client_with_timeout(server: &RecordedHttp, timeout: Duration) -> OnlineClient {
+fn endpoints_for(server: &RecordedHttp) -> Endpoints {
     let base = server.base_url();
-    OnlineClient::new(
-        Endpoints {
-            xboxunity_covers: format!("{base}/api/Covers/"),
-            archive_covers: format!("{base}{ARCHIVE_PATH}"),
-        },
-        timeout,
-    )
+    Endpoints {
+        xboxunity_covers: format!("{base}/api/Covers/"),
+        archive_covers: format!("{base}{ARCHIVE_PATH}"),
+    }
+}
+
+fn client_with_timeout(server: &RecordedHttp, timeout: Duration) -> OnlineClient {
+    OnlineClient::without_proxy(endpoints_for(server), timeout)
 }
 
 fn route(path: &str, status: u16, body: &[u8], behaviour: RouteBehaviour) -> Route {
@@ -267,7 +269,7 @@ fn truncated_body_is_error() {
 
     let result = client_for(&server).download_image(&format!("{}/cut.png", server.base_url()));
 
-    assert!(result.is_err());
+    assert!(matches!(result, Err(OnlineError::Request { .. })));
 }
 
 #[test]
@@ -296,8 +298,13 @@ fn unresponsive_server_times_out() {
 
     let result = client.download_image(&format!("{}/hang.png", server.base_url()));
 
+    let elapsed = started.elapsed();
     assert!(matches!(result, Err(OnlineError::Request { .. })));
-    assert!(started.elapsed() < Duration::from_secs(3));
+    assert!(
+        elapsed >= Duration::from_millis(250),
+        "gave up after {elapsed:?}"
+    );
+    assert!(elapsed < Duration::from_secs(3), "took {elapsed:?}");
 }
 
 #[test]
@@ -373,4 +380,85 @@ fn random_cover_from_archive() {
 
     assert_eq!(bytes, bodies[expected_index]);
     assert!(server.unmatched().is_empty());
+}
+
+#[test]
+fn archive_server_error_is_not_zero_results() {
+    let server = server_with(vec![route(
+        &format!("{ARCHIVE_PATH}00000001/"),
+        500,
+        b"oops",
+        RouteBehaviour::Normal,
+    )]);
+
+    let result = client_for(&server).find_covers(CoverSource::InternetArchive, &title(1));
+
+    assert!(matches!(
+        result,
+        Err(OnlineError::HttpStatus { status: 500, .. })
+    ));
+}
+
+#[test]
+fn body_over_the_size_limit_is_error() {
+    let server = server_with(vec![ok_route("/big.png", &[7u8; 100])]);
+    let client = OnlineClient::with_options(
+        endpoints_for(&server),
+        ClientOptions {
+            timeout: TIMEOUT,
+            use_proxy: false,
+            max_response_bytes: 50,
+        },
+    );
+
+    let result = client.download_image(&format!("{}/big.png", server.base_url()));
+
+    assert!(matches!(result, Err(OnlineError::Request { .. })));
+}
+
+#[test]
+fn redirect_loop_is_error() {
+    let server = server_with(vec![route(
+        "/loop",
+        302,
+        b"",
+        RouteBehaviour::Redirect {
+            location: "{server}/loop".to_string(),
+        },
+    )]);
+
+    let result = client_for(&server).download_image(&format!("{}/loop", server.base_url()));
+
+    assert!(matches!(result, Err(OnlineError::Request { .. })));
+}
+
+#[test]
+fn random_cover_reaches_every_index() {
+    let covers_json = br#"[
+        {"name":"A","url":"{server}/api/boxart/1"},
+        {"name":"B","url":"{server}/api/boxart/2"},
+        {"name":"C","url":"{server}/api/boxart/3"}
+    ]"#;
+    let server = server_with(vec![
+        ok_route("/api/Covers/00000007", covers_json),
+        ok_route("/api/boxart/1", b"1"),
+        ok_route("/api/boxart/2", b"2"),
+        ok_route("/api/boxart/3", b"3"),
+    ]);
+    let client = client_for(&server);
+    let mut reached = std::collections::BTreeSet::new();
+
+    for seed in 0..40 {
+        let bytes = client
+            .random_cover(
+                CoverSource::XboxUnity,
+                TitleId::new(7),
+                &mut fastrand::Rng::with_seed(seed),
+            )
+            .expect("the choice downloads")
+            .expect("there are covers");
+        reached.insert(bytes);
+    }
+
+    assert_eq!(reached.len(), 3);
 }

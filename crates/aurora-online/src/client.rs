@@ -4,6 +4,7 @@ use ureq::Agent;
 
 use crate::OnlineError;
 use crate::archive::{archive_cover, archive_listing_url, parse_archive_variants};
+use crate::client_options::ClientOptions;
 use crate::cover_result::CoverResult;
 use crate::endpoints::Endpoints;
 use crate::query::{CoverQuery, CoverSource, TitleId};
@@ -12,22 +13,51 @@ use crate::xboxunity::{parse_xboxunity_covers, xboxunity_search_url};
 /// The old `WebClient` default.
 pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(100);
 
-const MAX_RESPONSE_BYTES: u64 = 64 * 1024 * 1024;
 const NOT_FOUND: u16 = 404;
 
 /// Finds and downloads covers. Every request is attempted once; failures are returned.
 pub struct OnlineClient {
     endpoints: Endpoints,
     agent: Agent,
+    max_response_bytes: u64,
 }
 
 impl OnlineClient {
+    /// Uses the environment and Windows system proxy settings, like the old `WebClient`.
     pub fn new(endpoints: Endpoints, timeout: Duration) -> Self {
-        let agent: Agent = Agent::config_builder()
-            .timeout_global(Some(timeout))
-            .build()
-            .into();
-        OnlineClient { endpoints, agent }
+        OnlineClient::with_options(
+            endpoints,
+            ClientOptions {
+                timeout,
+                ..ClientOptions::default()
+            },
+        )
+    }
+
+    /// Ignores every proxy setting, for talking to a test server on 127.0.0.1.
+    pub fn without_proxy(endpoints: Endpoints, timeout: Duration) -> Self {
+        OnlineClient::with_options(
+            endpoints,
+            ClientOptions {
+                timeout,
+                use_proxy: false,
+                ..ClientOptions::default()
+            },
+        )
+    }
+
+    pub fn with_options(endpoints: Endpoints, options: ClientOptions) -> Self {
+        let builder = Agent::config_builder().timeout_global(Some(options.timeout));
+        let config = if options.use_proxy {
+            builder.build()
+        } else {
+            builder.proxy(None).build()
+        };
+        OnlineClient {
+            endpoints,
+            agent: config.into(),
+            max_response_bytes: options.max_response_bytes,
+        }
     }
 
     pub fn find_covers(
@@ -111,7 +141,7 @@ impl OnlineClient {
         response
             .body_mut()
             .with_config()
-            .limit(MAX_RESPONSE_BYTES)
+            .limit(self.max_response_bytes)
             .read_to_vec()
             .map_err(request_error)
     }
