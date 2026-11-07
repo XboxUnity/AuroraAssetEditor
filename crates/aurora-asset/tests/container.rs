@@ -447,4 +447,10 @@ fn move_screenshot_zeroes_header_of_emptied_slot() {
     let slot3 = entry_bytes(&saved, shot(3).index());
     assert_eq!(be_u32(slot3, 4), 8, "texture moved to slot 3");
     assert_eq!(loaded.get(shot(1)).unwrap().data, vec![2; 8]);
+
+    assert!(loaded.get(shot(2)).is_none());
+    let emptied = entry_bytes(&saved, shot(2).index());
+    assert_eq!(be_u32(emptied, 0), 8, "slot 2 keeps its own stored offset");
+    assert_eq!(be_u32(emptied, 4), 0, "slot 2 stores no data");
+    assert!(emptied[12..].iter().all(|byte| *byte == 0), "slot 2 header");
 }
