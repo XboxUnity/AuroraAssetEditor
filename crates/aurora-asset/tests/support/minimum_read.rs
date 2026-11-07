@@ -1,26 +1,6 @@
 use aurora_asset::{DecodeError, EncodedTexture, decode};
 
-use super::rgba_sha256;
-
-/// What a surface row is made of: 4x4 blocks of 8 or 16 bytes, or 4-byte texels.
-#[derive(Clone, Copy)]
-pub struct SurfaceUnit {
-    pub texels_per_side: usize,
-    pub bytes: usize,
-}
-
-pub const BC1_BLOCK: SurfaceUnit = SurfaceUnit {
-    texels_per_side: 4,
-    bytes: 8,
-};
-pub const BC3_BLOCK: SurfaceUnit = SurfaceUnit {
-    texels_per_side: 4,
-    bytes: 16,
-};
-pub const ARGB_TEXEL: SurfaceUnit = SurfaceUnit {
-    texels_per_side: 1,
-    bytes: 4,
-};
+use super::{SurfaceUnit, rgba_sha256};
 
 const FETCH_0_OFFSET: usize = 28;
 const PITCH_SHIFT: u32 = 22;

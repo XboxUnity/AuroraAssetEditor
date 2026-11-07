@@ -7,23 +7,23 @@ mod compression;
 mod decode_error;
 mod encode_error;
 mod encoded_texture;
-mod endian;
 mod fetch_format;
-mod format;
-mod header;
-mod layout;
+mod gpu_endian;
+mod surface_layout;
+mod texture_format;
+mod texture_header;
 
 use image::RgbaImage;
 
-use layout::SurfaceLayout;
+use surface_layout::SurfaceLayout;
 
 pub(crate) use block_decode::{decode_bc1_block, decode_bc3_block};
 pub use compression::Compression;
 pub use decode_error::DecodeError;
 pub use encode_error::EncodeError;
 pub use encoded_texture::EncodedTexture;
-pub use format::TextureFormat;
-pub use header::{TEXTURE_HEADER_LEN, TextureHeader};
+pub use texture_format::TextureFormat;
+pub use texture_header::{TEXTURE_HEADER_LEN, TextureHeader};
 
 pub const MAX_DIMENSION: u32 = 8192;
 

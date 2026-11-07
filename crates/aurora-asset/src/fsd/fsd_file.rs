@@ -1,5 +1,3 @@
-//! The FSD asset container (FreeStyle Dash), read for import only. All fields are big-endian.
-
 use std::fmt;
 
 use crate::bytes::read_u32_be;

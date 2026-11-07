@@ -33,8 +33,8 @@ mod x87;
 use image::RgbaImage;
 
 use super::channel::unit_from_byte;
-use super::endian::swap_8in16;
-use super::layout::SurfaceLayout;
+use super::gpu_endian::swap_8in16;
+use super::surface_layout::SurfaceLayout;
 use crate::bytes::BLOCK_SIDE;
 use x87::Fpu;
 

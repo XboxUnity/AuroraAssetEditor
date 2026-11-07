@@ -2,6 +2,7 @@
 
 mod manifest;
 mod minimum_read;
+mod surface_unit;
 
 use std::fs;
 use std::path::PathBuf;
@@ -10,9 +11,8 @@ use image::RgbaImage;
 use sha2::{Digest, Sha256};
 
 pub use manifest::{Crafted, DdsSample, Fixture, Manifest, manifest};
-pub use minimum_read::{
-    ARGB_TEXEL, BC1_BLOCK, BC3_BLOCK, SurfaceUnit, assert_decodes_at_minimum_len, minimum_data_len,
-};
+pub use minimum_read::{assert_decodes_at_minimum_len, minimum_data_len};
+pub use surface_unit::{ARGB_TEXEL, BC1_BLOCK, BC3_BLOCK, SurfaceUnit};
 
 fn codec_fixtures_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/codec")

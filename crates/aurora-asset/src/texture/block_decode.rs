@@ -3,8 +3,8 @@ use image::{Rgba, RgbaImage};
 use super::DecodeError;
 use super::channel::{expand_565, unit_from_byte};
 use super::channel_order::ChannelOrder;
-use super::endian::GpuEndian;
-use super::layout::SurfaceLayout;
+use super::gpu_endian::GpuEndian;
+use super::surface_layout::SurfaceLayout;
 use crate::bytes::{BLOCK_SIDE, CHANNEL_MAX, block_array};
 
 const TEXELS_PER_BLOCK: usize = BLOCK_SIDE * BLOCK_SIDE;

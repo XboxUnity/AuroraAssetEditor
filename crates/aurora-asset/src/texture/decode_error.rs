@@ -1,6 +1,6 @@
 use std::fmt;
 
-use super::format::TextureFormat;
+use super::texture_format::TextureFormat;
 
 /// Why a texture cannot be decoded.
 #[derive(Debug, Clone, PartialEq, Eq)]

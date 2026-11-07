@@ -1,8 +1,8 @@
 use super::channel_order::ChannelOrder;
 use super::compression::Compression;
-use super::endian::GpuEndian;
-use super::format::{self, FetchFields, TextureFormat};
-use super::layout::{PITCH_UNIT_BYTES, SurfaceLayout};
+use super::gpu_endian::GpuEndian;
+use super::surface_layout::{PITCH_UNIT_BYTES, SurfaceLayout};
+use super::texture_format::{self, FetchFields, TextureFormat};
 use super::{EncodeError, MAX_DIMENSION};
 use crate::bytes::read_u32_be;
 
@@ -159,7 +159,7 @@ impl TextureHeader {
     }
 
     pub fn format(&self) -> TextureFormat {
-        format::classify(&self.fetch_fields())
+        texture_format::classify(&self.fetch_fields())
     }
 
     pub(crate) fn tiled(&self) -> bool {

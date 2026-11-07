@@ -1,4 +1,4 @@
-use super::header::TextureHeader;
+use super::texture_header::TextureHeader;
 
 /// A texture as stored in an `.asset` entry: the 52-byte header plus the surface bytes.
 #[derive(Debug, Clone, PartialEq, Eq)]
