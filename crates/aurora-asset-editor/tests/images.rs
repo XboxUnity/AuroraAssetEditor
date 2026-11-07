@@ -247,7 +247,7 @@ fn dropping_a_folder_is_reported() {
     assert_eq!(message_title(app), "Could not load files");
     assert_eq!(
         message_text(app),
-        "covers: this is a folder, drop the files in it instead\n\nDetails are in error.log."
+        "covers: this is a folder, not a file\n\nDetails are in error.log."
     );
     assert!(is_empty(app, AssetSlot::Cover));
 }
@@ -390,14 +390,123 @@ fn replace_screenshot_targets_selected_slot() {
     let mut harness = harness_with_resize(false);
     let path = png(&folder, "new.png", 8, 8, RED);
     assert_eq!(harness.app().selected_screenshot(), number(1));
-    harness.app().select_screenshot(number(4));
 
-    replace(&mut harness, shot(1), &path);
+    replace(&mut harness, shot(4), &path);
 
     let app = harness.app();
     assert_eq!(pixels(app, shot(4)), solid(8, 8, RED));
     assert_eq!(app.pages().screenshots.screenshot_count(), 1);
     assert_eq!(app.selected_screenshot(), number(4));
+}
+
+#[test]
+fn replace_on_an_empty_selected_slot_works() {
+    let folder = TempDir::new().unwrap();
+    let mut harness = harness_with_resize(false);
+    let first = png(&folder, "first.png", 8, 8, RED);
+    let second = png(&folder, "second.png", 9, 9, GREEN);
+    replace(&mut harness, shot(1), &first);
+    harness.app().select_screenshot(number(2));
+    assert!(is_empty(harness.app(), shot(2)));
+
+    replace(&mut harness, shot(2), &second);
+
+    let app = harness.app();
+    assert_eq!(pixels(app, shot(2)), solid(9, 9, GREEN));
+    assert_eq!(pixels(app, shot(1)), solid(8, 8, RED));
+    assert_eq!(app.selected_screenshot(), number(2));
+}
+
+#[test]
+fn removing_an_empty_slot_changes_nothing() {
+    let mut harness = harness_with_resize(false);
+    let revision = harness.app().pages().cover.revision(AssetSlot::Cover);
+
+    harness.app().remove_image(AssetSlot::Cover);
+
+    assert_eq!(
+        harness.app().pages().cover.revision(AssetSlot::Cover),
+        revision
+    );
+}
+
+#[test]
+fn only_the_last_image_dropped_on_cover_is_imported() {
+    let folder = TempDir::new().unwrap();
+    let mut harness = harness_with_resize(false);
+    harness.app().show_page(Page::Cover);
+    let good = png(&folder, "good.png", 8, 8, RED);
+    replace(&mut harness, AssetSlot::Cover, &good);
+    let first = png(&folder, "first.png", 9, 9, GREEN);
+    let broken = folder.path().join("broken.png");
+    fs::write(&broken, b"this is not an image").unwrap();
+
+    drop_files(&mut harness, &[first, broken]);
+    harness.run_jobs();
+
+    let app = harness.app();
+    assert_eq!(message_title(app), "Could not use image");
+    assert_eq!(pixels(app, AssetSlot::Cover), solid(8, 8, RED));
+}
+
+#[test]
+fn banner_answer_imports_the_file_as_banner() {
+    let folder = TempDir::new().unwrap();
+    let mut harness = harness_with_resize(true);
+    harness.app().show_page(Page::IconBanner);
+    let path = png(&folder, "wide.png", 420, 96, GREEN);
+
+    drop_files(&mut harness, &[path]);
+    harness
+        .app()
+        .answer_modal(ModalAnswer::Choice(ChoiceId::Banner));
+    harness.run_jobs();
+
+    let app = harness.app();
+    assert_eq!(pixels(app, AssetSlot::Banner), solid(420, 96, GREEN));
+    assert!(is_empty(app, AssetSlot::Icon));
+}
+
+#[test]
+fn accept_on_a_choice_cancels_it() {
+    let folder = TempDir::new().unwrap();
+    let mut harness = harness_with_resize(true);
+    harness.app().show_page(Page::IconBanner);
+    let path = png(&folder, "icon.png", 64, 64, GREEN);
+
+    drop_files(&mut harness, &[path]);
+    harness.app().answer_modal(ModalAnswer::Accept);
+
+    assert!(harness.app().modal().is_none());
+    assert_eq!(harness.queued_jobs(), 0);
+}
+
+#[test]
+fn answer_the_dialog_does_not_offer_keeps_it_open_and_is_reported() {
+    let folder = TempDir::new().unwrap();
+    let mut harness = harness_with_resize(true);
+    harness.app().show_page(Page::IconBanner);
+    let first = png(&folder, "first.png", 64, 64, GREEN);
+    let second = png(&folder, "second.png", 64, 64, RED);
+    drop_files(&mut harness, &[first, second]);
+    let before = harness.app().modal().cloned();
+
+    harness
+        .app()
+        .answer_modal(ModalAnswer::Choice(ChoiceId::Replace));
+
+    let app = harness.app();
+    assert_eq!(app.modal().cloned(), before);
+    assert_eq!(app.status().severity, Severity::Error);
+    assert!(
+        app.status()
+            .text
+            .contains("the dialog has no Replace button"),
+        "{}",
+        app.status().text
+    );
+    assert!(harness.error_log_text().contains("no Replace button"));
+    assert_eq!(harness.queued_jobs(), 0);
 }
 
 #[test]
@@ -657,6 +766,12 @@ fn images_dropped_on_online_or_console_are_ignored_with_note() {
     }
 }
 
+/// A stretched solid image has the target size and its middle is still the colour.
+fn assert_green_stretched(image: &RgbaImage, size: (u32, u32)) {
+    assert_eq!(image.dimensions(), size);
+    assert_eq!(image.get_pixel(size.0 / 2, size.1 / 2).0, GREEN);
+}
+
 #[test]
 fn asset_files_dropped_on_any_page_load() {
     let folder = TempDir::new().unwrap();
@@ -682,6 +797,13 @@ fn asset_files_dropped_on_any_page_load() {
         let app = harness.app();
         assert!(!is_empty(app, AssetSlot::Cover), "{page:?}");
         assert_eq!(app.page(), Page::Cover);
+        match page {
+            Page::Background => {
+                assert_green_stretched(&pixels(app, AssetSlot::Background), (1280, 720))
+            }
+            Page::Screenshots => assert_green_stretched(&pixels(app, shot(1)), (1000, 562)),
+            _ => {}
+        }
         if matches!(page, Page::Online | Page::Console) {
             assert!(
                 app.status().text.starts_with("Loaded GC4D5307E6.asset"),

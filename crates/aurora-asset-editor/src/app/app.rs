@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use aurora_asset::ScreenshotNumber;
 
-use crate::dialogs::{Modal, ModalAnswer, ModalField, ModalQueue};
+use crate::dialogs::{Modal, ModalAnswer, ModalField, ModalQueue, UnofferedChoice};
 use crate::editor::EditorPages;
 use crate::jobs::JobOutcome;
 use crate::logging::error_chain;
@@ -77,6 +77,13 @@ impl App {
     }
 
     pub fn answer_modal(&mut self, answer: ModalAnswer) {
+        if let Some(rejected) = self.unoffered_choice(answer) {
+            self.report_error(
+                "A dialog was answered with a button it does not have",
+                &rejected,
+            );
+            return;
+        }
         let Some(modal) = self.modals.close_current() else {
             return;
         };
@@ -88,6 +95,22 @@ impl App {
             (Modal::Choice { pending, .. }, ModalAnswer::Accept | ModalAnswer::Cancel) => {
                 self.answer_choice(pending, None);
             }
+        }
+    }
+
+    /// The answer's choice when the dialog on screen does not offer it.
+    fn unoffered_choice(&self, answer: ModalAnswer) -> Option<UnofferedChoice> {
+        let ModalAnswer::Choice(id) = answer else {
+            return None;
+        };
+        let offered = match self.modals.current()? {
+            Modal::Choice { choices, .. } => choices.iter().any(|(offered, _)| *offered == id),
+            Modal::Message { .. } => false,
+        };
+        if offered {
+            None
+        } else {
+            Some(UnofferedChoice(id))
         }
     }
 

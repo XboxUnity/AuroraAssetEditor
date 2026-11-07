@@ -19,6 +19,7 @@ pub enum Modal {
 /// How the user closed a modal.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ModalAnswer {
+    /// Cancels a `Choice`, which has no accept button of its own.
     Accept,
     Cancel,
     Choice(ChoiceId),

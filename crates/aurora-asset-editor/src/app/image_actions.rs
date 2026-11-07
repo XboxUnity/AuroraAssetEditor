@@ -33,16 +33,11 @@ impl App {
         self.selected_screenshot = number;
     }
 
-    /// The page's Replace button. On Screenshots it fills the selected position, empty or not, whatever
-    /// `slot` says.
+    /// The page's Replace button; on Screenshots the view passes the selected position, empty or not.
     pub fn replace_image(&mut self, slot: AssetSlot) {
         if self.refuse_while_busy() {
             return;
         }
-        let slot = match slot {
-            AssetSlot::Screenshot(_) => AssetSlot::Screenshot(self.selected_screenshot),
-            other => other,
-        };
         let Some((title, default_name)) = replace_dialog(slot) else {
             return;
         };
@@ -50,6 +45,9 @@ impl App {
         let Some(path) = self.ask_open_file(&request) else {
             return;
         };
+        if let AssetSlot::Screenshot(number) = slot {
+            self.selected_screenshot = number;
+        }
         self.submit_import(vec![(path, slot)]);
     }
 
@@ -68,7 +66,10 @@ impl App {
         if self.refuse_while_busy() {
             return;
         }
-        if let Some(document) = self.pages.document_for_mut(slot) {
+        let Some(document) = self.pages.document_for_mut(slot) else {
+            return;
+        };
+        if document.texture_header(slot).is_some() {
             document.remove(slot);
         }
     }
@@ -95,8 +96,8 @@ impl App {
             return;
         }
         match self.page {
-            Page::Cover => self.import_all_into(images, AssetSlot::Cover),
-            Page::Background => self.import_all_into(images, AssetSlot::Background),
+            Page::Cover => self.import_last_into(images, AssetSlot::Cover),
+            Page::Background => self.import_last_into(images, AssetSlot::Background),
             Page::IconBanner => self.ask_icon_or_banner(images),
             Page::Screenshots => self.drop_screenshots(images),
             Page::Online | Page::Console => {
@@ -112,8 +113,8 @@ impl App {
                 match choice {
                     Some(ChoiceId::Icon) => self.submit_import(vec![(path, AssetSlot::Icon)]),
                     Some(ChoiceId::Banner) => self.submit_import(vec![(path, AssetSlot::Banner)]),
-                    None => {}
-                    Some(other) => panic!("the icon or banner question has no {other:?} button"),
+                    // Cancel skips this file; the other ids are not offered and `answer_modal` rejects them.
+                    None | Some(ChoiceId::Replace | ChoiceId::AddToFreeSlots) => {}
                 }
                 self.ask_icon_or_banner(remaining);
             }
@@ -123,18 +124,18 @@ impl App {
                 match choice {
                     Some(ChoiceId::Replace) => self.import_screenshots(files, true),
                     Some(ChoiceId::AddToFreeSlots) => self.import_screenshots(files, false),
-                    None => {}
-                    Some(other) => {
-                        panic!("the replace screenshot question has no {other:?} button")
-                    }
+                    // Cancel loads none of the files; the other ids are not offered and `answer_modal` rejects them.
+                    None | Some(ChoiceId::Icon | ChoiceId::Banner) => {}
                 }
             }
         }
     }
 
-    /// Each file replaces the one before it, as the old app loaded them one after another.
-    fn import_all_into(&mut self, files: Vec<PathBuf>, slot: AssetSlot) {
-        self.submit_import(files.into_iter().map(|file| (file, slot)).collect());
+    /// The old app loaded the files one after another into the same slot, so the last one is what stays.
+    fn import_last_into(&mut self, files: Vec<PathBuf>, slot: AssetSlot) {
+        if let Some(last) = files.into_iter().next_back() {
+            self.submit_import(vec![(last, slot)]);
+        }
     }
 
     fn ask_icon_or_banner(&mut self, files: Vec<PathBuf>) {
