@@ -15,12 +15,14 @@ const REFERENCE_SCRIPT: [&str; 3] = ["tools", "gdiplus", "gdiplus-reference.ps1"
 #[derive(Clone, Copy)]
 pub enum PowerShellHost {
     Bit32,
+    Bit64,
 }
 
 impl PowerShellHost {
     fn system_directory(self) -> &'static str {
         match self {
             PowerShellHost::Bit32 => "SysWOW64",
+            PowerShellHost::Bit64 => "System32",
         }
     }
 

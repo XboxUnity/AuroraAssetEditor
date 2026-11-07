@@ -107,3 +107,42 @@ The photo-like scene at cover size, decoded at its own size (no resize).
 | photo_like_900x600_q75 to 900x600 | 69.00 dB | 3 | 5488 |
 | photo_like_900x600_q95 to 900x600 | 68.85 dB | 3 | 6154 |
 
+## Measured GDI+ behaviour
+
+### Premultiplied copy and 16-bit samples
+
+Ramps of 256x256 pixels, measured at their own size; each cell counts the pixels of 65536 that differ from GDI+. "Pipeline" is `decode_image` and `encoder_pixels`. "High byte" and "Rounded" reduce 16-bit samples by `v >> 8` or with `image`'s rounding, then apply the copy. "Pipeline without the copy" leaves out `encoder_pixels`, which is how many pixels `new Bitmap(img)` changes. `colour_alpha_ramp` holds every (colour, alpha) pair of an 8-bit channel, so a 0 in its pipeline column means GDI+'s premultiply and unpremultiply are reproduced exactly.
+
+| Ramp | Pipeline | High byte | Rounded (`image`) | Pipeline without the copy |
+|---|---|---|---|---|
+| colour_alpha_ramp | 0 | 8-bit input | 0 | 65030 |
+| gray16_ramp | 0 | 16459 | 2669 | 0 |
+| gray_alpha16_alpha_ramp | 0 | 0 | 40896 | 40960 |
+| gray_alpha16_colour_ramp | 0 | 0 | 16256 | 0 |
+| rgb16_ramp | 0 | 0 | 16256 | 0 |
+| rgba16_alpha_ramp | 0 | 0 | 40896 | 56064 |
+| rgba16_colour_ramp | 0 | 0 | 16256 | 0 |
+
+The committed grey table `crates/aurora-image/src/gdiplus_gray16_table.rs` matches a fresh measurement of `gray16_ramp`.
+
+### Area-averaging threshold
+
+Opaque noise 419 and 420 pixels wide, stretched to every target. GDI+ resamples the 419-pixel source bilinearly and averages areas on the shrinking axes of the 420-pixel one; "GDI+ bilinear" switches at 420.
+
+| Input | Nearest | Triangle | CatmullRom | Gaussian | Lanczos3 | Triangle (premultiplied) | CatmullRom (premultiplied) | Lanczos3 (premultiplied) | Bilinear | GDI+ bilinear |
+|---|---|---|---|---|---|---|---|---|---|---|
+| noise_419x300 to 1000x562 | 14.86 dB / 221 | 20.07 dB / 199 | 18.58 dB / 199 | 20.85 dB / 199 | 17.62 dB / 199 | 20.07 dB / 199 | 18.58 dB / 199 | 17.62 dB / 199 | 20.07 dB / 199 | exact / 0 |
+| noise_419x300 to 1280x720 | 14.25 dB / 232 | 18.74 dB / 221 | 17.38 dB / 221 | 19.64 dB / 221 | 16.59 dB / 221 | 18.74 dB / 221 | 17.38 dB / 221 | 16.59 dB / 221 | 18.74 dB / 221 | exact / 0 |
+| noise_419x300 to 420x96 | 10.87 dB / 252 | 17.14 dB / 168 | 17.17 dB / 168 | 17.16 dB / 158 | 16.98 dB / 174 | 17.14 dB / 168 | 17.17 dB / 168 | 16.98 dB / 174 | 13.53 dB / 246 | exact / 0 |
+| noise_419x300 to 64x64 | 10.37 dB / 243 | 15.59 dB / 138 | 15.59 dB / 142 | 15.61 dB / 134 | 15.58 dB / 145 | 15.59 dB / 138 | 15.59 dB / 142 | 15.58 dB / 145 | 12.46 dB / 224 | exact / 0 |
+| noise_419x300 to 900x600 | 15.17 dB / 214 | 19.88 dB / 196 | 18.59 dB / 196 | 20.13 dB / 196 | 17.65 dB / 196 | 19.88 dB / 196 | 18.59 dB / 196 | 17.65 dB / 196 | 19.88 dB / 196 | exact / 0 |
+| noise_420x300 to 1000x562 | 14.88 dB / 221 | 20.13 dB / 198 | 18.63 dB / 198 | 20.91 dB / 198 | 17.67 dB / 198 | 20.13 dB / 198 | 18.63 dB / 198 | 17.67 dB / 198 | 20.13 dB / 198 | exact / 0 |
+| noise_420x300 to 1280x720 | 14.23 dB / 234 | 18.74 dB / 220 | 17.37 dB / 220 | 19.63 dB / 220 | 16.58 dB / 220 | 18.74 dB / 220 | 17.37 dB / 220 | 16.58 dB / 220 | 18.74 dB / 220 | exact / 0 |
+| noise_420x300 to 420x96 | 13.91 dB / 167 | 28.07 dB / 48 | 29.65 dB / 44 | 24.09 dB / 75 | 27.81 dB / 55 | 28.07 dB / 48 | 29.65 dB / 44 | 27.81 dB / 55 | 17.10 dB / 150 | exact / 0 |
+| noise_420x300 to 64x64 | 12.16 dB / 155 | 33.75 dB / 24 | 35.13 dB / 20 | 32.56 dB / 29 | 33.86 dB / 23 | 33.75 dB / 24 | 35.13 dB / 20 | 33.86 dB / 23 | 15.95 dB / 135 | exact / 0 |
+| noise_420x300 to 900x600 | 15.20 dB / 215 | 19.94 dB / 194 | 18.65 dB / 194 | 20.18 dB / 194 | 17.71 dB / 194 | 19.94 dB / 194 | 18.65 dB / 194 | 17.71 dB / 194 | 19.94 dB / 194 | exact / 0 |
+
+### 32-bit and 64-bit hosts
+
+32-bit and 64-bit Windows PowerShell 5.1 wrote identical references for 21 of 21 files (gate and ramp sets).
+

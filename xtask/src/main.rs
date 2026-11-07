@@ -5,6 +5,7 @@ mod content_db;
 mod crafted;
 mod cross_decode;
 mod dds_sample;
+mod gdiplus_measurements;
 mod gdiplus_report;
 mod gdiplus_tool;
 mod golden;

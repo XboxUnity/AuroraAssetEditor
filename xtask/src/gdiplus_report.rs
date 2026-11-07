@@ -10,11 +10,12 @@ use aurora_image::{RESIZE_FILTER, Resampler, decode_image, encoder_pixels};
 use image::RgbaImage;
 
 use crate::closeness_inputs::{self, gate_directory};
+use crate::gdiplus_measurements;
 use crate::gdiplus_tool::{PowerShellHost, run_reference_tool};
 use crate::golden::{Paths, absolute};
 
 const REPORT_PATH: [&str; 3] = ["docs", "image", "gdiplus-closeness.md"];
-const REFERENCE_DIRECTORY: &str = "gdiplus";
+pub(crate) const REFERENCE_DIRECTORY: &str = "gdiplus";
 const REFERENCE_EXTENSION: &str = "argb";
 const BYTES_PER_PIXEL: usize = 4;
 const ALPHA: usize = 0;
@@ -24,14 +25,14 @@ const EXACT_PSNR_DB: f64 = 100.0;
 
 /// How far one image is from its GDI+ reference.
 #[derive(Clone, Copy)]
-struct Closeness {
-    differing_pixels: usize,
-    max_difference: u8,
+pub(crate) struct Closeness {
+    pub(crate) differing_pixels: usize,
+    pub(crate) max_difference: u8,
     psnr_db: f64,
 }
 
 impl Closeness {
-    fn measure(ours: &[u8], gdiplus: &[u8]) -> Self {
+    pub(crate) fn measure(ours: &[u8], gdiplus: &[u8]) -> Self {
         let mut squared_error = 0.0;
         let mut max_difference = 0;
         for (&ours, &gdiplus) in ours.iter().zip(gdiplus) {
@@ -67,7 +68,7 @@ impl Closeness {
         self.psnr_db.min(EXACT_PSNR_DB)
     }
 
-    fn psnr_text(self) -> String {
+    pub(crate) fn psnr_text(self) -> String {
         if self.is_exact() {
             "exact".to_string()
         } else {
@@ -77,20 +78,20 @@ impl Closeness {
 }
 
 /// One GDI+ reference file: the input it came from and the size GDI+ produced.
-struct Reference {
-    input_stem: String,
+pub(crate) struct Reference {
+    pub(crate) input_stem: String,
     width: u32,
     height: u32,
-    argb: Vec<u8>,
+    pub(crate) argb: Vec<u8>,
 }
 
 impl Reference {
-    fn label(&self) -> String {
+    pub(crate) fn label(&self) -> String {
         format!("{} to {}x{}", self.input_stem, self.width, self.height)
     }
 }
 
-fn to_argb(image: &RgbaImage) -> Vec<u8> {
+pub(crate) fn to_argb(image: &RgbaImage) -> Vec<u8> {
     image
         .pixels()
         .flat_map(|pixel| {
@@ -100,7 +101,7 @@ fn to_argb(image: &RgbaImage) -> Vec<u8> {
         .collect()
 }
 
-fn sorted_files(directory: &Path) -> Result<Vec<PathBuf>> {
+pub(crate) fn sorted_files(directory: &Path) -> Result<Vec<PathBuf>> {
     let mut files = Vec::new();
     for entry in std::fs::read_dir(directory)
         .with_context(|| format!("cannot read {}", directory.display()))?
@@ -114,7 +115,7 @@ fn sorted_files(directory: &Path) -> Result<Vec<PathBuf>> {
     Ok(files)
 }
 
-fn file_stem(path: &Path) -> Result<String> {
+pub(crate) fn file_stem(path: &Path) -> Result<String> {
     Ok(path
         .file_stem()
         .with_context(|| format!("{} has no file name", path.display()))?
@@ -139,7 +140,7 @@ fn read_reference(path: &Path) -> Result<Reference> {
     })
 }
 
-fn read_references(directory: &Path) -> Result<Vec<Reference>> {
+pub(crate) fn read_references(directory: &Path) -> Result<Vec<Reference>> {
     sorted_files(directory)?
         .iter()
         .filter(|path| {
@@ -151,7 +152,7 @@ fn read_references(directory: &Path) -> Result<Vec<Reference>> {
 }
 
 /// Decodes every input once, keyed by file stem.
-fn decode_inputs(directory: &Path) -> Result<BTreeMap<String, RgbaImage>> {
+pub(crate) fn decode_inputs(directory: &Path) -> Result<BTreeMap<String, RgbaImage>> {
     let mut decoded = BTreeMap::new();
     for path in sorted_files(directory)? {
         let file_name = path
@@ -216,13 +217,13 @@ fn measure_gate(
         .collect()
 }
 
-struct ResizeRow {
+pub(crate) struct ResizeRow {
     label: String,
     has_alpha: bool,
     per_resampler: Vec<Closeness>,
 }
 
-fn measure_resize(
+pub(crate) fn measure_resize(
     inputs: &BTreeMap<String, RgbaImage>,
     references: &[Reference],
 ) -> Result<Vec<ResizeRow>> {
@@ -409,6 +410,11 @@ fn write_resize_section(
         report,
         "PSNR and max channel difference per input and target:\n"
     )?;
+    write_per_input_table(report, rows)
+}
+
+/// One row per input and target, one `PSNR / max difference` cell per candidate.
+pub(crate) fn write_per_input_table(report: &mut String, rows: &[ResizeRow]) -> Result<()> {
     let header: Vec<&str> = Resampler::ALL
         .iter()
         .map(|resampler| resampler.name())
@@ -468,17 +474,25 @@ fn measure_jpeg(
         .collect()
 }
 
-fn generate_set(
+/// Writes a set's inputs into `work/<name>-inputs` and GDI+'s references into `work/<name>-gdiplus`.
+pub(crate) fn generate_set(
     paths: &Paths,
     work: &Path,
     name: &str,
     write_inputs: impl FnOnce(&Path) -> Result<()>,
+    targets: Option<&str>,
 ) -> Result<(BTreeMap<String, RgbaImage>, Vec<Reference>)> {
     let input_dir = work.join(format!("{name}-inputs"));
     let output_dir = work.join(format!("{name}-gdiplus"));
     std::fs::create_dir_all(&input_dir)?;
     write_inputs(&input_dir)?;
-    run_reference_tool(paths, PowerShellHost::Bit32, &input_dir, &output_dir, None)?;
+    run_reference_tool(
+        paths,
+        PowerShellHost::Bit32,
+        &input_dir,
+        &output_dir,
+        targets,
+    )?;
     Ok((decode_inputs(&input_dir)?, read_references(&output_dir)?))
 }
 
@@ -505,12 +519,21 @@ pub fn write_report() -> Result<()> {
     ensure_references_current(&gate_references, &read_references(&fresh_gate_dir)?)?;
     let gate_rows = measure_gate(&decode_inputs(&gate_inputs)?, &gate_references)?;
 
-    let (resize_inputs, resize_references) = generate_set(&paths, &work, "resize", |dir| {
-        closeness_inputs::write_resize_set(&paths, dir)
-    })?;
+    let (resize_inputs, resize_references) = generate_set(
+        &paths,
+        &work,
+        "resize",
+        |dir| closeness_inputs::write_resize_set(&paths, dir),
+        None,
+    )?;
     let resize_rows = measure_resize(&resize_inputs, &resize_references)?;
-    let (jpeg_inputs, jpeg_references) =
-        generate_set(&paths, &work, "jpeg", closeness_inputs::write_jpeg_set)?;
+    let (jpeg_inputs, jpeg_references) = generate_set(
+        &paths,
+        &work,
+        "jpeg",
+        closeness_inputs::write_jpeg_set,
+        None,
+    )?;
     let jpeg_rows = measure_jpeg(&jpeg_inputs, &jpeg_references)?;
 
     let chosen = chosen_resampler(&resize_rows);
@@ -528,6 +551,7 @@ pub fn write_report() -> Result<()> {
         transparent_colour_counts(&resize_references),
     )?;
     write_jpeg_section(&mut report, &jpeg_rows)?;
+    gdiplus_measurements::write_measurements_section(&mut report, &paths, &work)?;
 
     let report_path = REPORT_PATH
         .iter()

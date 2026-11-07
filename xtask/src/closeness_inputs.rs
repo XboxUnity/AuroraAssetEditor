@@ -28,6 +28,10 @@ const PLACEHOLDERS: [&str; 5] = [
     "ph_screenshot",
 ];
 const PLACEHOLDER_SCALE: f64 = 1.5;
+/// Colour of the alpha ramps: mid values whose high and low bytes differ.
+const RAMP_MID_SAMPLES: [u16; 3] = [0xC03F, 0x8071, 0x40A5];
+/// Height, then the widths just below and at GDI+'s area-averaging side.
+const THRESHOLD_SIZES: (u32, u32, u32) = (300, 419, 420);
 const GAMMA_1_0_SCALED: u32 = 100_000;
 const PALETTE_ENTRIES: usize = 256;
 const CLOSENESS_SEED: u64 = 62;
@@ -195,17 +199,92 @@ fn gray16_input(prng: &mut Prng) -> PngInput {
     input
 }
 
-/// Every 16-bit grey value once, row by row: sample `y * 256 + x`.
-fn gray16_ramp() -> PngInput {
-    let data = (0..=u16::MAX).flat_map(u16::to_be_bytes).collect();
-    let mut input = PngInput::new(RAMP_SIDE, RAMP_SIDE, ColorType::Grayscale, data);
+/// Every 16-bit value once, row by row (sample `y * 256 + x`), in each channel `samples` makes
+/// from it.
+fn sixteen_bit_ramp(color_type: ColorType, samples: impl Fn(u16) -> Vec<u16>) -> PngInput {
+    let data = (0..=u16::MAX)
+        .flat_map(&samples)
+        .flat_map(u16::to_be_bytes)
+        .collect();
+    let mut input = PngInput::new(RAMP_SIDE, RAMP_SIDE, color_type, data);
     input.bit_depth = BitDepth::Sixteen;
     input
+}
+
+fn gray16_ramp() -> PngInput {
+    sixteen_bit_ramp(ColorType::Grayscale, |value| vec![value])
 }
 
 /// Writes the 16-bit grey ramp as `gray16_ramp.png` into `directory`.
 pub fn write_gray16_ramp(directory: &Path) -> Result<()> {
     gray16_ramp().write(&directory.join("gray16_ramp.png"))
+}
+
+/// Every (colour, alpha) pair of one channel value once: x is the colour, y the alpha.
+fn colour_alpha_ramp() -> PngInput {
+    let image = RgbaImage::from_fn(RAMP_SIDE, RAMP_SIDE, |x, y| {
+        let colour = x as u8;
+        Rgba([colour, OPAQUE - colour, colour.wrapping_mul(37), y as u8])
+    });
+    PngInput::rgba(&image)
+}
+
+/// Writes the ramps measured at their own size: the 8-bit (colour, alpha) ramp and a 16-bit ramp
+/// per PNG colour type, the ones with alpha once for colour and once for alpha.
+pub fn write_ramp_set(directory: &Path) -> Result<()> {
+    let ramps = [
+        ("colour_alpha_ramp", colour_alpha_ramp()),
+        ("gray16_ramp", gray16_ramp()),
+        (
+            "gray_alpha16_colour_ramp",
+            sixteen_bit_ramp(ColorType::GrayscaleAlpha, |value| vec![value, u16::MAX]),
+        ),
+        (
+            "gray_alpha16_alpha_ramp",
+            sixteen_bit_ramp(ColorType::GrayscaleAlpha, |value| {
+                vec![RAMP_MID_SAMPLES[0], value]
+            }),
+        ),
+        (
+            "rgb16_ramp",
+            sixteen_bit_ramp(ColorType::Rgb, |value| {
+                vec![value, !value, value.rotate_left(8)]
+            }),
+        ),
+        (
+            "rgba16_colour_ramp",
+            sixteen_bit_ramp(ColorType::Rgba, |value| {
+                vec![value, !value, value.rotate_left(8), u16::MAX]
+            }),
+        ),
+        (
+            "rgba16_alpha_ramp",
+            sixteen_bit_ramp(ColorType::Rgba, |value| {
+                let [red, green, blue] = RAMP_MID_SAMPLES;
+                vec![red, green, blue, value]
+            }),
+        ),
+    ];
+    for (name, ramp) in ramps {
+        ramp.write(&directory.join(format!("{name}.png")))?;
+    }
+    Ok(())
+}
+
+/// Writes opaque noise just below and at the side where GDI+ starts averaging areas.
+pub fn write_threshold_set(directory: &Path) -> Result<()> {
+    let mut prng = Prng::with_seed(CLOSENESS_SEED);
+    let (height, below, at) = THRESHOLD_SIZES;
+    for width in [below, at] {
+        let image = RgbaImage::from_fn(width, height, |_, _| {
+            Rgba([prng.next_byte(), prng.next_byte(), prng.next_byte(), OPAQUE])
+        });
+        write_rgba_png(
+            &image,
+            &directory.join(format!("noise_{width}x{height}.png")),
+        )?;
+    }
+    Ok(())
 }
 
 fn write_bmp(image: &RgbaImage, with_alpha: bool, path: &Path) -> Result<()> {
