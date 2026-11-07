@@ -45,10 +45,22 @@ impl ConsoleClient {
         let cleanup_error = remove_with_retries(&path, CLEANUP_ATTEMPTS, CLEANUP_DELAY)
             .err()
             .map(|source| TempCleanupError { path, source });
-        Ok(GameListing {
-            games: games.map_err(ConsoleError::ContentDb)?,
-            cleanup_error,
-        })
+        match games {
+            Ok(games) => Ok(GameListing {
+                games,
+                cleanup_error,
+            }),
+            Err(read_error) => {
+                if let Some(leftover) = &cleanup_error {
+                    log::warn!(
+                        "could not remove the temporary Content.db copy {}: {}",
+                        leftover.path.display(),
+                        leftover.source
+                    );
+                }
+                Err(ConsoleError::ContentDb(read_error))
+            }
+        }
     }
 }
 
