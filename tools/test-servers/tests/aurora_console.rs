@@ -290,3 +290,43 @@ fn file_dates_outside_the_calendar_are_refused() {
     assert!(FileDate::new(2026, 12, 31, 23, 60).is_err());
     assert!(FileDate::new(2026, 12, 31, 23, 59).is_ok());
 }
+
+#[test]
+fn verbs_match_by_case_insensitive_prefix_like_aurora() {
+    let console = aurora_console();
+    let mut session = RawSession::connect(&console);
+    session.read_line();
+
+    assert_eq!(
+        session.send("user xboxftp"),
+        "331 User xboxftp OK, need password\r\n"
+    );
+    assert_eq!(session.send("PAS xboxftp"), "230 User logged in\r\n");
+    assert_eq!(session.send("NOO"), "200 ori r0, r0, 0\r\n");
+    assert_eq!(session.send("NOOPS"), "502 Command not found\r\n");
+    assert_eq!(session.send("P"), "530 Already logged in\r\n");
+}
+
+#[test]
+fn empty_line_gets_500() {
+    let console = aurora_console();
+    let mut session = RawSession::logged_in(&console);
+
+    assert_eq!(session.send(""), "500 ?\r\n");
+}
+
+#[test]
+fn cwd_does_not_resolve_dot_segments() {
+    let console = aurora_console();
+    console.add_dir("/Game/Data");
+    let mut session = RawSession::logged_in(&console);
+    session.send("CWD /Game/Data");
+
+    assert_eq!(session.send("CWD .."), "550 No such directory\r\n");
+    assert_eq!(
+        session.send("CWD /Game/Data/../Data"),
+        "550 No such directory\r\n"
+    );
+    assert_eq!(session.send("CWD  /Game"), "550 No such directory\r\n");
+    assert_eq!(session.send("PWD"), "257 \"/Game/Data/\"\r\n");
+}

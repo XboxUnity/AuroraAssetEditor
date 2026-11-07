@@ -13,6 +13,15 @@ use super::listing_line::listing_line;
 const POLL_INTERVAL: Duration = Duration::from_millis(5);
 const DATA_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 const MASKED_PASSWORD: &str = "PASS ****";
+/// Aurora's command table in its order. A typed verb runs the first entry it is a prefix of.
+const COMMAND_TABLE: [&str; 30] = [
+    "CDUP", "CWD", "DELE", "FEAT", "LIST", "MKD", "MKTS", "MDTM", "NLST", "NOOP", "PASS", "PASV",
+    "PORT", "PWD", "QUIT", "RETR", "RMD", "RNFR", "RNTO", "SIZE", "STAT", "APPE", "STOR", "SYST",
+    "TYPE", "USER", "XMKD", "SITE", "HELP", "XCRC",
+];
+const LOGIN_NOT_REQUIRED: [&str; 3] = ["PASS", "QUIT", "USER"];
+/// Verbs outside Aurora's table that the non-Aurora variants answer.
+const EXTENSION_VERBS: [&str; 2] = ["OPTS", "MLSD"];
 const CLIENT_GONE: [io::ErrorKind; 5] = [
     io::ErrorKind::BrokenPipe,
     io::ErrorKind::ConnectionReset,
@@ -86,9 +95,9 @@ impl<'a> Session<'a> {
     }
 
     fn handle(&mut self, line: &str) -> io::Result<Flow> {
-        let (verb, argument) = line.split_once(' ').unwrap_or((line, ""));
-        let verb = verb.to_uppercase();
-        self.log_command(&verb, line);
+        let (typed, argument) = line.split_once(' ').unwrap_or((line, ""));
+        let verb = resolve_verb(typed);
+        self.log_command(verb, line);
         if self
             .shared
             .timing_out_next_command
@@ -98,28 +107,32 @@ impl<'a> Session<'a> {
             shut_down(self.control.get_ref());
             return Ok(Flow::Close);
         }
-        if !self.logged_in && !matches!(verb.as_str(), "USER" | "PASS" | "QUIT") {
+        if line.is_empty() {
+            self.reply("500 ?")?;
+            return Ok(Flow::Continue);
+        }
+        if !self.logged_in && !verb.is_some_and(|verb| LOGIN_NOT_REQUIRED.contains(&verb)) {
             self.reply("530 Not logged in")?;
             return Ok(Flow::Continue);
         }
-        match verb.as_str() {
-            "USER" => self.user(argument)?,
-            "PASS" => self.pass(argument)?,
-            "FEAT" => self.feat()?,
-            "OPTS" => self.opts(argument)?,
-            "SITE" => self.site(argument)?,
-            "NOOP" => self.reply("200 ori r0, r0, 0")?,
-            "TYPE" => self.reply(&format!("200 Type set to {argument}"))?,
-            "PWD" => self.pwd()?,
-            "CWD" => self.cwd(argument)?,
-            "CDUP" => self.cdup()?,
-            "PASV" => self.pasv()?,
-            "LIST" | "NLST" => self.list()?,
-            "MLSD" => self.mlsd(argument)?,
-            "RETR" => self.retr(argument)?,
-            "STOR" => self.stor(argument)?,
-            "SIZE" => self.size(argument)?,
-            "QUIT" => {
+        match verb {
+            Some("USER") => self.user(argument)?,
+            Some("PASS") => self.pass(argument)?,
+            Some("FEAT") => self.feat()?,
+            Some("OPTS") => self.opts(argument)?,
+            Some("SITE") => self.site(argument)?,
+            Some("NOOP") => self.reply("200 ori r0, r0, 0")?,
+            Some("TYPE") => self.reply(&format!("200 Type set to {argument}"))?,
+            Some("PWD") => self.pwd()?,
+            Some("CWD") => self.cwd(argument)?,
+            Some("CDUP") => self.cdup()?,
+            Some("PASV") => self.pasv()?,
+            Some("LIST" | "NLST") => self.list()?,
+            Some("MLSD") => self.mlsd(argument)?,
+            Some("RETR") => self.retr(argument)?,
+            Some("STOR") => self.stor(argument)?,
+            Some("SIZE") => self.size(argument)?,
+            Some("QUIT") => {
                 self.reply("221 Goodbye")?;
                 return Ok(Flow::Close);
             }
@@ -128,8 +141,8 @@ impl<'a> Session<'a> {
         Ok(Flow::Continue)
     }
 
-    fn log_command(&self, verb: &str, line: &str) {
-        let entry = if verb == "PASS" {
+    fn log_command(&self, verb: Option<&str>, line: &str) {
+        let entry = if verb == Some("PASS") {
             MASKED_PASSWORD
         } else {
             line
@@ -228,6 +241,13 @@ impl<'a> Session<'a> {
         let forced_reply = self.shared.state().folder_change_reply.clone();
         if let Some(reply) = forced_reply {
             return self.reply(&reply);
+        }
+        // Aurora hands `.` and `..` to the console's file system, which has no such folders.
+        if argument
+            .split('/')
+            .any(|segment| matches!(segment, "." | ".."))
+        {
+            return self.reply("550 No such directory");
         }
         let target = resolve_path(&self.current_folder, argument);
         self.change_folder(target)
@@ -476,6 +496,27 @@ impl<'a> Session<'a> {
         }
         Ok(())
     }
+}
+
+/// The command a typed verb runs, matched case-insensitively as a prefix like Aurora does: `PAS`
+/// runs `PASS`, and a verb longer than a table name never matches it.
+fn resolve_verb(typed: &str) -> Option<&'static str> {
+    if typed.is_empty() {
+        return None;
+    }
+    let is_prefix_of = |name: &str| {
+        name.as_bytes()
+            .get(..typed.len())
+            .is_some_and(|start| start.eq_ignore_ascii_case(typed.as_bytes()))
+    };
+    COMMAND_TABLE
+        .into_iter()
+        .find(|name| is_prefix_of(name))
+        .or_else(|| {
+            EXTENSION_VERBS
+                .into_iter()
+                .find(|name| name.eq_ignore_ascii_case(typed))
+        })
 }
 
 /// A folder as Aurora echoes it: absolute, with a trailing slash.
