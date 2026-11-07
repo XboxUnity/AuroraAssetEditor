@@ -3,6 +3,7 @@ name = "aurora-asset-editor"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
+license.workspace = true
 
 [dependencies]
 arboard = { version = "3.7.0", default-features = false, features = ["wayland-data-control"] }

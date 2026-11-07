@@ -3,6 +3,7 @@ name = "aurora-asset"
 version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
+license.workspace = true
 
 [dependencies]
 image = { version = "0.25", default-features = false }

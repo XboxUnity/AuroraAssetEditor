@@ -19,6 +19,7 @@ members = [
 version = "2.0.0"
 edition = "2024"
 rust-version = "1.99"
+license = "Unlicense"
 
 [profile.release]
 lto = true
