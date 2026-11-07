@@ -1,5 +1,11 @@
 #![forbid(unsafe_code)]
 
+#[expect(unused_imports, reason = "the FTP client will be the first user")]
+#[cfg_attr(
+    not(test),
+    expect(dead_code, reason = "the FTP client will be the first user")
+)]
+mod ftp;
 mod games;
 mod ids;
 mod paths;
