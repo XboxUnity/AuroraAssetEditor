@@ -1,0 +1,70 @@
+import { MenuList } from "../controls/menu_list.slint";
+import { MenuRow } from "../controls/menu_row.slint";
+import { MenuAction } from "../model/menu_action.slint";
+import { ShellModel } from "../model/shell_model.slint";
+import { ThemeOption } from "../model/theme_option.slint";
+import { Theme } from "../theme/theme.slint";
+
+export component GearMenu inherits MenuList {
+    MenuRow {
+        text: "Auto Resize Images";
+        checkable: true;
+        checked: ShellModel.auto-resize;
+        activated => {
+            ShellModel.menu-action(MenuAction.toggle-auto-resize);
+        }
+    }
+    MenuRow {
+        text: "Use Compression";
+        checkable: true;
+        checked: ShellModel.use-compression;
+        activated => {
+            ShellModel.menu-action(MenuAction.toggle-use-compression);
+        }
+    }
+    Rectangle {
+        height: 9px;
+        Rectangle {
+            height: 1px;
+            background: Theme.border;
+        }
+    }
+    MenuRow {
+        text: "Theme: System";
+        checkable: true;
+        checked: ShellModel.theme == ThemeOption.system;
+        activated => {
+            ShellModel.menu-action(MenuAction.theme-system);
+        }
+    }
+    MenuRow {
+        text: "Theme: Light";
+        checkable: true;
+        checked: ShellModel.theme == ThemeOption.light;
+        activated => {
+            ShellModel.menu-action(MenuAction.theme-light);
+        }
+    }
+    MenuRow {
+        text: "Theme: Dark";
+        checkable: true;
+        checked: ShellModel.theme == ThemeOption.dark;
+        activated => {
+            ShellModel.menu-action(MenuAction.theme-dark);
+        }
+    }
+    Rectangle {
+        height: 9px;
+        Rectangle {
+            height: 1px;
+            background: Theme.border;
+        }
+    }
+    MenuRow {
+        text: "About";
+        indented: true;
+        activated => {
+            ShellModel.menu-action(MenuAction.about);
+        }
+    }
+}

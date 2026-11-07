@@ -1,6 +1,8 @@
+use std::cell::RefCell;
 use std::io;
 use std::panic::{self, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 use std::sync::{Arc, Mutex, PoisonError, mpsc};
 use std::thread;
 use std::time::Duration;
@@ -225,6 +227,17 @@ impl AppHarness {
                 .expect("the app was built before the first job");
             run_job(running, job, &mut hook);
         }
+    }
+
+    /// Moves the app out for a view that shares it (`MainWindowView::connect`). `app()` and the job runs
+    /// are not available afterwards; the fake services' handles still are.
+    pub fn share_app(&mut self) -> Rc<RefCell<App>> {
+        self.running();
+        let running = self
+            .running
+            .take()
+            .expect("running() has just built the app");
+        Rc::new(RefCell::new(running.app))
     }
 
     fn setup(&mut self, method: &str) -> &mut Setup {

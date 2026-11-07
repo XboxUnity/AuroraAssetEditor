@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 
 use aurora_asset::ScreenshotNumber;
 
+use crate::about::BuildInfo;
 use crate::console::ConsoleState;
 use crate::dialogs::{Modal, ModalAnswer, ModalField, ModalQueue, UnofferedChoice};
 use crate::editor::EditorPages;
@@ -13,7 +14,7 @@ use crate::platform::{DialogError, OpenRequest, SaveRequest};
 use crate::settings::AppSettings;
 use crate::status::{ActiveWork, Locks, StatusLine};
 
-use super::{AppEnvironment, CurrentGame, Page, PendingImportStatus, StartupProblem};
+use super::{AppEnvironment, CurrentGame, Menu, Page, PendingImportStatus, StartupProblem};
 
 pub const LOG_WRITE_FAILED: &str = "Could not write error.log";
 pub const DIALOG_FAILED_TITLE: &str = "Could not open the file dialog";
@@ -27,6 +28,7 @@ pub struct App {
     /// `settings.json` could not be read at start and is left as it is until the user changes a setting.
     pub(super) keep_settings_file: bool,
     pub(super) page: Page,
+    pub(super) open_menu: Option<Menu>,
     pub(super) pages: EditorPages,
     pub(super) current_game: Option<CurrentGame>,
     pub(super) console: ConsoleState,
@@ -52,6 +54,7 @@ impl App {
             settings,
             keep_settings_file,
             page: Page::Cover,
+            open_menu: None,
             pages: EditorPages::new(),
             current_game: None,
             console,
@@ -69,6 +72,10 @@ impl App {
 
     pub fn config_dir(&self) -> &Path {
         &self.environment.config_dir
+    }
+
+    pub fn build_info(&self) -> &BuildInfo {
+        &self.environment.build
     }
 
     pub fn page(&self) -> Page {

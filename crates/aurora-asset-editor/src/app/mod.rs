@@ -12,6 +12,9 @@ mod current_game_actions;
 mod file_actions;
 mod image_actions;
 mod kind_choice;
+mod menu;
+mod menu_action;
+mod menu_actions;
 mod online_actions;
 mod page;
 mod pending_import_status;
@@ -32,6 +35,8 @@ pub use console_transfer_actions::{
 pub use current_game::CurrentGame;
 pub use file_actions::BUSY_TEXT;
 pub use kind_choice::KindChoice;
+pub use menu::Menu;
+pub use menu_action::MenuAction;
 pub use online_actions::{
     ENTER_KEYWORDS_TEXT, ENTER_TITLE_ID_TEXT, IMAGE_FAILED_TEXT, IMPORTING_COVER_TEXT,
     SAVE_RESULT_DEFAULT_NAME, SAVE_RESULT_TITLE, SEARCH_FAILED,

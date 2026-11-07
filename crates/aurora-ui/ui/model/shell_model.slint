@@ -1,3 +1,42 @@
+import { Palette } from "std-widgets.slint";
+import { MenuAction } from "menu_action.slint";
+import { MenuId } from "menu_id.slint";
+import { PageId } from "page_id.slint";
+import { ThemeOption } from "theme_option.slint";
+
 export global ShellModel {
+    in property <PageId> page;
     in property <bool> dark;
+    in property <ColorScheme> color-scheme;
+    // Read once by `SystemTheme` before the first write to `color-scheme`, while it still holds the OS value.
+    out property <ColorScheme> palette-color-scheme: Palette.color-scheme;
+    in property <string> window-title;
+    in property <string> build-pill;
+    in property <string> chip-text;
+    in property <bool> has-game;
+    in property <string> game-title-id;
+    in property <string> game-database-id;
+    in property <int> screenshot-count;
+    in property <string> status-text;
+    in property <bool> status-is-error;
+    in property <string> progress-text;
+    in property <bool> bulk-stop-available;
+    in property <MenuId> open-menu;
+    in property <string> save-to-console-reason;
+    in property <bool> editor-locked;
+    in property <bool> save-locked;
+    in property <bool> auto-resize;
+    in property <bool> use-compression;
+    in property <ThemeOption> theme;
+
+    callback show-page(PageId);
+    callback toggle-menu(MenuId);
+    callback menu-action(MenuAction);
+    callback stop-bulk();
+    callback show-about();
+
+    // The std widgets follow `Palette`, so the theme override reaches them too.
+    changed color-scheme => {
+        Palette.color-scheme = self.color-scheme;
+    }
 }

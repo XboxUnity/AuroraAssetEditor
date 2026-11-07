@@ -1,0 +1,55 @@
+import { Icon } from "../controls/icon.slint";
+import { Theme } from "../theme/theme.slint";
+
+export component SideBarItem inherits Rectangle {
+    in property <image> icon;
+    in property <string> label;
+    // Shown after the label when above 0.
+    in property <int> count;
+    in property <bool> selected;
+    callback clicked();
+
+    property <color> foreground: selected ? Theme.text-strong : Theme.row-text;
+
+    border-radius: 4px;
+    background: selected ? Theme.chip-background : transparent;
+    accessible-role: tab;
+    accessible-label: label;
+    accessible-item-selected: selected;
+    accessible-action-default => {
+        clicked();
+    }
+
+    HorizontalLayout {
+        padding-top: 5px;
+        padding-bottom: 5px;
+        padding-left: 6px;
+        padding-right: 6px;
+        spacing: 6px;
+        alignment: start;
+        Icon {
+            y: (parent.height - self.height) / 2;
+            source: icon;
+            colorize: foreground;
+        }
+        Text {
+            horizontal-stretch: 0;
+            text: label;
+            color: foreground;
+            overflow: elide;
+            vertical-alignment: center;
+        }
+        if count > 0: Text {
+            text: count;
+            color: Theme.text-muted;
+            font-size: Theme.caption-font-size;
+            vertical-alignment: center;
+        }
+    }
+
+    TouchArea {
+        clicked => {
+            clicked();
+        }
+    }
+}

@@ -1,0 +1,79 @@
+import { PageId } from "../model/page_id.slint";
+import { ShellModel } from "../model/shell_model.slint";
+import { Theme } from "../theme/theme.slint";
+import { SideBarItem } from "side_bar_item.slint";
+
+export component SideBar inherits Rectangle {
+    // The mockup's 118 px content box, 8 px padding on each side and the 1 px border.
+    width: 135px;
+    background: Theme.sidebar-background;
+
+    HorizontalLayout {
+        VerticalLayout {
+            padding: 8px;
+            alignment: start;
+            cover-item := SideBarItem {
+                icon: @image-url("../icons/cover.svg");
+                label: "Cover";
+                selected: ShellModel.page == PageId.cover;
+                clicked => {
+                    ShellModel.show-page(PageId.cover);
+                }
+            }
+            background-item := SideBarItem {
+                icon: @image-url("../icons/background.svg");
+                label: "Background";
+                selected: ShellModel.page == PageId.background;
+                clicked => {
+                    ShellModel.show-page(PageId.background);
+                }
+            }
+            icon-banner-item := SideBarItem {
+                icon: @image-url("../icons/icon_banner.svg");
+                label: "Icon & Banner";
+                selected: ShellModel.page == PageId.icon-banner;
+                clicked => {
+                    ShellModel.show-page(PageId.icon-banner);
+                }
+            }
+            screenshots-item := SideBarItem {
+                icon: @image-url("../icons/screenshots.svg");
+                label: "Screenshots";
+                count: ShellModel.screenshot-count;
+                selected: ShellModel.page == PageId.screenshots;
+                clicked => {
+                    ShellModel.show-page(PageId.screenshots);
+                }
+            }
+            Rectangle {
+                height: 10px;
+            }
+            Text {
+                text: "SOURCES";
+                color: Theme.text-muted;
+                font-size: Theme.caption-font-size;
+            }
+            online-item := SideBarItem {
+                icon: @image-url("../icons/online.svg");
+                label: "Online";
+                selected: ShellModel.page == PageId.online;
+                clicked => {
+                    ShellModel.show-page(PageId.online);
+                }
+            }
+            console-item := SideBarItem {
+                icon: @image-url("../icons/console.svg");
+                label: "Console";
+                selected: ShellModel.page == PageId.console;
+                clicked => {
+                    ShellModel.show-page(PageId.console);
+                }
+            }
+        }
+
+        Rectangle {
+            width: 1px;
+            background: Theme.border;
+        }
+    }
+}

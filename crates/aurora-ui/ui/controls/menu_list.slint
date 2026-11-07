@@ -1,0 +1,21 @@
+import { Theme } from "../theme/theme.slint";
+
+export component MenuList inherits Rectangle {
+    width: 220px;
+    height: self.preferred-height;
+    background: Theme.bar-background;
+    border-width: 1px;
+    border-color: Theme.border;
+    border-radius: 6px;
+    drop-shadow-blur: 8px;
+    drop-shadow-offset-y: 2px;
+    drop-shadow-color: #00000040;
+
+    // Keeps clicks between rows from reaching the backdrop that closes the menu.
+    TouchArea { }
+
+    VerticalLayout {
+        padding: 4px;
+        @children
+    }
+}

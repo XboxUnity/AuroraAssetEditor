@@ -1,0 +1,44 @@
+import { Theme } from "../theme/theme.slint";
+import { Icon } from "icon.slint";
+
+export component Chip inherits Rectangle {
+    in property <string> text;
+    in property <bool> has-chevron;
+    in property <bool> enabled: true;
+    callback clicked();
+
+    horizontal-stretch: 0;
+    border-radius: 12px;
+    background: Theme.chip-background;
+    accessible-role: button;
+    accessible-label: text;
+    accessible-enabled: enabled;
+    accessible-action-default => {
+        clicked();
+    }
+
+    HorizontalLayout {
+        padding-top: 2px;
+        padding-bottom: 2px;
+        padding-left: 10px;
+        padding-right: 10px;
+        spacing: 4px;
+        Text {
+            text: text;
+            color: Theme.chip-text;
+            vertical-alignment: center;
+        }
+        if has-chevron: Icon {
+            y: (parent.height - self.height) / 2;
+            source: @image-url("../icons/chevron_down.svg");
+            colorize: Theme.chip-text;
+        }
+    }
+
+    TouchArea {
+        enabled: enabled;
+        clicked => {
+            clicked();
+        }
+    }
+}

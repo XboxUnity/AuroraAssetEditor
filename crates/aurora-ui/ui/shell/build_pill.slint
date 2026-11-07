@@ -1,0 +1,10 @@
+import { PillButton } from "../controls/pill_button.slint";
+import { ShellModel } from "../model/shell_model.slint";
+
+export component BuildPill inherits PillButton {
+    text: ShellModel.build-pill;
+    compact: true;
+    clicked => {
+        ShellModel.show-about();
+    }
+}

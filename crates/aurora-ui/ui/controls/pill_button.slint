@@ -1,0 +1,58 @@
+import { Theme } from "../theme/theme.slint";
+import { Icon } from "icon.slint";
+
+export component PillButton inherits Rectangle {
+    in property <string> text;
+    in property <image> icon;
+    in property <bool> accent;
+    in property <bool> has-chevron;
+    in property <bool> enabled: true;
+    // Status line size: caption font, no vertical padding.
+    in property <bool> compact;
+    callback clicked();
+
+    property <color> foreground: accent ? Theme.accent-text : Theme.pill-text;
+
+    horizontal-stretch: 0;
+    border-radius: 4px;
+    background: accent ? Theme.accent : Theme.pill-background;
+    opacity: enabled ? 1 : 0.5;
+    accessible-role: button;
+    accessible-label: text;
+    accessible-enabled: enabled;
+    accessible-action-default => {
+        clicked();
+    }
+
+    HorizontalLayout {
+        padding-top: compact ? 0px : 2px;
+        padding-bottom: compact ? 0px : 2px;
+        padding-left: compact ? 6px : 8px;
+        padding-right: compact ? 6px : 8px;
+        spacing: 4px;
+        alignment: center;
+        if icon.width > 0: Icon {
+            y: (parent.height - self.height) / 2;
+            source: icon;
+            colorize: foreground;
+        }
+        if text != "": Text {
+            text: text;
+            color: foreground;
+            font-size: compact ? Theme.caption-font-size : Theme.font-size;
+            vertical-alignment: center;
+        }
+        if has-chevron: Icon {
+            y: (parent.height - self.height) / 2;
+            source: @image-url("../icons/chevron_down.svg");
+            colorize: foreground;
+        }
+    }
+
+    TouchArea {
+        enabled: enabled;
+        clicked => {
+            clicked();
+        }
+    }
+}

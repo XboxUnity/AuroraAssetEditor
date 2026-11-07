@@ -1,0 +1,63 @@
+import { Theme } from "../theme/theme.slint";
+import { Icon } from "icon.slint";
+
+export component MenuRow inherits Rectangle {
+    in property <string> text;
+    // Shown under the text, e.g. why the item is disabled.
+    in property <string> caption;
+    in property <bool> checkable;
+    in property <bool> checked;
+    // Keeps the check column so the text lines up with checkable rows.
+    in property <bool> indented;
+    in property <bool> enabled: true;
+    callback activated();
+
+    border-radius: 4px;
+    background: touch.has-hover && enabled ? Theme.pill-background : transparent;
+    accessible-role: button;
+    accessible-label: text;
+    accessible-description: caption;
+    accessible-enabled: enabled;
+    accessible-checkable: checkable;
+    accessible-checked: checked;
+    accessible-action-default => {
+        if enabled {
+            activated();
+        }
+    }
+
+    HorizontalLayout {
+        padding-top: 5px;
+        padding-bottom: 5px;
+        padding-left: 8px;
+        padding-right: 8px;
+        spacing: 6px;
+        if checkable || indented: Rectangle {
+            width: 14px;
+            if checked: Icon {
+                y: (parent.height - self.height) / 2;
+                source: @image-url("../icons/check.svg");
+                colorize: Theme.text;
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            Text {
+                text: text;
+                color: enabled ? Theme.text : Theme.text-muted;
+            }
+            if caption != "": Text {
+                text: caption;
+                color: Theme.text-muted;
+                font-size: Theme.caption-font-size;
+            }
+        }
+    }
+
+    touch := TouchArea {
+        enabled: enabled;
+        clicked => {
+            activated();
+        }
+    }
+}

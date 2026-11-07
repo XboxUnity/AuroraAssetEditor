@@ -1,0 +1,50 @@
+import { MenuList } from "../controls/menu_list.slint";
+import { MenuRow } from "../controls/menu_row.slint";
+import { MenuAction } from "../model/menu_action.slint";
+import { ShellModel } from "../model/shell_model.slint";
+
+export component SaveMenu inherits MenuList {
+    MenuRow {
+        text: "Save cover…";
+        enabled: !ShellModel.save-locked;
+        activated => {
+            ShellModel.menu-action(MenuAction.save-cover);
+        }
+    }
+    MenuRow {
+        text: "Save background…";
+        enabled: !ShellModel.save-locked;
+        activated => {
+            ShellModel.menu-action(MenuAction.save-background);
+        }
+    }
+    MenuRow {
+        text: "Save icon & banner…";
+        enabled: !ShellModel.save-locked;
+        activated => {
+            ShellModel.menu-action(MenuAction.save-icon-banner);
+        }
+    }
+    MenuRow {
+        text: "Save screenshots…";
+        enabled: !ShellModel.save-locked;
+        activated => {
+            ShellModel.menu-action(MenuAction.save-screenshots);
+        }
+    }
+    MenuRow {
+        text: "Save all locally…";
+        enabled: !ShellModel.save-locked;
+        activated => {
+            ShellModel.menu-action(MenuAction.save-all-locally);
+        }
+    }
+    save-to-console-row := MenuRow {
+        text: "Save all to console…";
+        caption: ShellModel.save-to-console-reason;
+        enabled: ShellModel.save-to-console-reason == "";
+        activated => {
+            ShellModel.menu-action(MenuAction.save-all-to-console);
+        }
+    }
+}

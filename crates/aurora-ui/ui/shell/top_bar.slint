@@ -1,0 +1,70 @@
+import { Chip } from "../controls/chip.slint";
+import { PillButton } from "../controls/pill_button.slint";
+import { MenuId } from "../model/menu_id.slint";
+import { ShellModel } from "../model/shell_model.slint";
+import { Theme } from "../theme/theme.slint";
+
+export component TopBar inherits Rectangle {
+    // Where the menus anchor, in window coordinates (the bar sits at the window's top left).
+    out property <length> open-button-x: open-button.x;
+    out property <length> save-button-x: save-button.x;
+    out property <length> game-chip-right: game-chip.x + game-chip.width;
+    out property <length> gear-button-right: gear-button.x + gear-button.width;
+
+    background: Theme.bar-background;
+
+    VerticalLayout {
+        HorizontalLayout {
+            padding-top: 6px;
+            padding-bottom: 6px;
+            padding-left: 10px;
+            padding-right: 10px;
+            spacing: 8px;
+            Text {
+                horizontal-stretch: 0;
+                text: "Aurora Asset Editor";
+                color: Theme.text-strong;
+                font-weight: Theme.semibold-font-weight;
+                vertical-alignment: center;
+            }
+            open-button := PillButton {
+                text: "Open";
+                has-chevron: true;
+                clicked => {
+                    ShellModel.toggle-menu(MenuId.open);
+                }
+            }
+            save-button := PillButton {
+                text: "Save";
+                accent: true;
+                has-chevron: true;
+                clicked => {
+                    ShellModel.toggle-menu(MenuId.save);
+                }
+            }
+            Rectangle {
+                horizontal-stretch: 1;
+            }
+            game-chip := Chip {
+                text: ShellModel.chip-text;
+                has-chevron: true;
+                enabled: ShellModel.has-game;
+                clicked => {
+                    ShellModel.toggle-menu(MenuId.game);
+                }
+            }
+            gear-button := PillButton {
+                icon: @image-url("../icons/gear.svg");
+                accessible-label: "Settings";
+                clicked => {
+                    ShellModel.toggle-menu(MenuId.gear);
+                }
+            }
+        }
+
+        Rectangle {
+            height: 1px;
+            background: Theme.border;
+        }
+    }
+}

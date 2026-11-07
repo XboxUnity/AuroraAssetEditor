@@ -1,0 +1,21 @@
+import { MenuList } from "../controls/menu_list.slint";
+import { MenuRow } from "../controls/menu_row.slint";
+import { MenuAction } from "../model/menu_action.slint";
+import { ShellModel } from "../model/shell_model.slint";
+
+export component OpenMenu inherits MenuList {
+    open-files-row := MenuRow {
+        text: "Open asset files…";
+        enabled: !ShellModel.editor-locked;
+        activated => {
+            ShellModel.menu-action(MenuAction.open-asset-files);
+        }
+    }
+    new-asset-set-row := MenuRow {
+        text: "New asset set";
+        enabled: !ShellModel.editor-locked;
+        activated => {
+            ShellModel.menu-action(MenuAction.new-asset-set);
+        }
+    }
+}

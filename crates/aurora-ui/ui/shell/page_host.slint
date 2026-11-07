@@ -1,0 +1,22 @@
+import { PageId } from "../model/page_id.slint";
+import { ShellModel } from "../model/shell_model.slint";
+import { Theme } from "../theme/theme.slint";
+
+// The page area. Until the pages exist, it shows the page's title where the page header goes.
+export component PageHost inherits Rectangle {
+    VerticalLayout {
+        padding: 12px;
+        alignment: start;
+        page-title := Text {
+            text: ShellModel.page == PageId.cover ? "Cover"
+                : ShellModel.page == PageId.background ? "Background"
+                : ShellModel.page == PageId.icon-banner ? "Icon & Banner"
+                : ShellModel.page == PageId.screenshots ? "Screenshots"
+                : ShellModel.page == PageId.online ? "Online"
+                : "Console";
+            color: Theme.text-strong;
+            font-size: Theme.page-title-font-size;
+            font-weight: Theme.semibold-font-weight;
+        }
+    }
+}

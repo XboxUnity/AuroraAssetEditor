@@ -1,0 +1,25 @@
+import { MenuList } from "../controls/menu_list.slint";
+import { MenuRow } from "../controls/menu_row.slint";
+import { MenuAction } from "../model/menu_action.slint";
+import { ShellModel } from "../model/shell_model.slint";
+
+export component GameMenu inherits MenuList {
+    copy-title-id-row := MenuRow {
+        text: "Copy TitleID \{ShellModel.game-title-id}";
+        activated => {
+            ShellModel.menu-action(MenuAction.copy-title-id);
+        }
+    }
+    copy-database-id-row := MenuRow {
+        text: "Copy DatabaseID \{ShellModel.game-database-id}";
+        activated => {
+            ShellModel.menu-action(MenuAction.copy-database-id);
+        }
+    }
+    clear-selection-row := MenuRow {
+        text: "Clear selection";
+        activated => {
+            ShellModel.menu-action(MenuAction.clear-selection);
+        }
+    }
+}

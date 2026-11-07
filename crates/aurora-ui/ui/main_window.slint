@@ -1,11 +1,21 @@
 import "fonts/Inter-Regular.ttf";
 import "fonts/Inter-SemiBold.ttf";
+import { MenuAction } from "model/menu_action.slint";
+import { MenuId } from "model/menu_id.slint";
+import { PageId } from "model/page_id.slint";
 import { ShellModel } from "model/shell_model.slint";
+import { ThemeOption } from "model/theme_option.slint";
+import { MenuOverlay } from "shell/menu_overlay.slint";
+import { PageHost } from "shell/page_host.slint";
+import { SideBar } from "shell/side_bar.slint";
+import { StatusLine } from "shell/status_line.slint";
+import { TopBar } from "shell/top_bar.slint";
 import { Theme } from "theme/theme.slint";
 
-export { ShellModel, Theme }
+export { MenuAction, MenuId, PageId, ShellModel, Theme, ThemeOption }
 
 export component MainWindow inherits Window {
+    title: ShellModel.window-title;
     preferred-width: 1024px;
     preferred-height: 680px;
     min-width: 760px;
@@ -13,4 +23,31 @@ export component MainWindow inherits Window {
     default-font-family: Theme.font-family;
     default-font-size: Theme.font-size;
     background: Theme.window-background;
+
+    VerticalLayout {
+        top-bar := TopBar {
+            vertical-stretch: 0;
+        }
+        HorizontalLayout {
+            vertical-stretch: 1;
+            SideBar { }
+            PageHost {
+                horizontal-stretch: 1;
+            }
+        }
+
+        StatusLine {
+            vertical-stretch: 0;
+        }
+    }
+
+    MenuOverlay {
+        width: 100%;
+        height: 100%;
+        menu-top: top-bar.height + 2px;
+        open-button-x: top-bar.open-button-x;
+        save-button-x: top-bar.save-button-x;
+        game-chip-right: top-bar.game-chip-right;
+        gear-button-right: top-bar.gear-button-right;
+    }
 }

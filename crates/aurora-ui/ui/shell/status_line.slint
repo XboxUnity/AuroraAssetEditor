@@ -1,0 +1,46 @@
+import { PillButton } from "../controls/pill_button.slint";
+import { ShellModel } from "../model/shell_model.slint";
+import { Theme } from "../theme/theme.slint";
+import { BuildPill } from "build_pill.slint";
+
+export component StatusLine inherits Rectangle {
+    background: Theme.status-background;
+
+    VerticalLayout {
+        Rectangle {
+            height: 1px;
+            background: Theme.border;
+        }
+
+        HorizontalLayout {
+            padding-top: 4px;
+            padding-bottom: 4px;
+            padding-left: 10px;
+            padding-right: 10px;
+            spacing: 8px;
+            if ShellModel.progress-text != "": Text {
+                horizontal-stretch: 0;
+                text: ShellModel.progress-text;
+                color: Theme.text-muted;
+                font-size: Theme.caption-font-size;
+                vertical-alignment: center;
+            }
+            status-text := Text {
+                horizontal-stretch: 1;
+                text: ShellModel.status-text;
+                color: ShellModel.status-is-error ? Theme.error-text : Theme.text-muted;
+                font-size: Theme.caption-font-size;
+                overflow: elide;
+                vertical-alignment: center;
+            }
+            if ShellModel.bulk-stop-available: PillButton {
+                text: "Stop";
+                compact: true;
+                clicked => {
+                    ShellModel.stop-bulk();
+                }
+            }
+            build-pill := BuildPill { }
+        }
+    }
+}

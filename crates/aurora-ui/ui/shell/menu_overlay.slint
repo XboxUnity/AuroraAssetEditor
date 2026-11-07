@@ -1,0 +1,37 @@
+import { MenuId } from "../model/menu_id.slint";
+import { ShellModel } from "../model/shell_model.slint";
+import { GameMenu } from "game_menu.slint";
+import { GearMenu } from "gear_menu.slint";
+import { OpenMenu } from "open_menu.slint";
+import { SaveMenu } from "save_menu.slint";
+
+// Covers the window while a menu is open: a click outside the menu closes it.
+export component MenuOverlay inherits Rectangle {
+    in property <length> menu-top;
+    in property <length> open-button-x;
+    in property <length> save-button-x;
+    in property <length> game-chip-right;
+    in property <length> gear-button-right;
+
+    if ShellModel.open-menu != MenuId.none: TouchArea {
+        clicked => {
+            ShellModel.toggle-menu(MenuId.none);
+        }
+    }
+    if ShellModel.open-menu == MenuId.open: OpenMenu {
+        x: open-button-x;
+        y: menu-top;
+    }
+    if ShellModel.open-menu == MenuId.save: SaveMenu {
+        x: save-button-x;
+        y: menu-top;
+    }
+    if ShellModel.open-menu == MenuId.game: GameMenu {
+        x: game-chip-right - self.width;
+        y: menu-top;
+    }
+    if ShellModel.open-menu == MenuId.gear: GearMenu {
+        x: gear-button-right - self.width;
+        y: menu-top;
+    }
+}
