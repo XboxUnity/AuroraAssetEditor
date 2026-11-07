@@ -39,6 +39,10 @@ impl Shared {
         lock(&self.requests).push(path.to_owned());
     }
 
+    pub(super) fn is_stopping(&self) -> bool {
+        self.stopping.load(Ordering::SeqCst)
+    }
+
     pub(super) fn record_unmatched(&self, path: &str) {
         lock(&self.unmatched).push(path.to_owned());
     }

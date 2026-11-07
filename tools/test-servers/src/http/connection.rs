@@ -1,5 +1,6 @@
-use std::io::{BufRead, BufReader, Read, Write};
+use std::io::{self, BufRead, BufReader, Read, Write};
 use std::net::{Shutdown, TcpStream};
+use std::time::Duration;
 
 use super::recorded_http::Shared;
 use super::route::{Route, RouteBehaviour};
@@ -7,15 +8,21 @@ use super::route::{Route, RouteBehaviour};
 const REDIRECT_STATUS: u16 = 302;
 const NOT_FOUND_STATUS: u16 = 404;
 const DRAIN_BUFFER_BYTES: usize = 64;
+/// A blocked read is not woken by `shutdown` on Windows, so reads time out and check the stop flag.
+const POLL_INTERVAL: Duration = Duration::from_millis(5);
 
 pub(super) fn serve(shared: &Shared, stream: TcpStream) {
+    if let Err(error) = stream.set_read_timeout(Some(POLL_INTERVAL)) {
+        eprintln!("recorded http: preparing a connection failed: {error}");
+        return;
+    }
     let mut reader = BufReader::new(&stream);
-    let Some(path) = read_request_path(&mut reader) else {
+    let Some(path) = read_request_path(shared, &mut reader) else {
         return;
     };
     shared.record_request(&path);
     match shared.route_for(&path) {
-        Some(route) => answer(&stream, &mut reader, route),
+        Some(route) => answer(shared, &stream, &mut reader, route),
         None => {
             shared.record_unmatched(&path);
             send(&stream, NOT_FOUND_STATUS, "text/plain", &[], b"no route");
@@ -24,14 +31,14 @@ pub(super) fn serve(shared: &Shared, stream: TcpStream) {
 }
 
 /// The request target of the first line, once the blank line ending the head has been read.
-fn read_request_path(reader: &mut BufReader<&TcpStream>) -> Option<String> {
+fn read_request_path(shared: &Shared, reader: &mut BufReader<&TcpStream>) -> Option<String> {
     let mut request_line = String::new();
-    if reader.read_line(&mut request_line).ok()? == 0 {
+    if read_line_until_stopped(shared, reader, &mut request_line).ok()? == 0 {
         return None;
     }
     loop {
         let mut header = String::new();
-        if reader.read_line(&mut header).ok()? == 0 {
+        if read_line_until_stopped(shared, reader, &mut header).ok()? == 0 {
             return None;
         }
         if header.trim_end().is_empty() {
@@ -41,7 +48,33 @@ fn read_request_path(reader: &mut BufReader<&TcpStream>) -> Option<String> {
     request_line.split_whitespace().nth(1).map(str::to_owned)
 }
 
-fn answer(stream: &TcpStream, reader: &mut BufReader<&TcpStream>, route: &Route) {
+/// Like `read_line`, but returns 0 (as for a closed peer) once the server is stopping. Bytes read
+/// before a timeout stay in `line`.
+fn read_line_until_stopped(
+    shared: &Shared,
+    reader: &mut BufReader<&TcpStream>,
+    line: &mut String,
+) -> io::Result<usize> {
+    loop {
+        match reader.read_line(line) {
+            Err(error) if is_read_timeout(&error) => {
+                if shared.is_stopping() {
+                    return Ok(0);
+                }
+            }
+            result => return result,
+        }
+    }
+}
+
+fn is_read_timeout(error: &io::Error) -> bool {
+    matches!(
+        error.kind(),
+        io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut
+    )
+}
+
+fn answer(shared: &Shared, stream: &TcpStream, reader: &mut BufReader<&TcpStream>, route: &Route) {
     match &route.behaviour {
         RouteBehaviour::Normal => send(stream, route.status, &route.content_type, &[], &route.body),
         RouteBehaviour::Truncated { declared_len } => send_with_length(
@@ -59,13 +92,23 @@ fn answer(stream: &TcpStream, reader: &mut BufReader<&TcpStream>, route: &Route)
             &[("Location", location)],
             &[],
         ),
-        RouteBehaviour::NeverRespond => wait_for_peer_to_leave(reader),
+        RouteBehaviour::NeverRespond => wait_for_peer_to_leave(shared, reader),
     }
 }
 
-fn wait_for_peer_to_leave(reader: &mut BufReader<&TcpStream>) {
+fn wait_for_peer_to_leave(shared: &Shared, reader: &mut BufReader<&TcpStream>) {
     let mut sink = [0u8; DRAIN_BUFFER_BYTES];
-    while matches!(reader.read(&mut sink), Ok(read) if read > 0) {}
+    loop {
+        match reader.read(&mut sink) {
+            Ok(0) => return,
+            Ok(_) => {}
+            Err(error) if is_read_timeout(&error) && !shared.is_stopping() => {}
+            Err(error) => {
+                eprintln!("recorded http: waiting for the client failed: {error}");
+                return;
+            }
+        }
+    }
 }
 
 fn send(

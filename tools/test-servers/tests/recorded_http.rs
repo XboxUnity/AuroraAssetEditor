@@ -1,6 +1,9 @@
 use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::path::PathBuf;
+use std::sync::mpsc;
+use std::thread;
+use std::time::Duration;
 
 use test_servers::{RecordedHttp, Route, RouteBehaviour};
 
@@ -166,4 +169,34 @@ fn unknown_path_is_404_and_listed() {
 
     assert_eq!(response.status, 404);
     assert_eq!(server.unmatched(), ["/nowhere"]);
+}
+
+#[test]
+fn drop_stops_connections_whose_client_is_still_open() {
+    const STOP_WITHIN: Duration = Duration::from_secs(3);
+    let server = RecordedHttp::start(vec![route("/hang", b"", RouteBehaviour::NeverRespond)]);
+    let address = server.base_url().replace("http://", "");
+    let mut silent = TcpStream::connect(&address).expect("connecting without a request");
+    let mut waiting = TcpStream::connect(&address).expect("connecting to the hanging route");
+    write!(
+        waiting,
+        "GET /hang HTTP/1.1
+Host: {address}
+
+"
+    )
+    .expect("sending the request");
+    while server.requests().is_empty() {
+        thread::sleep(Duration::from_millis(5));
+    }
+    let (stopped, stopped_signal) = mpsc::channel();
+    thread::spawn(move || {
+        drop(server);
+        stopped.send(()).expect("the test is still waiting");
+    });
+
+    let result = stopped_signal.recv_timeout(STOP_WITHIN);
+
+    assert!(result.is_ok(), "dropping the server hung on an open client");
+    silent.flush().expect("the silent client is still open");
 }
