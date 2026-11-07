@@ -52,6 +52,58 @@ fn translucent_image_is_refused() {
 }
 
 #[test]
+fn a_refused_write_leaves_an_existing_file_untouched() {
+    let folder = tempfile::tempdir().expect("a temporary folder is needed for the PNG");
+    let path = folder.path().join("image.png");
+    std::fs::write(&path, b"existing bytes").expect("the existing file is created");
+    let mut image = plain_image(3, 2);
+    image.put_pixel(2, 1, Rgba([10, 20, 30, 0]));
+
+    write_opaque_png(&path, &image).expect_err("a translucent pixel is refused");
+
+    assert_eq!(
+        std::fs::read(&path).expect("the existing file is still there"),
+        b"existing bytes"
+    );
+    assert_eq!(
+        std::fs::read_dir(folder.path())
+            .expect("the folder lists")
+            .count(),
+        1
+    );
+}
+
+#[test]
+fn a_write_replaces_an_existing_file_and_leaves_no_temporary_file() {
+    let folder = tempfile::tempdir().expect("a temporary folder is needed for the PNG");
+    let path = folder.path().join("image.png");
+    std::fs::write(&path, b"old bytes").expect("the existing file is created");
+    let image = plain_image(3, 2);
+
+    write_opaque_png(&path, &image).expect("an opaque image is written");
+
+    assert_eq!(read_png(&path).expect("the PNG reads back"), image);
+    assert_eq!(
+        std::fs::read_dir(folder.path())
+            .expect("the folder lists")
+            .count(),
+        1
+    );
+}
+
+#[test]
+fn a_file_that_is_not_a_png_fails_to_decode() {
+    let folder = tempfile::tempdir().expect("a temporary folder is needed for the file");
+    let path = folder.path().join("image.png");
+    std::fs::write(&path, b"this is not a PNG").expect("the corrupt file is created");
+
+    let error = read_png(&path).expect_err("a corrupt file is refused");
+
+    assert!(matches!(error, PngFileError::Decode(_)));
+    assert!(error.to_string().starts_with("the file is not a valid PNG"));
+}
+
+#[test]
 fn identical_images_are_the_same() {
     let image = plain_image(8, 8);
 
@@ -158,6 +210,13 @@ fn comparison_reads_as_one_sentence() {
     assert_eq!(
         compare_pixels(&plain_image(4, 4), &plain_image(4, 5)).to_string(),
         "the size changed from 4x4 to 4x5"
+    );
+
+    let mut one_change = reference.clone();
+    one_change.put_pixel(5, 7, Rgba([10, 21, 30, 255]));
+    assert_eq!(
+        compare_pixels(&reference, &one_change).to_string(),
+        "1 pixel differs in x 5..=5, y 7..=7 (largest channel difference 1)"
     );
 
     let many = PixelComparison::DifferentPixels(PixelDifference {

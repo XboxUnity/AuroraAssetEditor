@@ -106,9 +106,13 @@ impl PixelDifference {
 impl fmt::Display for PixelDifference {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let bounds = &self.bounds;
+        let verb_phrase = match self.count {
+            1 => "pixel differs",
+            _ => "pixels differ",
+        };
         write!(
             formatter,
-            "{} pixels differ in x {}..={}, y {}..={} (largest channel difference {})",
+            "{} {verb_phrase} in x {}..={}, y {}..={} (largest channel difference {})",
             group_thousands(self.count),
             bounds.left,
             bounds.right,
