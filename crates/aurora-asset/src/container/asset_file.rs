@@ -111,7 +111,7 @@ impl AssetFile {
 
         let mut file = Self::new();
         let mut data_cursor = DATA_START;
-        for slot in all_slots() {
+        for slot in AssetSlot::all() {
             let entry_start = ENTRY_TABLE_START + slot.index() * ENTRY_LEN;
             let size = read_u32_be(bytes, entry_start + 4) as usize;
             let header_start = entry_start + ENTRY_FIXED_FIELDS_LEN;
@@ -197,13 +197,28 @@ impl AssetFile {
     /// entry is never kept.
     pub fn only(&self, kind: AssetKind) -> AssetFile {
         let mut kept = Self::new();
-        for slot in all_slots().filter(|slot| kind.owns(*slot)) {
+        for slot in kind.slots() {
             let source = &self.entries[slot.index()];
             let target = &mut kept.entries[slot.index()];
             target.texture = source.texture.clone();
             target.empty_header = source.empty_header;
         }
         kept
+    }
+
+    pub fn has_entries_for(&self, kind: AssetKind) -> bool {
+        kind.slots().any(|slot| self.get(slot).is_some())
+    }
+
+    /// The old `SetImage(AssetFile, index)` for every entry `kind` owns: texture and header of
+    /// empty entries come from `source`, while this file's offsets stay.
+    pub fn replace_kind(&mut self, kind: AssetKind, source: &AssetFile) {
+        for slot in kind.slots() {
+            let from = &source.entries[slot.index()];
+            let to = &mut self.entries[slot.index()];
+            to.texture = from.texture.clone();
+            to.empty_header = from.empty_header;
+        }
     }
 
     /// Packs the screenshots into slots 1, 2, 3, ... keeping their order and stored bytes.
@@ -271,7 +286,7 @@ impl AssetFile {
     }
 
     fn flags(&self) -> u32 {
-        all_slots()
+        AssetSlot::all()
             .filter(|slot| self.get(*slot).is_some())
             .fold(0, |flags, slot| flags | 1 << slot.index())
     }
@@ -282,12 +297,4 @@ impl AssetFile {
             .filter(|entry| entry.texture.is_some())
             .count() as u32
     }
-
-    fn has_entries_for(&self, kind: AssetKind) -> bool {
-        all_slots().any(|slot| kind.owns(slot) && self.get(slot).is_some())
-    }
-}
-
-fn all_slots() -> impl Iterator<Item = AssetSlot> {
-    (0..ENTRY_COUNT).filter_map(AssetSlot::from_index)
 }

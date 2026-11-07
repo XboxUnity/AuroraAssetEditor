@@ -27,6 +27,11 @@ impl AssetKind {
         }
     }
 
+    /// The entries this page owns, in entry order.
+    pub fn slots(self) -> impl Iterator<Item = AssetSlot> {
+        AssetSlot::all().filter(move |slot| self.owns(*slot))
+    }
+
     pub(super) fn owns(self, slot: AssetSlot) -> bool {
         match self {
             Self::Cover => slot == AssetSlot::Cover,

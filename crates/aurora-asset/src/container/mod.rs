@@ -8,6 +8,6 @@ pub use asset_kind::AssetKind;
 pub use asset_slot::AssetSlot;
 pub use screenshot_number::ScreenshotNumber;
 
-const ENTRY_COUNT: usize = 25;
+pub const ENTRY_COUNT: usize = 25;
 const FIRST_SCREENSHOT_INDEX: usize = 5;
-const SCREENSHOT_COUNT: usize = ENTRY_COUNT - FIRST_SCREENSHOT_INDEX;
+pub const SCREENSHOT_COUNT: usize = ENTRY_COUNT - FIRST_SCREENSHOT_INDEX;

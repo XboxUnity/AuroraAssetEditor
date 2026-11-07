@@ -1,7 +1,8 @@
 mod support;
 
 use aurora_asset::{
-    AssetError, AssetFile, AssetKind, AssetSlot, EncodedTexture, ScreenshotNumber, TextureHeader,
+    AssetError, AssetFile, AssetKind, AssetSlot, ENTRY_COUNT, EncodedTexture, SCREENSHOT_COUNT,
+    ScreenshotNumber, TextureHeader,
 };
 
 const DATA_START: usize = 2048;
@@ -471,5 +472,129 @@ fn file_prefixes_match_aurora_names() {
             AssetKind::IconBanner,
             AssetKind::Screenshots
         ]
+    );
+}
+
+#[test]
+fn replace_kind_keeps_offsets_like_old_set_image() {
+    let mut target = AssetFile::new();
+    target.set(AssetSlot::Cover, Some(texture(9, 10)));
+    target.set(shot(1), Some(texture(1, 8)));
+    target.to_bytes();
+    target.set(shot(1), None);
+
+    let mut source_bytes_file = AssetFile::new();
+    source_bytes_file.set(shot(2), Some(texture(2, 16)));
+    let mut source_bytes = source_bytes_file.to_bytes();
+    patch_entry(&mut source_bytes, shot(3).index(), 0x77, 0x6d);
+    let source = AssetFile::parse(&source_bytes).unwrap();
+
+    target.replace_kind(AssetKind::Screenshots, &source);
+    let bytes = target.to_bytes();
+
+    let first = entry_bytes(&bytes, shot(1).index());
+    assert_eq!(
+        be_u32(first, 0),
+        10,
+        "slot 1 keeps the offset recorded by the first save"
+    );
+    assert!(
+        first[12..].iter().all(|byte| *byte == 0),
+        "slot 1 takes the source's zero header"
+    );
+
+    let third = entry_bytes(&bytes, shot(3).index());
+    assert_eq!(be_u32(third, 4), 0, "slot 3 stays empty");
+    assert!(
+        third[12..].iter().all(|byte| *byte == 0x6d),
+        "slot 3 takes the source's residue header"
+    );
+
+    assert_eq!(
+        entry_field(&bytes, shot(2).index(), 0),
+        10,
+        "slot 2 is recomputed after the cover"
+    );
+    assert_eq!(entry_field(&bytes, AssetSlot::Cover.index(), 0), 0);
+    assert_eq!(target.get(AssetSlot::Cover), Some(&texture(9, 10)));
+    assert_eq!(target.get(shot(2)), Some(&texture(2, 16)));
+}
+
+#[test]
+fn replace_kind_copies_only_owned_slots() {
+    let mut source = AssetFile::new();
+    for (seed, slot) in [
+        (1, AssetSlot::Icon),
+        (2, AssetSlot::Banner),
+        (3, AssetSlot::Cover),
+        (4, AssetSlot::Slot),
+        (5, AssetSlot::Background),
+        (6, shot(1)),
+        (7, shot(20)),
+    ] {
+        source.set(slot, Some(texture(seed, 4)));
+    }
+
+    for kind in AssetKind::ALL {
+        let mut target = AssetFile::new();
+        target.replace_kind(kind, &source);
+        for index in 0..25 {
+            let slot = AssetSlot::from_index(index).unwrap();
+            let expected = kind.slots().any(|owned| owned == slot) && source.get(slot).is_some();
+            assert_eq!(
+                target.get(slot).is_some(),
+                expected,
+                "{kind:?} slot {index}"
+            );
+        }
+    }
+
+    let mut cleared = source.clone();
+    cleared.replace_kind(AssetKind::Cover, &AssetFile::new());
+    assert!(cleared.get(AssetSlot::Cover).is_none());
+    assert!(cleared.get(AssetSlot::Icon).is_some());
+}
+
+#[test]
+fn kind_slots_are_disjoint_and_match_entries() {
+    let mut owners = [0usize; 25];
+    for kind in AssetKind::ALL {
+        for slot in kind.slots() {
+            owners[slot.index()] += 1;
+        }
+    }
+    for (index, count) in owners.iter().enumerate() {
+        let expected = usize::from(index != AssetSlot::Slot.index());
+        assert_eq!(*count, expected, "entry {index}");
+    }
+    assert_eq!(AssetKind::Screenshots.slots().count(), SCREENSHOT_COUNT);
+    assert_eq!(ENTRY_COUNT, 25);
+    assert_eq!(ScreenshotNumber::ALL.len(), SCREENSHOT_COUNT);
+    assert_eq!(ScreenshotNumber::ALL[0].get(), 1);
+    assert_eq!(
+        ScreenshotNumber::ALL[SCREENSHOT_COUNT - 1].get() as usize,
+        SCREENSHOT_COUNT
+    );
+
+    for checked in AssetKind::ALL {
+        for held in AssetKind::ALL {
+            for slot in held.slots() {
+                let mut file = AssetFile::new();
+                file.set(slot, Some(texture(1, 4)));
+                assert_eq!(
+                    file.has_entries_for(checked),
+                    checked == held,
+                    "{checked:?} vs {slot:?}"
+                );
+            }
+        }
+    }
+
+    let mut unused_slot_only = AssetFile::new();
+    unused_slot_only.set(AssetSlot::Slot, Some(texture(1, 4)));
+    assert!(
+        AssetKind::ALL
+            .iter()
+            .all(|kind| !unused_slot_only.has_entries_for(*kind))
     );
 }

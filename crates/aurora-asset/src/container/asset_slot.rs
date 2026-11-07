@@ -38,6 +38,11 @@ impl AssetSlot {
         }
     }
 
+    /// Every entry of the file in entry order, including the unused fourth one.
+    pub(super) fn all() -> impl Iterator<Item = AssetSlot> {
+        (0..ENTRY_COUNT).filter_map(Self::from_index)
+    }
+
     pub fn screenshot(number: u8) -> Option<Self> {
         ScreenshotNumber::new(number).map(Self::Screenshot)
     }
