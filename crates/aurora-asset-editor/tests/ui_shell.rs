@@ -243,6 +243,53 @@ fn sidebar_shows_screenshot_count_when_above_zero() {
     assert_eq!(shell.model().get_screenshot_count(), 3);
 }
 
+/// The element `id` of the sidebar row labelled "Screenshots".
+fn screenshots_row_part(shell: &Shell, id: &str) -> Option<ElementHandle> {
+    let row = ElementHandle::find_by_element_id(shell.view.window(), "SideBar::screenshots-item")
+        .next()
+        .expect("the sidebar has a Screenshots row");
+    let (origin, size) = (row.absolute_position(), row.size());
+    ElementHandle::find_by_element_id(shell.view.window(), id).find(|part| {
+        let position = part.absolute_position();
+        position.y >= origin.y && position.y < origin.y + size.height
+    })
+}
+
+#[test]
+fn screenshots_label_never_elides_beside_its_count() {
+    for theme in [ThemeChoice::Dark, ThemeChoice::Light] {
+        let mut harness = harness_with_theme(theme);
+        let shell = Shell::start(&mut harness);
+        let label = || {
+            screenshots_row_part(&shell, "SideBarItem::label-text").expect("the row has a label")
+        };
+        let full_width = label().size().width;
+        let row = shell.element("SideBar::screenshots-item");
+        let row_right = row.absolute_position().x + row.size().width;
+        for count in [1, 10, 20] {
+            shell.model().set_screenshot_count(count);
+            let label = label();
+            assert_eq!(
+                label.size().width,
+                full_width,
+                "{theme:?}: \"Screenshots\" keeps its full width beside {count}"
+            );
+            let count_text =
+                screenshots_row_part(&shell, "SideBarItem::count-text").expect("the count shows");
+            let count_right = count_text.absolute_position().x + count_text.size().width;
+            assert!(
+                count_right <= row_right,
+                "{theme:?}: {count} fits in the row"
+            );
+            assert!(
+                count_text.absolute_position().x >= label.absolute_position().x + full_width,
+                "{theme:?}: {count} follows the label"
+            );
+            keep_snapshot(&shell.snapshot(), &format!("shell-{theme:?}-count-{count}"));
+        }
+    }
+}
+
 #[test]
 fn a_job_run_after_the_view_is_connected_updates_the_view() {
     let mut harness = AppHarness::new();

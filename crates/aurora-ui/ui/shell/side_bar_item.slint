@@ -23,7 +23,7 @@ export component SideBarItem inherits Rectangle {
 
     HorizontalLayout {
         padding-left: Theme.sidebar-row-padding-x;
-        padding-right: Theme.sidebar-row-padding-x;
+        padding-right: count > 0 ? Theme.sidebar-count-row-padding-right : Theme.sidebar-row-padding-x;
         spacing: Theme.sidebar-icon-gap;
         alignment: start;
         Icon {
@@ -33,14 +33,14 @@ export component SideBarItem inherits Rectangle {
         }
         HorizontalLayout {
             spacing: Theme.sidebar-count-gap;
-            Text {
+            label-text := Text {
                 horizontal-stretch: 0;
                 text: label;
                 color: foreground;
                 overflow: elide;
                 vertical-alignment: center;
             }
-            if count > 0: Text {
+            if count > 0: count-text := Text {
                 text: count;
                 color: Theme.text-muted;
                 font-size: Theme.caption-font-size;

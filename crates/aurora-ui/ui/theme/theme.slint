@@ -73,6 +73,9 @@ export global Theme {
     out property <length> sidebar-row-radius: 4px;
     out property <length> sidebar-icon-gap: 6px;
     out property <length> sidebar-count-gap: 3px;
+    // "Screenshots" and a two-digit count are 2 px wider than the row's content box, so a row with a count
+    // takes them from its right padding.
+    out property <length> sidebar-count-row-padding-right: 4px;
     out property <length> sidebar-sources-gap: 10px;
     out property <length> body-padding: 12px;
     out property <length> status-height: 24px;
