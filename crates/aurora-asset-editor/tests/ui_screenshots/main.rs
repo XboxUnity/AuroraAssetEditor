@@ -1,6 +1,7 @@
 //! Every screen and dialog of the app in both themes, compared pixel for pixel with the approved
 //! references in `fixtures/ui`. `cargo xtask ui-screenshots check|update` runs this target.
 
+mod asset_page_screens;
 mod sample_content;
 mod shell_screens;
 
@@ -15,7 +16,7 @@ use editor_test_support::{
 };
 
 /// The catalogue, one area per section of the contact sheet.
-const AREAS: &[ScreenArea] = &[shell_screens::SHELL];
+const AREAS: &[ScreenArea] = &[shell_screens::SHELL, asset_page_screens::ASSET_PAGES];
 
 /// A screen name starts with what it shows, so a sorted listing of `fixtures/ui` groups related
 /// screens and each file name leads to its area.
