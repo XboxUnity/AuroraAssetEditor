@@ -7,9 +7,7 @@ import { ScreenshotThumb } from "screenshot_thumb.slint";
 export component ScreenshotStrip inherits Rectangle {
     property <length> inset: Theme.thumb-selected-outline-width;
     property <length> pitch: Theme.thumb-width + Theme.thumb-gap;
-    property <int> tile-count: EditorModel.screenshot-tiles.length;
-    property <int> numbered-count: tile-count
-        - (EditorModel.screenshot-tiles[tile-count - 1].is-next-free ? 1 : 0);
+    property <int> numbered-count: EditorModel.screenshot-position-count;
     // 0 while nothing is dragged.
     property <int> drag-from;
     property <int> drag-to;

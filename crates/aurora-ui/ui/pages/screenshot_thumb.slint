@@ -27,9 +27,12 @@ export component ScreenshotThumb inherits Rectangle {
     }
 
     function activate() {
+        if ShellModel.editor-locked {
+            return;
+        }
         if !tile.is-next-free {
             EditorModel.select-screenshot(tile.number);
-        } else if !ShellModel.editor-locked {
+        } else {
             EditorModel.add-screenshots();
         }
     }
@@ -74,7 +77,7 @@ export component ScreenshotThumb inherits Rectangle {
 
     TouchArea {
         moved => {
-            if tile.filled && self.pressed
+            if tile.filled && self.pressed && !ShellModel.editor-locked
                 && (abs(self.mouse-x - self.pressed-x) > Theme.drag-threshold
                 || abs(self.mouse-y - self.pressed-y) > Theme.drag-threshold) {
                 dragging = true;

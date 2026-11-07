@@ -24,6 +24,8 @@ const RED: Rgba<u8> = Rgba([255, 0, 0, 255]);
 const GREEN: Rgba<u8> = Rgba([0, 255, 0, 255]);
 const BLUE: Rgba<u8> = Rgba([0, 0, 255, 255]);
 const COLOUR_TOLERANCE: u8 = 24;
+/// The placeholder art must differ this much from the slot in every channel to read as art.
+const MIN_PLACEHOLDER_CONTRAST: u8 = 10;
 const TILED_FLAG_BYTE: usize = 7 * 4;
 const TILED_FLAG: u8 = 0x80;
 /// The icon's art is a square in a wide slot, with a transparent cross.
@@ -421,6 +423,7 @@ fn screenshot_strip_shows_filled_slots_and_next_free() {
     );
     assert!(tiles[0].selected, "position 1 is selected at start");
     assert_eq!(ui.elements("ScreenshotStrip::thumb").len(), 4);
+    assert_eq!(ui.model().get_screenshot_position_count(), 3);
     assert_eq!(
         ui.element("ScreenshotStrip::hint")
             .accessible_label()
@@ -433,6 +436,7 @@ fn screenshot_strip_shows_filled_slots_and_next_free() {
     ui.render();
     let tiles = ui.tiles();
     assert_eq!(tiles.len(), 20, "no + tile once every position is filled");
+    assert_eq!(ui.model().get_screenshot_position_count(), 20);
     assert!(tiles.iter().all(|tile| tile.filled && !tile.is_next_free));
 }
 
@@ -444,6 +448,7 @@ fn empty_strip_shows_only_the_add_tile() {
     let tiles = ui.tiles();
     assert_eq!(tiles.len(), 1);
     assert!(tiles[0].is_next_free && tiles[0].number == 1);
+    assert_eq!(ui.model().get_screenshot_position_count(), 0);
     assert!(ui.elements("ScreenshotStrip::hint").is_empty());
 }
 
@@ -633,4 +638,85 @@ fn asset_pages_render_in_both_themes() {
             }
         }
     }
+}
+
+#[test]
+fn placeholder_art_stands_out_in_both_themes() {
+    for (theme, slot_background) in [
+        (ThemeChoice::Dark, DARK_SLOT_BACKGROUND),
+        (ThemeChoice::Light, LIGHT_SLOT_BACKGROUND),
+    ] {
+        let mut harness = harness_with_theme(theme);
+        let ui = Ui::start(&mut harness);
+        let pixel = pixel_at(&ui.snapshot(), centre(&ui.element("ImagePanel::slot")));
+        for (art, slot) in pixel.0.iter().zip(slot_background.0).take(3) {
+            assert!(
+                art.abs_diff(slot) >= MIN_PLACEHOLDER_CONTRAST,
+                "{theme:?}: placeholder {pixel:?} on slot {slot_background:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn thumbnails_neither_select_nor_drag_while_the_editor_is_locked() {
+    let mut harness = harness_with_theme(ThemeChoice::Dark);
+    load_screenshots(&mut harness, &[(1, RED), (2, GREEN), (3, BLUE)]);
+    let folder = TempDir::new().expect("tests need a temp folder");
+    harness
+        .dialogs()
+        .push_files(vec![write_png(&folder, "more.png", BLUE)]);
+    let ui = Ui::start(&mut harness);
+    ui.act(|app| app.add_screenshots());
+    assert!(ui.app.borrow().locks().editor, "the import is queued");
+    let first_preview = screenshot_preview(&ui.app.borrow(), 1);
+
+    let thumbs = ui.elements("ScreenshotStrip::thumb");
+    thumbs[1].mock_single_click(PointerEventButton::Left);
+    assert_eq!(
+        ui.app.borrow().selected_screenshot().get(),
+        1,
+        "no selection"
+    );
+
+    let start = centre(&thumbs[0]);
+    let target = centre(&thumbs[2]);
+    let button = PointerEventButton::Left;
+    ui.dispatch(WindowEvent::PointerMoved { position: start });
+    ui.dispatch(WindowEvent::PointerPressed {
+        position: start,
+        button,
+    });
+    ui.dispatch(WindowEvent::PointerMoved { position: target });
+    assert!(
+        ui.elements("ScreenshotStrip::insertion-bar").is_empty(),
+        "no drag"
+    );
+    ui.dispatch(WindowEvent::PointerReleased {
+        position: target,
+        button,
+    });
+    let app = ui.app.borrow();
+    assert_eq!(screenshot_preview(&app, 1), first_preview, "no move");
+    assert_eq!(app.selected_screenshot().get(), 1);
+}
+
+#[test]
+fn new_asset_set_then_load_shows_the_new_image() {
+    let mut harness = harness_with_theme(ThemeChoice::Dark);
+    load_cover(&mut harness, RED);
+    harness.app().show_page(Page::Cover);
+    let ui = Ui::start(&mut harness);
+    let slot_centre = centre(&ui.element("ImagePanel::slot"));
+    assert!(near(pixel_at(&ui.snapshot(), slot_centre), RED));
+
+    // No render in between: the cover's revision must not come back to the one on screen.
+    ui.app.borrow_mut().new_asset_set();
+    load_cover(&mut harness, BLUE);
+    ui.render();
+
+    assert!(
+        near(pixel_at(&ui.snapshot(), slot_centre), BLUE),
+        "the new cover is shown"
+    );
 }

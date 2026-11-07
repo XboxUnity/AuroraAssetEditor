@@ -73,7 +73,14 @@ pub(super) fn render_editor(window: &MainWindow, app: &App, images: &mut ImageCa
     )
     .into();
     editor.set_screenshot(screenshot);
-    editor.set_screenshot_tiles(screenshot_tiles(screenshots, selected, images));
+    let position_count = shown_position_count(screenshots);
+    editor.set_screenshot_position_count(i32::try_from(position_count).unwrap_or(i32::MAX));
+    editor.set_screenshot_tiles(screenshot_tiles(
+        screenshots,
+        position_count,
+        selected,
+        images,
+    ));
     editor.set_drop_hover(app.drop_hover());
 }
 
@@ -95,18 +102,10 @@ fn slot_view(document: &AssetDocument, slot: AssetSlot, images: &mut ImageCache)
 /// Positions 1 to the last filled one, then the "+" tile for the position after it while there is one.
 fn screenshot_tiles(
     screenshots: &AssetDocument,
+    shown_count: usize,
     selected: ScreenshotNumber,
     images: &mut ImageCache,
 ) -> ModelRc<ScreenshotTile> {
-    let is_filled = |number: ScreenshotNumber| {
-        screenshots
-            .texture_header(AssetSlot::Screenshot(number))
-            .is_some()
-    };
-    let shown_count = ScreenshotNumber::ALL
-        .iter()
-        .rposition(|number| is_filled(*number))
-        .map_or(0, |last| last + 1);
     let mut tiles: Vec<ScreenshotTile> = ScreenshotNumber::ALL[..shown_count]
         .iter()
         .map(|number| {
@@ -114,7 +113,7 @@ fn screenshot_tiles(
             ScreenshotTile {
                 number: i32::from(number.get()),
                 image: slot_image(screenshots, slot, images),
-                filled: is_filled(*number),
+                filled: is_filled(screenshots, *number),
                 selected: *number == selected,
                 is_next_free: false,
             }
@@ -130,6 +129,20 @@ fn screenshot_tiles(
         });
     }
     ModelRc::new(VecModel::from(tiles))
+}
+
+/// Positions 1 to the last filled one; 0 when no screenshot is filled.
+fn shown_position_count(screenshots: &AssetDocument) -> usize {
+    ScreenshotNumber::ALL
+        .iter()
+        .rposition(|number| is_filled(screenshots, *number))
+        .map_or(0, |last| last + 1)
+}
+
+fn is_filled(screenshots: &AssetDocument, number: ScreenshotNumber) -> bool {
+    screenshots
+        .texture_header(AssetSlot::Screenshot(number))
+        .is_some()
 }
 
 fn slot_image(document: &AssetDocument, slot: AssetSlot, images: &mut ImageCache) -> Image {

@@ -9,6 +9,8 @@ export global EditorModel {
     // The selected screenshot position.
     in property <SlotView> screenshot;
     in property <[ScreenshotTile]> screenshot-tiles;
+    // Positions 1 to the last filled one: the tiles before the "+" tile.
+    in property <int> screenshot-position-count;
     in property <bool> drop-hover;
 
     callback replace(slot-index: int);

@@ -24,6 +24,8 @@ export global Theme {
     out property <brush> slot-filled-gradient: dark
         ? @linear-gradient(135deg, #2b3f63 0%, #1f2a3d 100%)
         : @linear-gradient(135deg, #e3ecfb 0%, #f2f6fd 100%);
+    // The old placeholder art, drawn in one quiet colour on the empty slot.
+    out property <color> placeholder-art: dark ? #585c61 : #d5dae2;
     out property <color> thumb-selected-outline: dark ? #ffffff : #0f172a;
     out property <color> error-text: dark ? #f87171 : #b91c1c;
     out property <color> danger: #dc2626;
@@ -88,7 +90,6 @@ export global Theme {
     out property <length> slot-dash-gap: 3px;
     out property <length> slot-content-padding: 12px;
     out property <length> drop-hint-gap: 6px;
-    out property <float> placeholder-opacity: 0.4;
     out property <length> panel-gap: 12px;
     out property <length> thumb-width: 64px;
     out property <length> thumb-height: thumb-width * 562 / 1000;
