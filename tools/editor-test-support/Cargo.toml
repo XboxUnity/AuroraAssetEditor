@@ -16,7 +16,7 @@ aurora-online = { path = "../../crates/aurora-online" }
 aurora-ui = { path = "../../crates/aurora-ui" }
 chrono = { version = "0.4.45", default-features = false, features = ["clock", "std"] }
 i-slint-backend-testing = { version = "=1.18.1", features = ["renderer-software"] }
-image = { version = "0.25.10", default-features = false }
+image = { version = "0.25.10", default-features = false, features = ["png"] }
 slint = { version = "=1.18.1", default-features = false, features = [
     "std",
     "compat-1-2",
