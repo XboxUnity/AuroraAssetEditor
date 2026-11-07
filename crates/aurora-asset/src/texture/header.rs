@@ -1,5 +1,7 @@
+use super::channel_order::ChannelOrder;
+use super::compression::Compression;
 use super::endian::GpuEndian;
-use super::format::{self, ChannelOrder, Compression, FetchFields, TextureFormat};
+use super::format::{self, FetchFields, TextureFormat};
 use super::layout::{PITCH_UNIT_BYTES, SurfaceLayout};
 use super::{EncodeError, MAX_DIMENSION};
 use crate::bytes::read_u32_be;

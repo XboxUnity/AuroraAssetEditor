@@ -1,5 +1,6 @@
 use super::DecodeError;
-use super::format::{Compression, TextureFormat};
+use super::compression::Compression;
+use super::format::TextureFormat;
 use super::header::TextureHeader;
 
 /// One GPU pitch unit is 32 texels: 128 bytes of ARGB, or 8 compressed blocks (128 bytes of

@@ -2,87 +2,30 @@ mod argb;
 mod bc3_encode;
 mod block_decode;
 mod channel;
+mod channel_order;
+mod compression;
+mod decode_error;
+mod encode_error;
+mod encoded_texture;
 mod endian;
+mod fetch_format;
 mod format;
 mod header;
 mod layout;
-
-use std::fmt;
 
 use image::RgbaImage;
 
 use layout::SurfaceLayout;
 
 pub(crate) use block_decode::{decode_bc1_block, decode_bc3_block};
-pub use format::{Compression, TextureFormat};
+pub use compression::Compression;
+pub use decode_error::DecodeError;
+pub use encode_error::EncodeError;
+pub use encoded_texture::EncodedTexture;
+pub use format::TextureFormat;
 pub use header::{TEXTURE_HEADER_LEN, TextureHeader};
 
 pub const MAX_DIMENSION: u32 = 8192;
-
-/// Why an image cannot be encoded.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum EncodeError {
-    DimensionsOutOfRange { width: u32, height: u32 },
-}
-
-impl fmt::Display for EncodeError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::DimensionsOutOfRange { width, height } => write!(
-                f,
-                "image size {width}x{height} is outside the supported range of 1 to \
-                 {MAX_DIMENSION} pixels per side"
-            ),
-        }
-    }
-}
-
-impl std::error::Error for EncodeError {}
-
-/// Why a texture cannot be decoded.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum DecodeError {
-    /// The header describes a format the port does not decode.
-    UnsupportedFormat(TextureFormat),
-    /// The data ends before the last byte the decode reads.
-    TruncatedData { expected: usize, actual: usize },
-    /// The header's row pitch is narrower than one row of the image.
-    RowPitchTooSmall {
-        pitch_units: u32,
-        required_units: u32,
-    },
-}
-
-impl fmt::Display for DecodeError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::UnsupportedFormat(format) => {
-                write!(f, "a texture in {format} cannot be decoded")
-            }
-            Self::TruncatedData { expected, actual } => write!(
-                f,
-                "texture data is {actual} bytes but its header requires {expected}"
-            ),
-            Self::RowPitchTooSmall {
-                pitch_units,
-                required_units,
-            } => write!(
-                f,
-                "texture row pitch of {pitch_units} units cannot hold a row, which needs \
-                 {required_units}"
-            ),
-        }
-    }
-}
-
-impl std::error::Error for DecodeError {}
-
-/// A texture as stored in an `.asset` entry: the 52-byte header plus the surface bytes.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct EncodedTexture {
-    pub header: TextureHeader,
-    pub data: Vec<u8>,
-}
 
 /// Encodes an image byte for byte as AuroraAsset.dll does: the header it writes and its
 /// zero-padded surface, BC3 (DXT4) for `Compression::Dxt` or A8R8G8B8 for `Compression::None`.

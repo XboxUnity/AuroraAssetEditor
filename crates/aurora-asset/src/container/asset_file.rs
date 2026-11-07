@@ -1,121 +1,17 @@
 use std::fmt;
 
+use super::{AssetKind, AssetSlot, ENTRY_COUNT, FIRST_SCREENSHOT_INDEX, ScreenshotNumber};
 use crate::bytes::read_u32_be;
 use crate::texture::{EncodedTexture, TEXTURE_HEADER_LEN, TextureHeader};
 
 const MAGIC: u32 = 0x5258_4541;
 const VERSION: u32 = 1;
-const ENTRY_COUNT: usize = 25;
-const FIRST_SCREENSHOT_INDEX: usize = 5;
-const SCREENSHOT_COUNT: usize = ENTRY_COUNT - FIRST_SCREENSHOT_INDEX;
 const ENTRY_TABLE_START: usize = 20;
 const ENTRY_FIXED_FIELDS_LEN: usize = 12;
 const ENTRY_LEN: usize = ENTRY_FIXED_FIELDS_LEN + TEXTURE_HEADER_LEN;
 const DATA_START: usize = 2048;
 /// Always written as 0: the field held a pointer in the console memory.
 const EXTENDED_INFO: u32 = 0;
-
-/// A screenshot position, 1 to 20, as the app numbers them.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ScreenshotNumber(u8);
-
-impl ScreenshotNumber {
-    pub fn new(number: u8) -> Option<Self> {
-        if (1..=SCREENSHOT_COUNT as u8).contains(&number) {
-            Some(Self(number))
-        } else {
-            None
-        }
-    }
-
-    pub fn get(self) -> u8 {
-        self.0
-    }
-
-    fn position(self) -> usize {
-        usize::from(self.0) - 1
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum AssetSlot {
-    Icon,
-    Banner,
-    Cover,
-    Slot,
-    Background,
-    Screenshot(ScreenshotNumber),
-}
-
-impl AssetSlot {
-    /// The entry number in the file; with `from_index`, the only place the numbering lives.
-    pub fn index(self) -> usize {
-        match self {
-            Self::Icon => 0,
-            Self::Banner => 1,
-            Self::Cover => 2,
-            Self::Slot => 3,
-            Self::Background => 4,
-            Self::Screenshot(number) => FIRST_SCREENSHOT_INDEX + number.position(),
-        }
-    }
-
-    pub fn from_index(index: usize) -> Option<Self> {
-        match index {
-            0 => Some(Self::Icon),
-            1 => Some(Self::Banner),
-            2 => Some(Self::Cover),
-            3 => Some(Self::Slot),
-            4 => Some(Self::Background),
-            FIRST_SCREENSHOT_INDEX..ENTRY_COUNT => {
-                let number = (index - FIRST_SCREENSHOT_INDEX + 1) as u8;
-                ScreenshotNumber::new(number).map(Self::Screenshot)
-            }
-            _ => None,
-        }
-    }
-
-    pub fn screenshot(number: u8) -> Option<Self> {
-        ScreenshotNumber::new(number).map(Self::Screenshot)
-    }
-}
-
-/// The page of the app that owns a group of entries (GC, BK, GL, SS).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum AssetKind {
-    Cover,
-    Background,
-    IconBanner,
-    Screenshots,
-}
-
-impl AssetKind {
-    pub const ALL: [AssetKind; 4] = [
-        Self::Cover,
-        Self::Background,
-        Self::IconBanner,
-        Self::Screenshots,
-    ];
-
-    /// The two letters Aurora puts in front of the title ID in an asset file name.
-    pub fn file_prefix(self) -> &'static str {
-        match self {
-            Self::Cover => "GC",
-            Self::Background => "BK",
-            Self::IconBanner => "GL",
-            Self::Screenshots => "SS",
-        }
-    }
-
-    fn owns(self, slot: AssetSlot) -> bool {
-        match self {
-            Self::Cover => slot == AssetSlot::Cover,
-            Self::Background => slot == AssetSlot::Background,
-            Self::IconBanner => matches!(slot, AssetSlot::Icon | AssetSlot::Banner),
-            Self::Screenshots => matches!(slot, AssetSlot::Screenshot(_)),
-        }
-    }
-}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AssetError {

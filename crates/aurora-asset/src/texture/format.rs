@@ -1,13 +1,8 @@
 use std::fmt;
 
 use super::block_decode::BlockCodec;
-
-/// The app's "Use Compression" toggle.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Compression {
-    Dxt,
-    None,
-}
+use super::channel_order::ChannelOrder;
+use super::fetch_format::{FetchFormat, GPU_FORMAT_DXT1, GPU_FORMAT_DXT4_5};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TextureFormat {
@@ -18,73 +13,9 @@ pub enum TextureFormat {
     Unsupported { data_format: u8, tiled: bool },
 }
 
-impl Compression {
-    pub(super) fn fetch_format(self) -> FetchFormat {
-        match self {
-            Self::Dxt => FetchFormat::LINEAR_DXT4,
-            Self::None => FetchFormat::LINEAR_ARGB8888,
-        }
-    }
-}
-
-/// How the GPU fetch constant describes a texture's data: format code, byte
-/// order and the channel order it presents to shaders.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) struct FetchFormat {
-    pub data_format: u32,
-    pub endian: u32,
-    pub swizzle: [u32; 4],
-}
-
-const GPU_ENDIAN_8IN16: u32 = 1;
-const GPU_ENDIAN_8IN32: u32 = 2;
-
-const GPU_FORMAT_8_8_8_8: u32 = 0x06;
-const GPU_FORMAT_DXT1: u32 = 0x12;
-const GPU_FORMAT_DXT4_5: u32 = 0x14;
-
 const GPU_NUM_FORMAT_FRACTION: u32 = 0;
 const GPU_SIGN_ALL_UNSIGNED: u32 = 0b0000_0000;
 const GPU_SIGN_ALL_SIGNED: u32 = 0b0101_0101;
-
-const GPU_SWIZZLE_R: u32 = 0;
-const GPU_SWIZZLE_G: u32 = 1;
-const GPU_SWIZZLE_B: u32 = 2;
-const GPU_SWIZZLE_A: u32 = 3;
-
-impl FetchFormat {
-    pub(super) const LINEAR_DXT4: Self = Self {
-        data_format: GPU_FORMAT_DXT4_5,
-        endian: GPU_ENDIAN_8IN16,
-        swizzle: [GPU_SWIZZLE_R, GPU_SWIZZLE_G, GPU_SWIZZLE_B, GPU_SWIZZLE_A],
-    };
-
-    pub(super) const LINEAR_ARGB8888: Self = Self {
-        data_format: GPU_FORMAT_8_8_8_8,
-        endian: GPU_ENDIAN_8IN32,
-        swizzle: [GPU_SWIZZLE_B, GPU_SWIZZLE_G, GPU_SWIZZLE_R, GPU_SWIZZLE_A],
-    };
-}
-
-/// Which decoded channel each presented channel (x, y, z, w) shows, from the fetch swizzle.
-/// The DLL honours any selection of the four stored channels; constant 0 and 1 are not supported.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct ChannelOrder([usize; 4]);
-
-impl ChannelOrder {
-    pub(super) fn from_swizzle(swizzle: [u32; 4]) -> Option<Self> {
-        let selects_stored_channel = |selector: u32| selector <= GPU_SWIZZLE_A;
-        swizzle
-            .iter()
-            .all(|selector| selects_stored_channel(*selector))
-            .then(|| Self(swizzle.map(|selector| selector as usize)))
-    }
-
-    /// Reorders decoded RGBA values to the presented channel order.
-    pub(super) fn arrange(self, values: [f32; 4]) -> [f32; 4] {
-        self.0.map(|selector| values[selector])
-    }
-}
 
 /// The fetch-constant fields that decide how AuroraAsset.dll reads a texture's data.
 pub(super) struct FetchFields {
