@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)]
+
 mod crafted;
 mod cross_decode;
 mod dds_corpus;

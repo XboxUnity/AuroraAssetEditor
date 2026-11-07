@@ -3,6 +3,8 @@
 //! Exit codes: 0 success, 2 usage or IO error, 4 encode refused, 5 decode refused,
 //! 6 DDS decode refused.
 
+#![deny(unsafe_code)]
+
 #[cfg(windows)]
 mod cli;
 #[cfg(windows)]
