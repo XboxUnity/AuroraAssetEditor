@@ -1,9 +1,10 @@
 #![forbid(unsafe_code)]
 
-#[expect(unused_imports, reason = "the FTP client will be the first user")]
+mod client;
+#[expect(unused_imports, reason = "listing uses the parsers in the next task")]
 #[cfg_attr(
     not(test),
-    expect(dead_code, reason = "the FTP client will be the first user")
+    expect(dead_code, reason = "listing uses the parsers in the next task")
 )]
 mod ftp;
 mod games;
@@ -11,6 +12,7 @@ mod ids;
 mod paths;
 mod settings;
 
+pub use client::{AuroraRevision, ConsoleClient, ConsoleError, ConsoleStatus, Timeouts};
 pub use games::{ContentDbError, Game, GameFilter, read_content_db};
 pub use ids::{GameIds, HexId, IdError};
 pub use paths::{CONTENT_DB_FILE, DATABASES_DIR, GAME_DATA_DIR, asset_file_name, asset_folder};
