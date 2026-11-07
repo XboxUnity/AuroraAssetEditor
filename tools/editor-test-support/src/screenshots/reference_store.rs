@@ -1,0 +1,236 @@
+use std::collections::BTreeSet;
+use std::ffi::OsStr;
+use std::fmt::Display;
+use std::fs;
+use std::io;
+use std::path::{Path, PathBuf};
+
+use image::RgbaImage;
+
+use super::diff_image::diff_image;
+use super::pixel_comparison::{PixelComparison, compare_pixels};
+use super::png_file::{PngFileError, read_png, write_opaque_png};
+use super::reference_mode::ReferenceMode;
+
+const PNG_EXTENSION: &str = "png";
+const ACTUAL_FOLDER: &str = "actual";
+const DIFF_FOLDER: &str = "diff";
+const REFERENCE_COPY_FOLDER: &str = "reference";
+
+/// The approved reference images and the folder one run writes its results into.
+///
+/// Output layout: `<output>/actual/<image>.png` for every image checked, and for an image that
+/// differs also `<output>/reference/<image>.png` (a copy of the reference as it was) and
+/// `<output>/diff/<image>.png`.
+pub struct ReferenceStore {
+    references: PathBuf,
+    output: PathBuf,
+}
+
+impl ReferenceStore {
+    pub fn new(references: PathBuf, output: PathBuf) -> ReferenceStore {
+        ReferenceStore { references, output }
+    }
+
+    /// `fixtures/ui` and `target/ui-screenshots` of the workspace this crate belongs to.
+    pub fn for_workspace() -> ReferenceStore {
+        let workspace = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .and_then(Path::parent)
+            .expect("this crate lives two folders below the workspace root");
+        ReferenceStore::new(
+            workspace.join("fixtures").join("ui"),
+            workspace.join("target").join("ui-screenshots"),
+        )
+    }
+
+    pub fn references(&self) -> &Path {
+        &self.references
+    }
+
+    pub fn output(&self) -> &Path {
+        &self.output
+    }
+
+    pub fn reference_path(&self, image: &str) -> PathBuf {
+        png_path(&self.references, image)
+    }
+
+    pub fn actual_path(&self, image: &str) -> PathBuf {
+        png_path(&self.output.join(ACTUAL_FOLDER), image)
+    }
+
+    pub fn diff_path(&self, image: &str) -> PathBuf {
+        png_path(&self.output.join(DIFF_FOLDER), image)
+    }
+
+    pub fn reference_copy_path(&self, image: &str) -> PathBuf {
+        png_path(&self.output.join(REFERENCE_COPY_FOLDER), image)
+    }
+
+    /// The names (file stems) of all reference PNGs; empty when the folder does not exist yet.
+    pub fn reference_names(&self) -> io::Result<BTreeSet<String>> {
+        let entries = match fs::read_dir(&self.references) {
+            Ok(entries) => entries,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(BTreeSet::new()),
+            Err(error) => return Err(error),
+        };
+
+        let mut names = BTreeSet::new();
+        for entry in entries {
+            let path = entry?.path();
+            if path.extension() != Some(OsStr::new(PNG_EXTENSION)) {
+                continue;
+            }
+            let name = path
+                .file_stem()
+                .and_then(OsStr::to_str)
+                .ok_or_else(|| invalid_name(&path))?;
+            names.insert(name.to_owned());
+        }
+        Ok(names)
+    }
+
+    pub fn remove_reference(&self, image: &str) -> io::Result<()> {
+        remove_file_with_path(&self.reference_path(image))
+    }
+
+    /// Removes what an earlier run left for this image, so an old diff can never describe the
+    /// current result. Files that are not there are fine.
+    pub fn clear_outputs(&self, image: &str) -> io::Result<()> {
+        let outputs = [
+            self.actual_path(image),
+            self.diff_path(image),
+            self.reference_copy_path(image),
+        ];
+        for path in outputs {
+            match remove_file_with_path(&path) {
+                Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+                other => other?,
+            }
+        }
+        Ok(())
+    }
+
+    /// Compares `actual` with the reference of `image`. Writes the actual always; when the pixels
+    /// differ also the diff and a copy of the reference. In update mode the reference is replaced
+    /// last, after everything meant for review is written, so a failure leaves it untouched.
+    pub fn check(&self, image: &str, actual: &RgbaImage, mode: ReferenceMode) -> ImageStatus {
+        match self.try_check(image, actual, mode) {
+            Ok(status) => status,
+            Err(message) => ImageStatus::Error(message),
+        }
+    }
+
+    fn try_check(
+        &self,
+        image: &str,
+        actual: &RgbaImage,
+        mode: ReferenceMode,
+    ) -> Result<ImageStatus, String> {
+        self.clear_outputs(image).map_err(|error| {
+            format!("The earlier outputs of {image} could not be removed: {error}")
+        })?;
+
+        let actual_path = self.actual_path(image);
+        write_opaque_png(&actual_path, actual)
+            .map_err(|error| failure("write the screenshot", &actual_path, error))?;
+
+        let reference_path = self.reference_path(image);
+        let reference = match read_png(&reference_path) {
+            Ok(reference) => reference,
+            Err(PngFileError::Io(error)) if error.kind() == io::ErrorKind::NotFound => {
+                return self.missing_reference(image, actual, mode);
+            }
+            Err(error) => return Err(failure("read the reference", &reference_path, error)),
+        };
+
+        let comparison = compare_pixels(&reference, actual);
+        if comparison == PixelComparison::Same {
+            return Ok(ImageStatus::Matches);
+        }
+
+        let copy_path = self.reference_copy_path(image);
+        if let Some(folder) = copy_path.parent() {
+            fs::create_dir_all(folder)
+                .map_err(|error| failure("create the folder of", &copy_path, error))?;
+        }
+        fs::copy(&reference_path, &copy_path)
+            .map_err(|error| failure("copy the reference to", &copy_path, error))?;
+        let diff_path = self.diff_path(image);
+        write_opaque_png(&diff_path, &diff_image(&reference, actual))
+            .map_err(|error| failure("write the diff", &diff_path, error))?;
+
+        match mode {
+            ReferenceMode::Check => Ok(ImageStatus::Differs(comparison)),
+            ReferenceMode::Update => {
+                write_opaque_png(&reference_path, actual)
+                    .map_err(|error| failure("write the reference", &reference_path, error))?;
+                Ok(ImageStatus::Replaced(comparison))
+            }
+        }
+    }
+
+    fn missing_reference(
+        &self,
+        image: &str,
+        actual: &RgbaImage,
+        mode: ReferenceMode,
+    ) -> Result<ImageStatus, String> {
+        match mode {
+            ReferenceMode::Check => Ok(ImageStatus::Missing),
+            ReferenceMode::Update => {
+                let reference_path = self.reference_path(image);
+                write_opaque_png(&reference_path, actual)
+                    .map_err(|error| failure("write the reference", &reference_path, error))?;
+                Ok(ImageStatus::Created)
+            }
+        }
+    }
+}
+
+/// The outcome of checking one image.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ImageStatus {
+    Matches,
+    Differs(PixelComparison),
+    Missing,
+    /// Update mode wrote a reference that did not exist.
+    Created,
+    /// Update mode replaced a reference whose pixels changed.
+    Replaced(PixelComparison),
+    Error(String),
+}
+
+impl ImageStatus {
+    pub fn is_failure(&self) -> bool {
+        matches!(
+            self,
+            ImageStatus::Differs(_) | ImageStatus::Missing | ImageStatus::Error(_)
+        )
+    }
+}
+
+fn png_path(folder: &Path, image: &str) -> PathBuf {
+    folder.join(format!("{image}.{PNG_EXTENSION}"))
+}
+
+fn failure(action: &str, path: &Path, error: impl Display) -> String {
+    format!("Could not {action} {}: {error}", path.display())
+}
+
+fn invalid_name(path: &Path) -> io::Error {
+    io::Error::new(
+        io::ErrorKind::InvalidData,
+        format!(
+            "the reference file name {} is not valid Unicode",
+            path.display()
+        ),
+    )
+}
+
+/// `fs::remove_file` whose error names the file, keeping the error kind.
+fn remove_file_with_path(path: &Path) -> io::Result<()> {
+    fs::remove_file(path)
+        .map_err(|error| io::Error::new(error.kind(), format!("{}: {error}", path.display())))
+}
