@@ -232,18 +232,13 @@ fn test_connection_always_reconnects() {
 
 #[test]
 fn non_numeric_port_falls_back_to_21() {
-    let mut client = ConsoleClient::new(
-        FtpSettings {
-            host: "192.0.2.1".to_owned(),
-            port: "abc".to_owned(),
-            ..FtpSettings::default()
-        },
-        Timeouts {
-            connect: Duration::from_millis(300),
-            read: SHORT,
-        },
-        |_| {},
-    );
+    let settings = FtpSettings {
+        host: HOST.to_owned(),
+        port: "abc".to_owned(),
+        ..FtpSettings::default()
+    };
+    assert_eq!(settings.port_number().unwrap(), 21);
+    let mut client = ConsoleClient::new(settings, timeouts(), |_| {});
     match client.test_connection() {
         Err(ConsoleError::Connect { port, .. }) => assert_eq!(port, 21),
         other => panic!("expected Connect, got {other:?}"),
