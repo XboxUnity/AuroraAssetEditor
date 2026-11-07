@@ -595,7 +595,8 @@ fn compare_manifests(committed: &Manifest, regenerated: &Manifest, mismatches: &
     }
 }
 
-/// Regenerates into a temp directory from the committed inputs and compares with the committed corpus.
+/// Regenerates into a temp directory from the committed inputs and compares with the committed
+/// corpus.
 pub fn check() -> Result<()> {
     require_windows()?;
     let paths = Paths::new()?;

@@ -137,7 +137,8 @@ impl Crafted {
 #[derive(Clone, Copy)]
 enum VideoPattern {
     Random,
-    /// Both colour endpoints of every block are equal, probing the "first greater than second" test.
+    /// Both colour endpoints of every block are equal, probing the "first greater than second"
+    /// test.
     EqualColorEndpoints,
 }
 

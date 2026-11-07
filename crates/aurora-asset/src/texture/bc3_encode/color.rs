@@ -45,7 +45,8 @@ const PREPARE_FPU: Fpu = Fpu::RoundTowardZero;
 const REFINE_FPU: Fpu = Fpu::RoundTowardZero;
 const QUANTIZE_FPU: Fpu = Fpu::RoundTowardZero;
 const INDEX_FPU: Fpu = Fpu::RoundTowardZero;
-// Derived from AuroraAsset.dll for interoperability: the endpoint search setup and the index scale round to nearest.
+// Derived from AuroraAsset.dll for interoperability: the endpoint search setup and the index scale
+// round to nearest.
 const SEARCH_FPU: Fpu = Fpu::RoundToNearest;
 const INDEX_SCALE_FPU: Fpu = Fpu::RoundToNearest;
 
@@ -170,7 +171,8 @@ fn choose_endpoints(points: &[Rgb; TEXELS_PER_BLOCK], weights: Rgb) -> Endpoints
                 ((fpu.load(point[channel]) - middle[channel]) * direction[channel]).store()
             })
             .map(|along| fpu.load(along));
-        // Derived from AuroraAsset.dll for interoperability: green is added to red before blue comes in.
+        // Derived from AuroraAsset.dll for interoperability: green is added to red before blue
+        // comes in.
         let sums = [
             green + red + blue,
             green + red - blue,
@@ -229,7 +231,8 @@ fn refine_endpoints(points: &[Rgb; TEXELS_PER_BLOCK], start: Endpoints) -> Endpo
     for iteration in 0..REFINE_ITERATIONS {
         let palette: [Rgb; STEP_COUNT] = std::array::from_fn(|step| {
             CHANNELS.map(|channel| {
-                // Derived from AuroraAsset.dll for interoperability: the high endpoint's share comes first.
+                // Derived from AuroraAsset.dll for interoperability: the high endpoint's share
+                // comes first.
                 let from_high = fpu.load(second_end_weight[step]) * high[channel];
                 (from_high + fpu.load(first_end_weight[step]) * low[channel]).store()
             })
@@ -400,7 +403,8 @@ fn assign_indices(
     let start = palette.colors[0];
     let axis = subtract(palette.colors[1], start);
     let scale = if palette.stored_first != palette.stored_second {
-        // Derived from AuroraAsset.dll for interoperability: one expression, with no store between the dot and the division.
+        // Derived from AuroraAsset.dll for interoperability: one expression, with no store
+        // between the dot and the division.
         let scale_fpu = INDEX_SCALE_FPU;
         (scale_fpu.load(LAST_POSITION) / wide_dot(axis, axis, scale_fpu)).store()
     } else {

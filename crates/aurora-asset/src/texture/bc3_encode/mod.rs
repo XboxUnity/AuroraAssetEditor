@@ -141,7 +141,8 @@ const NEIGHBOUR_BELOW_RIGHT_WEIGHT: f32 = 1.0 / 16.0;
 const LAST_ROW_START: usize = TEXELS_PER_BLOCK - BLOCK_SIDE;
 
 /// A texel's accumulated error after it receives `weight` of a neighbour's `difference`.
-// Derived from AuroraAsset.dll for interoperability: its dithering loops run with the FPU truncating.
+// Derived from AuroraAsset.dll for interoperability: its dithering loops run with the FPU
+// truncating.
 fn diffuse_error(error: f32, difference: f32, weight: f32) -> f32 {
     (Fpu::RoundTowardZero.load(difference) * weight + error).store()
 }

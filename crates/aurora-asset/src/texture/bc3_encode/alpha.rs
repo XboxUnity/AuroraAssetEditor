@@ -37,7 +37,8 @@ const QUANTIZE_FPU: Fpu = Fpu::RoundTowardZero;
 const REFINE_FPU: Fpu = Fpu::RoundTowardZero;
 const ENDPOINT_FPU: Fpu = Fpu::RoundTowardZero;
 const INDEX_FPU: Fpu = Fpu::RoundTowardZero;
-// Derived from AuroraAsset.dll for interoperability: step interpolation and index scale round to nearest.
+// Derived from AuroraAsset.dll for interoperability: step interpolation and index scale round to
+// nearest.
 const STEP_FPU: Fpu = Fpu::RoundToNearest;
 
 struct QuantizedAlpha {
@@ -146,7 +147,8 @@ fn refine_alpha_endpoints(points: &[f32; TEXELS_PER_BLOCK], step_count: usize) -
 
         let mut steps = [0.0f32; EIGHT_STEP_COUNT];
         for step in 0..step_count {
-            // Derived from AuroraAsset.dll for interoperability: the high endpoint's share comes first.
+            // Derived from AuroraAsset.dll for interoperability: the high endpoint's share comes
+            // first.
             let from_high = fpu.load(other_end_weights[step]) * high;
             steps[step] = (from_high + fpu.load(end_weights[step]) * low).store();
         }
@@ -257,7 +259,8 @@ fn alpha_steps(first: f32, second: f32, step_count: usize) -> [f32; EIGHT_STEP_C
     steps[1] = second;
     let interpolated = step_count - 1;
     let fpu = STEP_FPU;
-    // Derived from AuroraAsset.dll for interoperability: multiplies by an `f32` reciprocal instead of dividing.
+    // Derived from AuroraAsset.dll for interoperability: multiplies by an `f32` reciprocal
+    // instead of dividing.
     let reciprocal = 1.0 / interpolated as f32;
     for index in 1..interpolated {
         let first_share = fpu.load(steps[0]) * (interpolated - index) as f32;

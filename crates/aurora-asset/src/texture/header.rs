@@ -213,7 +213,8 @@ impl TextureHeader {
     }
 
     /// Fields the port does not model but the DLL's decode depends on (found by probing) must hold
-    /// the value of the DLL's own headers. Every other unmodelled field was probed and has no effect.
+    /// the value of the DLL's own headers. Every other unmodelled field was probed and has no
+    /// effect.
     fn template_fields_match(&self) -> bool {
         field::COMMON_TYPE.get(self.dword(dword::COMMON)) == COMMON_TEXTURE
             && field::BORDER_SIZE.get(self.dword(dword::FETCH_3)) == 0

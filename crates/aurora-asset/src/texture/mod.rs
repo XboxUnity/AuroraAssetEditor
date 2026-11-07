@@ -29,7 +29,8 @@ impl fmt::Display for EncodeError {
         match self {
             Self::DimensionsOutOfRange { width, height } => write!(
                 f,
-                "image size {width}x{height} is outside the supported range of 1 to {MAX_DIMENSION} pixels per side"
+                "image size {width}x{height} is outside the supported range of 1 to \
+                 {MAX_DIMENSION} pixels per side"
             ),
         }
     }
@@ -65,7 +66,8 @@ impl fmt::Display for DecodeError {
                 required_units,
             } => write!(
                 f,
-                "texture row pitch of {pitch_units} units cannot hold a row, which needs {required_units}"
+                "texture row pitch of {pitch_units} units cannot hold a row, which needs \
+                 {required_units}"
             ),
         }
     }

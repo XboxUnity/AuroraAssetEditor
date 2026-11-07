@@ -72,9 +72,14 @@ fn argb_decode_needs_only_the_bytes_the_dll_reads() {
 fn rejects_zero_and_oversized_dimensions() {
     for (width, height) in [(0, 10), (MAX_DIMENSION + 1, 1)] {
         let image = RgbaImage::new(width, height);
+        let error = encode(&image, Compression::None).unwrap_err();
+        assert_eq!(error, EncodeError::DimensionsOutOfRange { width, height });
         assert_eq!(
-            encode(&image, Compression::None).unwrap_err(),
-            EncodeError::DimensionsOutOfRange { width, height }
+            error.to_string(),
+            format!(
+                "image size {width}x{height} is outside the supported range of 1 to \
+                 {MAX_DIMENSION} pixels per side"
+            )
         );
     }
 }
