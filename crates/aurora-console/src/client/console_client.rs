@@ -117,4 +117,15 @@ mod tests {
         fn assert_send<T: Send>() {}
         assert_send::<ConsoleClient>();
     }
+
+    #[test]
+    fn results_handed_to_the_ui_thread_are_send_and_sync() {
+        fn assert_send_sync<T: Send + Sync + 'static>() {}
+        assert_send_sync::<crate::ConsoleError>();
+        assert_send_sync::<crate::BulkError>();
+        assert_send_sync::<crate::BulkReport>();
+        assert_send_sync::<crate::GameListing>();
+        assert_send_sync::<crate::SettingsError>();
+        assert_send_sync::<crate::ContentDbError>();
+    }
 }
