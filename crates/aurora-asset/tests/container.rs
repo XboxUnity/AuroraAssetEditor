@@ -454,3 +454,22 @@ fn move_screenshot_zeroes_header_of_emptied_slot() {
     assert_eq!(be_u32(emptied, 4), 0, "slot 2 stores no data");
     assert!(emptied[12..].iter().all(|byte| *byte == 0), "slot 2 header");
 }
+
+#[test]
+fn file_prefixes_match_aurora_names() {
+    // Aurora: Tools/Content/ContentItem.cpp, "%sGC%08X.asset" etc.
+    let prefixes: Vec<_> = AssetKind::ALL
+        .iter()
+        .map(|kind| kind.file_prefix())
+        .collect();
+    assert_eq!(prefixes, ["GC", "BK", "GL", "SS"]);
+    assert_eq!(
+        AssetKind::ALL,
+        [
+            AssetKind::Cover,
+            AssetKind::Background,
+            AssetKind::IconBanner,
+            AssetKind::Screenshots
+        ]
+    );
+}

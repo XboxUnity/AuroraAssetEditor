@@ -1,6 +1,13 @@
 [workspace]
 resolver = "3"
-members = ["crates/aurora-asset", "tools/golden/harness", "xtask"]
+members = [
+    "crates/aurora-asset",
+    "crates/aurora-console",
+    "crates/aurora-online",
+    "tools/golden/harness",
+    "tools/test-servers",
+    "xtask",
+]
 
 [workspace.package]
 edition = "2024"

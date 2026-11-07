@@ -1,0 +1,15 @@
+[package]
+name = "aurora-online"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+fastrand = "2"
+regex = "1.13.1"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+ureq = { version = "3.5.1", features = ["win-system-proxy"] }
+
+[dev-dependencies]
+test-servers = { path = "../../tools/test-servers" }
