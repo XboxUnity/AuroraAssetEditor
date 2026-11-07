@@ -1,11 +1,24 @@
-use aurora_asset::{AssetFile, AssetKind, AssetSlot, encode};
+use aurora_asset::{AssetFile, AssetKind, AssetSlot, Compression, encode};
 
-use super::{
-    BulkEntry, BulkError, BulkFailure, BulkOptions, BulkOutcome, BulkProgress, BulkReport,
-    CoverProvider,
-};
+use super::{BulkEntry, BulkError, BulkFailure, BulkOutcome, BulkReport, CoverProvider};
 use crate::client::{ConsoleClient, ConsoleError};
 use crate::games::Game;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BulkOptions {
+    /// Skips the check for an existing cover and overwrites it.
+    pub replace_existing: bool,
+    pub compression: Compression,
+}
+
+/// Reported before each game is handled.
+#[derive(Debug, Clone, Copy)]
+pub struct BulkProgress<'a> {
+    /// Counts from 1.
+    pub position: usize,
+    pub total: usize,
+    pub game: &'a Game,
+}
 
 /// Uploads a random cover to each game that has none, like the old app's bulk download with
 /// "cover art only". A game's error is recorded and the run goes on; it stops only when

@@ -1,21 +1,11 @@
-mod bulk_entry;
 mod bulk_error;
-mod bulk_failure;
-mod bulk_options;
 mod bulk_outcome;
-mod bulk_progress;
 mod bulk_report;
-mod bulk_summary;
 mod cover_provider;
 mod run_bulk_covers;
 
-pub use bulk_entry::BulkEntry;
 pub use bulk_error::BulkError;
-pub use bulk_failure::BulkFailure;
-pub use bulk_options::BulkOptions;
-pub use bulk_outcome::BulkOutcome;
-pub use bulk_progress::BulkProgress;
-pub use bulk_report::BulkReport;
-pub use bulk_summary::BulkSummary;
+pub use bulk_outcome::{BulkFailure, BulkOutcome};
+pub use bulk_report::{BulkEntry, BulkReport, BulkSummary};
 pub use cover_provider::CoverProvider;
-pub use run_bulk_covers::run_bulk_covers;
+pub use run_bulk_covers::{BulkOptions, BulkProgress, run_bulk_covers};
