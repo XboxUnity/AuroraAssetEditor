@@ -1,6 +1,8 @@
 use std::fmt;
 use std::io;
 
+use aurora_asset::AssetError;
+
 use crate::settings::SettingsError;
 
 #[derive(Debug)]
@@ -28,6 +30,24 @@ pub enum ConsoleError {
         action: String,
         source: suppaftp::FtpError,
     },
+    MissingFolder {
+        path: String,
+    },
+    FileTooLarge {
+        file: String,
+        size: u64,
+        limit: u64,
+    },
+    /// `received` stops counting one byte past `listed`, where the download is cut off.
+    SizeMismatch {
+        file: String,
+        listed: u64,
+        received: u64,
+    },
+    InvalidAsset {
+        file: String,
+        source: AssetError,
+    },
 }
 
 impl fmt::Display for ConsoleError {
@@ -46,6 +66,20 @@ impl fmt::Display for ConsoleError {
                 write!(f, "the console does not look like it runs Aurora: {reply}")
             }
             Self::Protocol { action, .. } => write!(f, "could not {action}"),
+            Self::MissingFolder { path } => write!(f, "the console has no folder {path}"),
+            Self::FileTooLarge { file, size, limit } => write!(
+                f,
+                "{file} is listed as {size} bytes, more than the {limit} bytes the editor accepts"
+            ),
+            Self::SizeMismatch {
+                file,
+                listed,
+                received,
+            } => write!(
+                f,
+                "{file} is listed as {listed} bytes but the console sent {received}"
+            ),
+            Self::InvalidAsset { file, .. } => write!(f, "{file} is not a valid asset file"),
         }
     }
 }
@@ -56,9 +90,13 @@ impl std::error::Error for ConsoleError {
             Self::Settings(source) => Some(source),
             Self::Resolve { source, .. } | Self::Connect { source, .. } => Some(source),
             Self::Protocol { source, .. } => Some(source),
-            Self::InvalidTimeout { .. } | Self::LoginRejected { .. } | Self::NotAurora { .. } => {
-                None
-            }
+            Self::InvalidAsset { source, .. } => Some(source),
+            Self::InvalidTimeout { .. }
+            | Self::LoginRejected { .. }
+            | Self::NotAurora { .. }
+            | Self::MissingFolder { .. }
+            | Self::FileTooLarge { .. }
+            | Self::SizeMismatch { .. } => None,
         }
     }
 }

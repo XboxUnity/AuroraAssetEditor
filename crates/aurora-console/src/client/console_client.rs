@@ -56,20 +56,44 @@ impl ConsoleClient {
     /// Sends one command and returns the reply whatever its code. A failure drops the connection,
     /// since the stream can no longer be trusted.
     pub(crate) fn execute(&mut self, command: &str) -> Result<FtpReply, ConsoleError> {
-        let Some(connection) = self.connection.as_mut() else {
-            return Err(ConsoleError::Protocol {
-                action: format!("send {command}"),
-                source: suppaftp::FtpError::ConnectionError(io::Error::new(
-                    io::ErrorKind::NotConnected,
-                    "no connection to the console is open",
-                )),
-            });
-        };
-        let result = connection.execute(command);
+        let result = self
+            .connection(&format!("send {command}"))?
+            .execute(command);
         if result.is_err() {
             self.connection = None;
         }
         result
+    }
+
+    /// Runs a public operation on a live connection and drops the connection when it fails.
+    pub(super) fn run_operation<T>(
+        &mut self,
+        operation: impl FnOnce(&mut ConsoleClient) -> Result<T, ConsoleError>,
+    ) -> Result<T, ConsoleError> {
+        let result = self.ensure_connected().and_then(|()| operation(self));
+        if result.is_err() {
+            self.connection = None;
+        }
+        result
+    }
+
+    pub(super) fn connection(
+        &mut self,
+        action: &str,
+    ) -> Result<&mut ConsoleConnection, ConsoleError> {
+        self.connection
+            .as_mut()
+            .ok_or_else(|| ConsoleError::Protocol {
+                action: action.to_owned(),
+                source: suppaftp::FtpError::ConnectionError(io::Error::new(
+                    io::ErrorKind::NotConnected,
+                    "no connection to the console is open",
+                )),
+            })
+    }
+
+    pub(super) fn report(&mut self, status: ConsoleStatus) {
+        (self.on_status)(&status);
     }
 
     fn connect(&mut self) -> Result<AuroraRevision, ConsoleError> {

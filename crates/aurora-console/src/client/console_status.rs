@@ -8,6 +8,9 @@ pub enum ConsoleStatus {
     Connecting { host: String },
     CheckingForAurora { host: String },
     AuroraFound { revision: AuroraRevision },
+    OpeningFolder { path: String },
+    Downloading { file: String },
+    Uploading { file: String },
 }
 
 impl fmt::Display for ConsoleStatus {
@@ -20,6 +23,9 @@ impl fmt::Display for ConsoleStatus {
             Self::AuroraFound { revision } => {
                 write!(f, "Connected to Aurora revision {}", revision.as_str())
             }
+            Self::OpeningFolder { path } => write!(f, "Opening {path}..."),
+            Self::Downloading { file } => write!(f, "Downloading {file}..."),
+            Self::Uploading { file } => write!(f, "Uploading {file}..."),
         }
     }
 }

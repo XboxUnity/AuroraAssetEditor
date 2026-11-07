@@ -1,4 +1,4 @@
-use std::io;
+use std::io::{self, Cursor, Read};
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 
 use suppaftp::types::{FileType, Mode, Response};
@@ -67,9 +67,57 @@ impl ConsoleConnection {
         }
     }
 
-    #[expect(dead_code, reason = "listing reads the features in the next task")]
     pub(super) fn features(&self) -> Features {
         self.features
+    }
+
+    pub(super) fn list(&mut self, path: &str) -> Result<Vec<String>, ConsoleError> {
+        self.stream
+            .list(Some(path))
+            .map_err(protocol_error(format!("list {path}")))
+    }
+
+    pub(super) fn mlsd(&mut self, path: &str) -> Result<Vec<String>, ConsoleError> {
+        self.stream
+            .mlsd(Some(path))
+            .map_err(protocol_error(format!("list {path}")))
+    }
+
+    /// Reads the file, which the listing gave as `listed` bytes, and fails on any other length.
+    pub(super) fn retrieve(&mut self, name: &str, listed: u64) -> Result<Vec<u8>, ConsoleError> {
+        let action = format!("download {name}");
+        let mut transfer = self
+            .stream
+            .retr_as_stream(name)
+            .map_err(protocol_error(action.clone()))?;
+        let mut bytes = Vec::new();
+        // One byte past the listed size is enough to tell that the console sends more.
+        transfer
+            .by_ref()
+            .take(listed.saturating_add(1))
+            .read_to_end(&mut bytes)
+            .map_err(|source| ConsoleError::Protocol {
+                action: action.clone(),
+                source: FtpError::ConnectionError(source),
+            })?;
+        let received = bytes.len() as u64;
+        if received != listed {
+            return Err(ConsoleError::SizeMismatch {
+                file: name.to_owned(),
+                listed,
+                received,
+            });
+        }
+        transfer.finish().map_err(protocol_error(action))?;
+        Ok(bytes)
+    }
+
+    /// Stores the bytes unchanged in the working folder, replacing any file of that name.
+    pub(super) fn store(&mut self, name: &str, bytes: &[u8]) -> Result<(), ConsoleError> {
+        self.stream
+            .put_file(name, &mut Cursor::new(bytes))
+            .map(|_| ())
+            .map_err(protocol_error(format!("upload {name}")))
     }
 
     fn log_in(&mut self, settings: &FtpSettings) -> Result<(), ConsoleError> {
@@ -116,9 +164,9 @@ fn reply_from(response: Response, action: &dyn Fn() -> String) -> Result<FtpRepl
     })
 }
 
-fn protocol_error(action: &'static str) -> impl FnOnce(FtpError) -> ConsoleError {
+fn protocol_error(action: impl Into<String>) -> impl FnOnce(FtpError) -> ConsoleError {
     move |source| ConsoleError::Protocol {
-        action: action.to_owned(),
+        action: action.into(),
         source,
     }
 }
