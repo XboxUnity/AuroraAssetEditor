@@ -11,6 +11,11 @@ use super::recording_manifest::routes_from_manifest;
 use super::route::{Route, RouteBehaviour};
 
 const ACCEPT_POLL: Duration = Duration::from_millis(5);
+/// How the recorded JSON writes the image host's origin: plain and with escaped slashes.
+const RECORDED_IMAGE_HOSTS: [&str; 2] = [
+    r"http://assets.xboxunity.net",
+    r"http:\/\/assets.xboxunity.net",
+];
 const SERVER_PLACEHOLDER: &str = "{server}";
 
 /// An in-process HTTP/1.1 server on 127.0.0.1 that answers fixed routes. Dropping it stops the
@@ -95,6 +100,17 @@ impl RecordedHttp {
         RecordedHttp::start(routes)
     }
 
+    /// Like `from_recordings`, but the recorded answers' links to the services' image host point at this
+    /// server, so a client that follows them stays local.
+    pub fn from_recordings_with_local_images(manifest: &Path, extra: Vec<Route>) -> RecordedHttp {
+        let mut routes = routes_from_manifest(manifest);
+        for route in &mut routes {
+            route.body = point_recorded_hosts_here(&route.body);
+        }
+        routes.extend(extra);
+        RecordedHttp::start(routes)
+    }
+
     pub fn base_url(&self) -> String {
         self.base_url.clone()
     }
@@ -132,6 +148,19 @@ impl Drop for RecordedHttp {
             }
         }
     }
+}
+
+/// The recorded answers name the services' own image hosts; tests must reach their images on this server.
+fn point_recorded_hosts_here(body: &[u8]) -> Vec<u8> {
+    let mut rewritten = body.to_vec();
+    for recorded in RECORDED_IMAGE_HOSTS {
+        rewritten = replace_bytes(
+            &rewritten,
+            recorded.as_bytes(),
+            SERVER_PLACEHOLDER.as_bytes(),
+        );
+    }
+    rewritten
 }
 
 fn substitute_server(mut route: Route, base_url: &str) -> Route {

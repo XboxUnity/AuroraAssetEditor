@@ -11,7 +11,7 @@ use aurora_asset_editor::jobs::{Job, JobOutcome, JobWorkers, Progress, ProgressS
 use aurora_asset_editor::logging::{ERROR_LOG_FILE, ErrorLog};
 use aurora_asset_editor::settings::{AppSettings, ThemeChoice};
 use aurora_console::{FtpSettings, Timeouts};
-use aurora_online::{Endpoints, OnlineClient};
+use aurora_online::{ClientOptions, Endpoints, OnlineClient};
 use tempfile::TempDir;
 use test_servers::FakeConsole;
 
@@ -26,6 +26,19 @@ const TEST_ONLINE_TIMEOUT: Duration = Duration::from_secs(5);
 /// a refused connect takes about 2 s).
 const REFUSING_URL: &str = "http://127.0.0.1:9/";
 const FAKE_CONSOLE_HOST: &str = "127.0.0.1";
+
+/// A client that refuses every destination but the local machine, so no test reaches the internet.
+fn loopback_only_client(endpoints: Endpoints) -> OnlineClient {
+    OnlineClient::with_options(
+        endpoints,
+        ClientOptions {
+            timeout: TEST_ONLINE_TIMEOUT,
+            use_proxy: false,
+            loopback_only: true,
+            ..ClientOptions::default()
+        },
+    )
+}
 
 /// The build every harness app reports.
 pub fn test_build_info() -> BuildInfo {
@@ -107,7 +120,7 @@ impl AppHarness {
             jobs,
             setup: Some(Setup {
                 environment,
-                online: OnlineClient::without_proxy(offline, TEST_ONLINE_TIMEOUT),
+                online: loopback_only_client(offline),
             }),
             running: None,
         }
@@ -136,8 +149,7 @@ impl AppHarness {
     }
 
     pub fn with_online(&mut self, endpoints: Endpoints) {
-        self.setup("with_online").online =
-            OnlineClient::without_proxy(endpoints, TEST_ONLINE_TIMEOUT);
+        self.setup("with_online").online = loopback_only_client(endpoints);
     }
 
     /// Starts the app with `startup` in place of the harness's settings, as `main` does.
