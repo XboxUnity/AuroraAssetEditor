@@ -253,10 +253,12 @@ fn refine_endpoints(points: &[Rgb; TEXELS_PER_BLOCK], start: Endpoints) -> Endpo
         for point in points {
             let position = projection(*point, low, direction, fpu);
             let step = match refine_step(position, fpu) {
-                Ok(step) => palette_step(step),
+                RefineStep::InPalette(step) => palette_step(step),
                 // Deeper steps read stack residue or load addresses in the DLL; step 0 stands in.
-                Err(step) => underrun::read_before_palette(step, &low, &high, &sums, iteration)
-                    .unwrap_or_else(|| palette_step(0)),
+                RefineStep::BeforePalette(step) => {
+                    underrun::read_before_palette(step, &low, &high, &sums, iteration)
+                        .unwrap_or_else(|| palette_step(0))
+                }
             };
             sums.add(*point, &step, fpu);
         }
@@ -327,15 +329,25 @@ fn move_endpoint(endpoint: &mut Rgb, gradient: Rgb, curvature: f32, fpu: Fpu) {
     }
 }
 
+/// The step a point's projection onto the endpoint axis rounds to.
+enum RefineStep {
+    InPalette(usize),
+    /// A negative step: the point lies far before the low endpoint.
+    BeforePalette(i32),
+}
+
 /// The palette position nearest a point's projection onto the endpoint axis, or the negative
 /// step a point far before the low endpoint rounds to.
 // Derived from AuroraAsset.dll for interoperability: there is no lower bound on the step here.
-fn refine_step(position: f32, fpu: Fpu) -> Result<usize, i32> {
+fn refine_step(position: f32, fpu: Fpu) -> RefineStep {
     if position >= LAST_POSITION {
-        Ok(STEP_COUNT - 1)
+        return RefineStep::InPalette(STEP_COUNT - 1);
+    }
+    let step = (fpu.load(position) + ROUNDING).store() as i32;
+    if step < 0 {
+        RefineStep::BeforePalette(step)
     } else {
-        let step = (fpu.load(position) + ROUNDING).store() as i32;
-        usize::try_from(step).map_err(|_| step)
+        RefineStep::InPalette(step as usize)
     }
 }
 
