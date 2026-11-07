@@ -143,9 +143,10 @@ How reproducible each depth is:
 - **Steps -1 and -3** read only the optimizer's own state and fixed constants. They are fully
   reproducible, and the port reproduces them (`bc3_encode/color/underrun.rs`).
 - **Steps -2, -4 and -5** each read one slot that this function never writes. It holds
-  residue from whatever code used that stack memory before, so the DLL's result depends on its
-  caller and on earlier calls. Nobody can reproduce that from the pixels alone. The port reads
-  those slots as 0 and reproduces the rest of each entry.
+  residue from whatever code used that stack memory before: a probe found it constant within one
+  `ConvertImageToAsset` call but different from one process to the next. Nobody can reproduce
+  that from the pixels alone. The port reads those slots as 0 and reproduces the rest of each
+  entry.
 - **Step -6** also reads the previous point's difference, which for the first point of a call
   is residue too.
 - **Step -7 and below** read the table pointers. The DLL is built with `DYNAMIC_BASE`, so their
@@ -166,8 +167,9 @@ Evidence:
   All 256 blocks match the DLL. They are not committed as fixtures, because step -4 depends
   on residue.
 - **A residue-dependent block:** the review's example block (all alpha 255, reaching -1, -3
-  and -5) does not match. The DLL's colour half is `80ca56a257155555`; with the slot at
-  `[ebp-0x30]` read as 0 the port gives `fdc1c452084ab2a2`.
+  and -5) gives a colour half that changes from one DLL process to the next (`80ca56a257155555`
+  in one of them). With the slot at `[ebp-0x30]` read as 0 the port gives `fdc1c452084ab2a2`,
+  which the final review's probe saw as one of the DLL's variants.
 
 ### Checking a block against the DLL
 

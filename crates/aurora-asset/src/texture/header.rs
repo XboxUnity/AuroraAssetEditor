@@ -76,7 +76,8 @@ mod field {
     pub const NUM_FORMAT: BitField = BitField::new(0, 1);
     pub const SIGN: BitField = BitField::new(2, 8);
 
-    /// The low bits of the first dword that select the resource type; any other value crashes the DLL.
+    /// The low bits of the first dword that select the resource type; flipping any one of them
+    /// crashed the DLL.
     pub const COMMON_TYPE: BitField = BitField::new(0, 4);
     /// FETCH_3 bit 31: when set the DLL decodes a texture two pixels wider and taller.
     pub const BORDER_SIZE: BitField = BitField::new(31, 1);
