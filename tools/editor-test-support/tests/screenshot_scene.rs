@@ -1,3 +1,4 @@
+use std::path::{MAIN_SEPARATOR, Path};
 use std::thread;
 
 use aurora_asset::AssetSlot;
@@ -5,11 +6,12 @@ use aurora_asset_editor::app::{CurrentGame, Menu, Page};
 use aurora_asset_editor::jobs::{Job, OnlineJob};
 use aurora_asset_editor::settings::ThemeChoice;
 use aurora_console::{GameIds, HexId};
+use aurora_ui::ConsoleModel;
 use editor_test_support::{AppHarness, HeadlessUi, Scene, ScreenTextProblem, check_screen_text};
 use i_slint_backend_testing::ElementHandle;
 use image::{Rgba, RgbaImage};
-use slint::LogicalPosition;
 use slint::platform::WindowEvent;
+use slint::{ComponentHandle, LogicalPosition};
 
 const DARK_BAR: Rgba<u8> = Rgba([0x24, 0x27, 0x2e, 0xff]);
 const LIGHT_BAR: Rgba<u8> = Rgba([0xff, 0xff, 0xff, 0xff]);
@@ -17,8 +19,22 @@ const TOP_BAR_PROBE: (u32, u32) = (500, 14);
 const HALO_3: &str = "Halo 3";
 const HALO_3_TITLE_ID: &str = "4D5307E6";
 const NON_LATIN_TITLE: &str = "ポケモン";
-const SHELL_MENUS: [Menu; 4] = [Menu::Open, Menu::Save, Menu::Game, Menu::Gear];
-const CONSOLE_MENUS: [Menu; 3] = [Menu::Download, Menu::Upload, Menu::Remove];
+/// A space Inter has no glyph for.
+const IDEOGRAPHIC_SPACE: char = '\u{3000}';
+/// Each top bar menu with the label of one of its rows.
+const SHELL_MENUS: [(Menu, &str); 4] = [
+    (Menu::Open, "Open asset files…"),
+    (Menu::Save, "Save all to console…"),
+    (Menu::Game, "Copy TitleID 4D5307E6"),
+    (Menu::Gear, "About"),
+];
+/// Each Console page menu with the button it opens above; they share their rows.
+const CONSOLE_MENUS: [(Menu, &str); 3] = [
+    (Menu::Download, "ConsolePage::download-button"),
+    (Menu::Upload, "ConsolePage::upload-button"),
+    (Menu::Remove, "ConsolePage::remove-button"),
+];
+const CONSOLE_MENU_ROW: &str = "All";
 
 fn game_titled(title: &str) -> CurrentGame {
     CurrentGame {
@@ -57,6 +73,23 @@ fn hover_about_row(scene: &Scene) {
     scene.dispatch(WindowEvent::PointerMoved {
         position: LogicalPosition::new(origin.x + size.width / 2.0, origin.y + size.height / 2.0),
     });
+}
+
+fn workspace_folder() -> &'static Path {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .ancestors()
+        .nth(2)
+        .expect("editor-test-support sits two folders below the workspace root")
+}
+
+fn assert_folder_rejected(folder: &Path, name: &str) {
+    let path = folder.display().to_string();
+    let scene = scene_with_game(&path);
+
+    let problem = screen_text_problem(&scene);
+
+    assert_names(&problem, name);
+    assert_names(&problem, path.trim_end_matches(MAIN_SEPARATOR));
 }
 
 fn screen_text_problem(scene: &Scene) -> ScreenTextProblem {
@@ -150,18 +183,39 @@ fn capture_parks_the_pointer() {
 #[test]
 fn screen_text_check_accepts_the_ui_copy() {
     let scene = scene_with_game(HALO_3);
-    for (page, menus) in [
-        (Page::Cover, &SHELL_MENUS[..]),
-        (Page::Console, &CONSOLE_MENUS[..]),
-    ] {
-        scene.act(|app| app.show_page(page));
-        for menu in menus {
-            scene.act(|app| app.toggle_menu(Some(*menu)));
-            if let Err(problem) = check_screen_text(scene.window()) {
-                panic!("{menu:?} menu: {problem}");
-            }
-            scene.act(|app| app.toggle_menu(None));
-        }
+    for (menu, row_label) in SHELL_MENUS {
+        scene.act(|app| app.toggle_menu(Some(menu)));
+        assert_menu_copy_accepted(&scene, menu, row_label);
+        scene.act(|app| app.toggle_menu(None));
+    }
+
+    scene.act(|app| app.show_page(Page::Console));
+    for (menu, button_id) in CONSOLE_MENUS {
+        scene.act(|app| app.toggle_menu(Some(menu)));
+        open_above(&scene, button_id);
+        assert_menu_copy_accepted(&scene, menu, CONSOLE_MENU_ROW);
+        scene.act(|app| app.toggle_menu(None));
+    }
+}
+
+/// Places the open Console menu above its button, as the button's click does; the buttons need a
+/// connected console with a selected game, whose address would fail the check.
+fn open_above(scene: &Scene, button_id: &str) {
+    let anchor = scene.element(button_id).absolute_position();
+    let console = scene.window().global::<ConsoleModel>();
+    console.set_menu_anchor_x(anchor.x);
+    console.set_menu_anchor_y(anchor.y);
+}
+
+fn assert_menu_copy_accepted(scene: &Scene, menu: Menu, row_label: &str) {
+    assert!(
+        ElementHandle::find_by_accessible_label(scene.window(), row_label)
+            .next()
+            .is_some(),
+        "the {menu:?} menu shows its \"{row_label}\" row"
+    );
+    if let Err(problem) = check_screen_text(scene.window()) {
+        panic!("{menu:?} menu: {problem}");
     }
 }
 
@@ -186,16 +240,27 @@ fn screen_text_check_rejects_an_os_error_text() {
 
 #[test]
 fn screen_text_check_rejects_a_temp_path() {
-    let temp_folder = std::env::temp_dir().display().to_string();
-    let scene = scene_with_game(&temp_folder);
+    assert_folder_rejected(&std::env::temp_dir(), "temp folder");
+}
 
-    let problem = screen_text_problem(&scene);
+#[cfg(windows)]
+#[test]
+fn screen_text_check_rejects_an_upper_cased_temp_path_on_windows() {
+    let upper_cased = std::env::temp_dir().display().to_string().to_uppercase();
+    let scene = scene_with_game(&upper_cased);
 
-    assert_names(&problem, "temp folder");
-    assert_names(
-        &problem,
-        temp_folder.trim_end_matches(std::path::MAIN_SEPARATOR),
-    );
+    assert_names(&screen_text_problem(&scene), "temp folder");
+}
+
+#[test]
+fn screen_text_check_rejects_the_workspace_path() {
+    assert_folder_rejected(workspace_folder(), "workspace folder");
+}
+
+#[test]
+fn screen_text_check_rejects_the_home_path() {
+    let home = std::env::home_dir().expect("the test machine has a home folder");
+    assert_folder_rejected(&home, "home folder");
 }
 
 #[test]
@@ -208,6 +273,16 @@ fn screen_text_check_rejects_a_glyph_missing_from_inter() {
     for character in NON_LATIN_TITLE.chars() {
         assert_names(&problem, &format!("{character:?}"));
     }
+}
+
+#[test]
+fn screen_text_check_rejects_a_space_missing_from_inter() {
+    let scene = scene_with_game(&format!("Halo{IDEOGRAPHIC_SPACE}3"));
+
+    assert_names(
+        &screen_text_problem(&scene),
+        &format!("{IDEOGRAPHIC_SPACE:?}"),
+    );
 }
 
 #[test]

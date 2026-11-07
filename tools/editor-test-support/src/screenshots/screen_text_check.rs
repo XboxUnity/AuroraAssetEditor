@@ -1,5 +1,5 @@
 use std::fmt;
-use std::path::MAIN_SEPARATOR;
+use std::path::{MAIN_SEPARATOR, Path};
 use std::sync::OnceLock;
 
 use aurora_ui::MainWindow;
@@ -14,6 +14,9 @@ const INTER_FONTS: [&[u8]; 2] = [
     include_bytes!("../../../../crates/aurora-ui/ui/fonts/Inter-Regular.ttf"),
     include_bytes!("../../../../crates/aurora-ui/ui/fonts/Inter-SemiBold.ttf"),
 ];
+/// Without element debug info the walk finds no elements, and a check that sees nothing must not pass.
+const NO_SCREEN_TEXT: &str =
+    "the screen has no text to check: element debug info is missing; run in the debug profile";
 
 /// Texts on a screen that would make its capture differ on another machine.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -36,19 +39,68 @@ impl fmt::Display for ScreenTextProblem {
 
 impl std::error::Error for ScreenTextProblem {}
 
+/// A folder whose path differs between machines, so no screen may show it.
+struct MachineFolder {
+    name: &'static str,
+    /// Without its trailing separator, so a text naming the folder itself matches too.
+    path: String,
+}
+
+impl MachineFolder {
+    fn new(name: &'static str, path: &Path) -> MachineFolder {
+        let path = path.display().to_string();
+        let path = match path.strip_suffix(MAIN_SEPARATOR) {
+            Some(trimmed) if !trimmed.is_empty() => trimmed.to_owned(),
+            _ => path,
+        };
+        MachineFolder { name, path }
+    }
+
+    /// The temp folder, the workspace the tests were built in, and the home folder.
+    fn all() -> Vec<MachineFolder> {
+        let workspace = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .ancestors()
+            .nth(2)
+            .expect("editor-test-support sits two folders below the workspace root");
+        let mut folders = vec![
+            MachineFolder::new("temp folder", &std::env::temp_dir()),
+            MachineFolder::new("workspace folder", workspace),
+        ];
+        if let Some(home) = std::env::home_dir() {
+            folders.push(MachineFolder::new("home folder", &home));
+        }
+        folders
+    }
+
+    /// Windows paths are case-insensitive, so the app may show the folder in another case.
+    fn is_in(&self, text: &str) -> bool {
+        if cfg!(windows) {
+            text.to_lowercase().contains(&self.path.to_lowercase())
+        } else {
+            text.contains(&self.path)
+        }
+    }
+}
+
 /// Checks every text of the window's elements (accessible label, value, placeholder and description) for
-/// machine-specific content: a forbidden text, the temp folder, or a character the bundled Inter lacks.
+/// machine-specific content: a forbidden text, a machine folder, or a character the bundled Inter lacks.
 pub fn check_screen_text(window: &MainWindow) -> Result<(), ScreenTextProblem> {
-    let temp_folder = temp_folder_text();
-    let problems: Vec<String> = screen_texts(window)
-        .iter()
-        .flat_map(|text| problems_in(text, &temp_folder))
-        .collect();
+    let problems = problems_on_screen(&screen_texts(window), &MachineFolder::all());
     if problems.is_empty() {
         Ok(())
     } else {
         Err(ScreenTextProblem { problems })
     }
+}
+
+fn problems_on_screen(texts: &[String], folders: &[MachineFolder]) -> Vec<String> {
+    if texts.is_empty() {
+        return vec![NO_SCREEN_TEXT.to_owned()];
+    }
+    texts
+        .iter()
+        .flat_map(|text| problems_in(text, folders))
+        .collect()
 }
 
 /// Every distinct non-empty text of the window, in tree order.
@@ -76,15 +128,16 @@ fn element_texts(element: &ElementHandle) -> impl Iterator<Item = String> {
     .map(|text| text.to_string())
 }
 
-fn problems_in(text: &str, temp_folder: &str) -> Vec<String> {
+fn problems_in(text: &str, folders: &[MachineFolder]) -> Vec<String> {
     let mut problems: Vec<String> = FORBIDDEN_SCREEN_TEXT
         .iter()
         .filter(|forbidden| text.contains(*forbidden))
         .map(|forbidden| format!("\"{text}\" contains \"{forbidden}\""))
         .collect();
-    if contains_folder(text, temp_folder) {
+    for folder in folders.iter().filter(|folder| folder.is_in(text)) {
         problems.push(format!(
-            "\"{text}\" contains the temp folder \"{temp_folder}\""
+            "\"{text}\" contains the {} \"{}\"",
+            folder.name, folder.path
         ));
     }
     let missing = chars_missing_from_inter(text);
@@ -96,34 +149,16 @@ fn problems_in(text: &str, temp_folder: &str) -> Vec<String> {
     problems
 }
 
-/// The temp folder without its trailing separator, so a text naming the folder itself matches too.
-fn temp_folder_text() -> String {
-    let folder = std::env::temp_dir().display().to_string();
-    match folder.strip_suffix(MAIN_SEPARATOR) {
-        Some(trimmed) if !trimmed.is_empty() => trimmed.to_owned(),
-        _ => folder,
-    }
-}
-
-/// Windows paths are case-insensitive, so the app may show the folder in another case.
-fn contains_folder(text: &str, folder: &str) -> bool {
-    if cfg!(windows) {
-        text.to_lowercase().contains(&folder.to_lowercase())
-    } else {
-        text.contains(folder)
-    }
-}
-
-/// The visible characters of `text` that are missing from either Inter face, each named once.
+/// The characters of `text` that are missing from either Inter face, each named once. Control characters
+/// (tab, newline) are layout, not glyphs; every other character, unusual spaces included, needs a glyph.
 fn chars_missing_from_inter(text: &str) -> Vec<char> {
     let faces = inter_faces();
     let mut missing = Vec::new();
     for character in text.chars() {
-        let drawn = !character.is_whitespace() && !character.is_control();
         let in_both_faces = faces
             .iter()
             .all(|face| face.glyph_index(character).is_some());
-        if drawn && !in_both_faces && !missing.contains(&character) {
+        if !character.is_control() && !in_both_faces && !missing.contains(&character) {
             missing.push(character);
         }
     }
@@ -135,4 +170,19 @@ fn inter_faces() -> &'static [Face<'static>; 2] {
     FACES.get_or_init(|| {
         INTER_FONTS.map(|font| Face::parse(font, 0).expect("the bundled Inter fonts parse"))
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_screen_without_text_fails_the_check() {
+        assert_eq!(problems_on_screen(&[], &[]), vec![NO_SCREEN_TEXT]);
+    }
+
+    #[test]
+    fn inter_has_a_plain_space() {
+        assert!(chars_missing_from_inter("Halo 3").is_empty());
+    }
 }
