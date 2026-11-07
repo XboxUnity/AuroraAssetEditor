@@ -327,6 +327,11 @@ fn dll_decode(
         report.trim(),
         buffer.len()
     );
+    ensure!(
+        reported_len <= buffer.len(),
+        "{name}: the DLL reports {reported_len} bytes but writes {}",
+        buffer.len()
+    );
     Ok(Some(DllDecode {
         buffer,
         reported_len,
