@@ -1,11 +1,11 @@
 Third-party software in Aurora Asset Editor
 ============================================
 
-MIT License (356 crates)
+MIT License (366 crates)
 Unicode License v3 (26 crates)
 ISC License (24 crates)
 Apache License 2.0 (13 crates)
-The Unlicense (7 crates)
+The Unlicense (8 crates)
 BSD 3-Clause "New" or "Revised" License (5 crates)
 zlib License (3 crates)
 Boost Software License 1.0 (2 crates)
@@ -2494,6 +2494,7 @@ MIT License
 Used by:
   cfg-if 1.0.5 (https://github.com/rust-lang/cfg-if)
   scoped-tls 1.0.1 (https://github.com/alexcrichton/scoped-tls)
+  socket2 0.6.5 (https://github.com/rust-lang/socket2)
 
 Copyright (c) 2014 Alex Crichton
 
@@ -4815,8 +4816,11 @@ MIT License
 
 Used by:
   zbus 5.19.0 (https://github.com/z-galaxy/zbus/)
+  zbus 6.2.1 (https://github.com/z-galaxy/zbus/)
   zbus_macros 5.19.0 (https://github.com/z-galaxy/zbus/)
+  zbus_macros 6.2.1 (https://github.com/z-galaxy/zbus/)
   zbus_names 4.3.5 (https://github.com/z-galaxy/zbus/)
+  zbus_utils 6.1.0 (https://github.com/z-galaxy/zbus/)
   zbus_xml 5.2.1 (https://github.com/z-galaxy/zbus/)
   zvariant 5.15.1 (https://github.com/z-galaxy/zbus/)
   zvariant_derive 5.15.1 (https://github.com/z-galaxy/zbus/)
@@ -4879,6 +4883,45 @@ CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
 IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
+
+
+--------------------------------------------------------------------------------
+MIT License
+
+Used by:
+  zruntime 0.2.2 (https://github.com/z-galaxy/zruntime)
+
+Copyright (c) 2026 Zeeshan Ali Khan & zruntime contributors
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+
+The broadcast channel (`src/broadcast.rs`), its tests (`src/tests/broadcast.rs`) and its
+benchmark (`benches/broadcast.rs`) come from the async-broadcast crate
+(https://github.com/smol-rs/async-broadcast), under the license above and this notice:
+
+Copyright (c) 2020 Yoshua Wuyts, Stjepan Glavina & Zeeshan Ali Khan
 
 
 --------------------------------------------------------------------------------
@@ -5705,6 +5748,36 @@ SOFTWARE.
 MIT License
 
 Used by:
+  ashpd 0.14.0 (https://github.com/bilelmoussaoui/ashpd)
+  rfd 0.18.0 (https://github.com/PolyMeilex/rfd)
+
+MIT License
+
+Copyright (c) 2020 Bilal Elmoussaoui
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+--------------------------------------------------------------------------------
+MIT License
+
+Used by:
   xcursor 0.3.11 (https://github.com/esposm03/xcursor-rs)
 
 MIT License
@@ -5763,6 +5836,7 @@ SOFTWARE.
 MIT License
 
 Used by:
+  rfd 0.18.0 (https://github.com/PolyMeilex/rfd)
   sctk-adwaita 0.10.1 (https://github.com/PolyMeilex/sctk-adwaita)
 
 MIT License
@@ -5946,6 +6020,7 @@ Used by:
   block2 0.5.1 (https://github.com/madsmtm/objc2)
   block2 0.6.2 (https://github.com/madsmtm/objc2)
   chrono 0.4.45 (https://github.com/chronotope/chrono)
+  dispatch2 0.3.1 (https://github.com/madsmtm/objc2)
   dispatch 0.2.0 (http://github.com/SSheldon/rust-dispatch)
   dpi 0.1.2 (https://github.com/rust-windowing/winit)
   lazy-regex-proc_macros 3.6.2 (https://github.com/Canop/lazy-regex/tree/main/src/proc_macros)
@@ -5964,6 +6039,7 @@ Used by:
   objc2-foundation 0.2.2 (https://github.com/madsmtm/objc2)
   objc2-foundation 0.3.2 (https://github.com/madsmtm/objc2)
   objc2-quartz-core 0.3.2 (https://github.com/madsmtm/objc2)
+  objc2-uniform-type-identifiers 0.3.2 (https://github.com/madsmtm/objc2)
   objc2 0.5.3 (https://github.com/madsmtm/objc2)
   objc2 0.6.5 (https://github.com/madsmtm/objc2)
   suppaftp 12.2.1 (https://github.com/veeso/suppaftp)
@@ -7720,6 +7796,7 @@ Used by:
   aurora-asset 0.1.0
   aurora-asset-editor 2.0.0
   aurora-console 0.1.0
+  aurora-file-dialogs 0.1.0
   aurora-image 0.1.0
   aurora-online 0.1.0
   aurora-ui 0.1.0
