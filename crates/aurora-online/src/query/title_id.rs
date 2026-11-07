@@ -2,6 +2,7 @@ use std::fmt;
 
 const TITLE_ID_DIGITS: usize = 8;
 const HEX_RADIX: u32 = 16;
+const HEX_DIGIT_BITS: u32 = 4;
 
 /// Not `HexId`: the old app's `uint.TryParse(.., HexNumber)` accepts surrounding whitespace and
 /// leading zeros beyond eight digits, where `HexId` wants exactly eight digits.
@@ -40,7 +41,7 @@ impl TitleId {
     }
 
     pub fn parse(text: &str) -> Result<TitleId, QueryError> {
-        let trimmed = text.trim();
+        let trimmed = trim_like_dotnet(text);
         if trimmed.is_empty() {
             return Err(QueryError::Empty);
         }
@@ -58,12 +59,22 @@ impl TitleId {
         let value = if significant.is_empty() {
             0
         } else {
-            u32::from_str_radix(significant, HEX_RADIX).map_err(|_| QueryError::TooLong {
-                len: trimmed.chars().count(),
-            })?
+            // At most eight hex digits remain, so the value fits in a u32.
+            significant
+                .chars()
+                .filter_map(|digit| digit.to_digit(HEX_RADIX))
+                .fold(0, |value, digit| (value << HEX_DIGIT_BITS) | digit)
         };
         Ok(TitleId(value))
     }
+}
+
+/// `NumberStyles.HexNumber` allows white space (U+0009 to U+000D, U+0020) at both ends and
+/// trailing NUL characters; `str::trim` would also strip other Unicode white space.
+fn trim_like_dotnet(text: &str) -> &str {
+    let is_white_space = |c: char| matches!(c, '\u{9}'..='\u{D}' | ' ');
+    text.trim_start_matches(is_white_space)
+        .trim_end_matches(|c: char| is_white_space(c) || c == '\0')
 }
 
 impl fmt::Display for TitleId {
@@ -102,6 +113,13 @@ mod tests {
                 text: "0x12".to_string()
             })
         );
+    }
+
+    #[test]
+    fn trims_like_dotnet() {
+        assert_eq!(parsed("\t\n1F\r "), Ok("0000001F".to_string()));
+        assert_eq!(parsed("1F\0"), Ok("0000001F".to_string()));
+        assert!(matches!(parsed("\u{A0}1F"), Err(QueryError::NotHex { .. })));
     }
 
     #[test]

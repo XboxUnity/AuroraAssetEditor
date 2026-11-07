@@ -18,7 +18,10 @@ pub(crate) fn xboxunity_search_url(base: &str, query: &CoverQuery) -> String {
 
 pub(crate) fn parse_xboxunity_covers(json: &[u8]) -> Result<Vec<CoverResult>, serde_json::Error> {
     let covers: Vec<XboxUnityCover> = serde_json::from_slice(json)?;
-    Ok(covers.into_iter().map(CoverResult::from).collect())
+    Ok(covers
+        .into_iter()
+        .filter_map(CoverResult::from_entry)
+        .collect())
 }
 
 /// The service sends the rating as a string; a number is accepted too.
@@ -44,12 +47,22 @@ struct XboxUnityCover {
     #[serde(default)]
     official: bool,
     rating: Option<Rating>,
-    url: String,
+    url: Option<String>,
     thumbnail: Option<String>,
+    titleid: Option<String>,
 }
 
-impl From<XboxUnityCover> for CoverResult {
-    fn from(cover: XboxUnityCover) -> Self {
+impl CoverResult {
+    /// An entry without a `url` cannot be downloaded, so it is left out of the results.
+    fn from_entry(cover: XboxUnityCover) -> Option<CoverResult> {
+        let Some(image_url) = cover.url else {
+            log::warn!(
+                "skipping an XboxUnity cover without a url (title {}, name {})",
+                cover.titleid.as_deref().unwrap_or("unknown"),
+                cover.name.as_deref().unwrap_or("unknown")
+            );
+            return None;
+        };
         let kind = if cover.official {
             "Official cover"
         } else {
@@ -59,11 +72,11 @@ impl From<XboxUnityCover> for CoverResult {
         let rating = cover
             .rating
             .map_or_else(|| NO_RATING.to_string(), |rating| rating.to_string());
-        CoverResult {
+        Some(CoverResult {
             label: format!("{kind} for {name} Rating: {rating}"),
-            image_url: cover.url,
+            image_url,
             thumbnail_url: cover.thumbnail,
-        }
+        })
     }
 }
 
@@ -124,7 +137,13 @@ mod tests {
     fn parses_recorded_keyword_search_and_unknown_title() {
         let keyword_json = recorded("xboxunity_keywords_halo_3.json");
         let covers = parse_xboxunity_covers(&keyword_json).expect("the recording parses");
-        assert!(!covers.is_empty());
+        let recorded_count = serde_json::from_slice::<serde_json::Value>(&keyword_json)
+            .expect("the recording is JSON")
+            .as_array()
+            .expect("the recording is an array")
+            .len();
+        assert_eq!(covers.len(), recorded_count);
+        assert_eq!(recorded_count, 59);
 
         let unknown = parse_xboxunity_covers(&recorded("xboxunity_title_FFFFFFFF.json"))
             .expect("the recording parses");
@@ -146,6 +165,26 @@ mod tests {
     #[test]
     fn invalid_xboxunity_json_is_error() {
         assert!(parse_xboxunity_covers(b"<html>").is_err());
-        assert!(parse_xboxunity_covers(br#"[{"name":"x"}]"#).is_err());
+        assert!(parse_xboxunity_covers(br#"{"name":"x"}"#).is_err());
+    }
+
+    #[test]
+    fn entries_without_url_are_skipped() {
+        let json = recorded("xboxunity_title_4D5307E6.json");
+        let recorded_count = serde_json::from_slice::<serde_json::Value>(&json)
+            .expect("the recording is JSON")
+            .as_array()
+            .expect("the recording is an array")
+            .len();
+        let mut entries: Vec<serde_json::Value> =
+            serde_json::from_slice(&json).expect("the recording is a JSON array");
+        entries.insert(1, serde_json::json!({"titleid":"4D5307E6","name":"No url"}));
+        entries.push(serde_json::json!({"name":"Null url","url":null}));
+        let with_broken_entries = serde_json::to_vec(&entries).expect("entries serialise");
+
+        let covers = parse_xboxunity_covers(&with_broken_entries).expect("the rest still parses");
+
+        assert_eq!(covers.len(), recorded_count);
+        assert_eq!(covers[1].label, "Cover for Halo 3 Rating: 4");
     }
 }

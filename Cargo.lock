@@ -65,6 +65,7 @@ name = "aurora-online"
 version = "0.1.0"
 dependencies = [
  "fastrand",
+ "log",
  "regex",
  "serde",
  "serde_json",
