@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::fmt;
+use std::ops::ControlFlow;
 use std::time::Duration;
 
 use aurora_asset::{
@@ -7,7 +8,7 @@ use aurora_asset::{
     TextureFormat, TextureHeader, encode,
 };
 use aurora_console::{
-    BulkEntry, BulkError, BulkFailure, BulkOptions, BulkOutcome, BulkReport, BulkSummary,
+    BulkEntry, BulkError, BulkFailure, BulkOptions, BulkOutcome, BulkReport, BulkStop, BulkSummary,
     ConsoleClient, ConsoleError, CoverProvider, FtpSettings, Game, GameIds, HexId, Timeouts,
     run_bulk_covers,
 };
@@ -168,7 +169,10 @@ fn run(
     options: BulkOptions,
 ) -> BulkReport {
     let games: Vec<Game> = titles.iter().map(|title| game(title)).collect();
-    run_bulk_covers(&mut client_for(console), &games, provider, options, |_| {}).unwrap()
+    run_bulk_covers(&mut client_for(console), &games, provider, options, |_| {
+        ControlFlow::Continue(())
+    })
+    .unwrap()
 }
 
 fn retrievals(console: &FakeConsole) -> Vec<String> {
@@ -197,7 +201,7 @@ fn bulk_uploads_cover_when_missing() {
     );
 
     assert!(matches!(only_outcome(&report), BulkOutcome::Uploaded));
-    assert!(report.aborted.is_none());
+    assert!(report.stopped.is_none());
     let uploaded = console.file(&cover_path(FIRST_TITLE)).unwrap();
     let parsed = AssetFile::parse(&uploaded).unwrap();
     let cover = parsed.get(AssetSlot::Cover).unwrap();
@@ -360,7 +364,7 @@ fn bulk_continues_after_game_errors() {
         options(Compression::Dxt),
     );
 
-    assert!(report.aborted.is_none());
+    assert!(report.stopped.is_none());
     let outcomes: Vec<&BulkOutcome> = report.entries.iter().map(|entry| &entry.outcome).collect();
     assert!(matches!(
         outcomes[0],
@@ -412,7 +416,7 @@ fn bulk_checks_connection_first() {
             replace_existing: true,
             compression: Compression::Dxt,
         },
-        |_| {},
+        |_| ControlFlow::Continue(()),
     )
     .unwrap_err();
 
@@ -433,7 +437,7 @@ fn bulk_rejects_empty_list() {
         &[],
         &mut provider,
         options(Compression::Dxt),
-        |_| {},
+        |_| ControlFlow::Continue(()),
     )
     .unwrap_err();
 
@@ -462,7 +466,7 @@ fn bulk_stops_when_console_is_gone() {
         only_outcome(&report),
         BulkOutcome::Failed(BulkFailure::Console(_))
     ));
-    assert!(report.aborted.is_some());
+    assert!(matches!(report.stopped, Some(BulkStop::ConsoleGone(_))));
     assert_eq!(provider.calls, [FIRST_TITLE]);
 }
 
@@ -486,7 +490,8 @@ fn bulk_progress_counts_positions() {
                 progress.position,
                 progress.total,
                 progress.game.title_name.clone(),
-            ))
+            ));
+            ControlFlow::Continue(())
         },
     )
     .unwrap();
@@ -517,8 +522,9 @@ fn summary_reads_like_a_sentence() {
         ConsoleError::ContentDbMissing,
     ))));
     let report = BulkReport {
+        total: entries.len(),
         entries,
-        aborted: None,
+        stopped: None,
     };
 
     let summary: BulkSummary = report.summary();
@@ -528,4 +534,59 @@ fn summary_reads_like_a_sentence() {
         "3 covers uploaded, 2 already had one, 1 unreadable cover skipped, \
          1 without a cover online, 1 failed"
     );
+}
+
+#[test]
+fn bulk_stops_before_the_next_game_when_cancelled() {
+    let console = console_with_games(&[FIRST_TITLE, SECOND_TITLE, THIRD_TITLE]);
+    let mut provider = FakeProvider::new().with_cover(FIRST_TITLE, cover_image());
+    let games = [game(FIRST_TITLE), game(SECOND_TITLE), game(THIRD_TITLE)];
+
+    let report = run_bulk_covers(
+        &mut client_for(&console),
+        &games,
+        &mut provider,
+        options(Compression::Dxt),
+        |progress| {
+            if progress.position == 2 {
+                ControlFlow::Break(())
+            } else {
+                ControlFlow::Continue(())
+            }
+        },
+    )
+    .unwrap();
+
+    assert!(matches!(only_outcome(&report), BulkOutcome::Uploaded));
+    assert!(matches!(report.stopped, Some(BulkStop::Cancelled)));
+    assert_eq!(report.summary().not_handled, 2);
+    assert_eq!(provider.calls, [FIRST_TITLE]);
+    assert!(console.file(&cover_path(FIRST_TITLE)).is_some());
+    assert!(console.file(&cover_path(SECOND_TITLE)).is_none());
+    assert_eq!(
+        report.summary().to_string(),
+        "1 cover uploaded, 0 already had one, 0 unreadable covers skipped, \
+         0 without a cover online, 0 failed, 2 not handled"
+    );
+}
+
+#[test]
+fn bulk_cancelled_at_the_first_game_handles_nothing() {
+    let console = console_with_games(&[FIRST_TITLE, SECOND_TITLE]);
+    let mut provider = FakeProvider::new();
+    let games = [game(FIRST_TITLE), game(SECOND_TITLE)];
+
+    let report = run_bulk_covers(
+        &mut client_for(&console),
+        &games,
+        &mut provider,
+        options(Compression::Dxt),
+        |_| ControlFlow::Break(()),
+    )
+    .unwrap();
+
+    assert!(report.entries.is_empty());
+    assert!(matches!(report.stopped, Some(BulkStop::Cancelled)));
+    assert_eq!(report.summary().not_handled, 2);
+    assert!(provider.calls.is_empty());
 }

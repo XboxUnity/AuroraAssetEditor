@@ -1,6 +1,8 @@
+use std::ops::ControlFlow;
+
 use aurora_asset::{AssetFile, AssetKind, AssetSlot, Compression, encode};
 
-use super::{BulkEntry, BulkError, BulkFailure, BulkOutcome, BulkReport, CoverProvider};
+use super::{BulkEntry, BulkError, BulkFailure, BulkOutcome, BulkReport, BulkStop, CoverProvider};
 use crate::client::{ConsoleClient, ConsoleError};
 use crate::games::Game;
 
@@ -21,14 +23,15 @@ pub struct BulkProgress<'a> {
 }
 
 /// Uploads a random cover to each game that has none, like the old app's bulk download with
-/// "cover art only". A game's error is recorded and the run goes on; it stops only when
-/// reconnecting to the console fails.
+/// "cover art only". A game's error is recorded and the run goes on. It stops when reconnecting
+/// to the console fails, or when `on_progress` returns `Break`, which is checked before a game is
+/// handled so a cover is never half uploaded.
 pub fn run_bulk_covers<P: CoverProvider>(
     client: &mut ConsoleClient,
     games: &[Game],
     provider: &mut P,
     options: BulkOptions,
-    mut on_progress: impl FnMut(BulkProgress<'_>),
+    mut on_progress: impl FnMut(BulkProgress<'_>) -> ControlFlow<()>,
 ) -> Result<BulkReport, BulkError> {
     if games.is_empty() {
         return Err(BulkError::NoGames);
@@ -37,16 +40,21 @@ pub fn run_bulk_covers<P: CoverProvider>(
 
     let mut report = BulkReport {
         entries: Vec::with_capacity(games.len()),
-        aborted: None,
+        total: games.len(),
+        stopped: None,
     };
     for (index, game) in games.iter().enumerate() {
-        on_progress(BulkProgress {
+        let progress = BulkProgress {
             position: index + 1,
             total: games.len(),
             game,
-        });
+        };
+        if on_progress(progress).is_break() {
+            report.stopped = Some(BulkStop::Cancelled);
+            break;
+        }
         if let Err(error) = client.ensure_connected() {
-            report.aborted = Some(error);
+            report.stopped = Some(BulkStop::ConsoleGone(error));
             break;
         }
         let outcome = handle_game(client, game, provider, options);

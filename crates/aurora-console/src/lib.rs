@@ -10,7 +10,7 @@ mod settings;
 
 pub use bulk::{
     BulkEntry, BulkError, BulkFailure, BulkOptions, BulkOutcome, BulkProgress, BulkReport,
-    BulkSummary, CoverProvider, run_bulk_covers,
+    BulkStop, BulkSummary, CoverProvider, run_bulk_covers,
 };
 pub use client::{
     AssetPresence, AuroraRevision, ConsoleClient, ConsoleError, ConsoleStatus, GameListing,
