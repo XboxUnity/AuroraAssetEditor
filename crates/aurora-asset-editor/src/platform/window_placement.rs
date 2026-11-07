@@ -11,7 +11,7 @@ pub fn restore_size(window: &slint::Window, geometry: Option<&WindowGeometry>) {
 }
 
 /// Once the window exists: the saved position, in physical pixels, when it is still on a monitor, then the
-/// maximized state, so a maximized window comes back on the monitor it was on.
+/// maximized state, so a maximized window comes back on the monitor it was on and returns to that position.
 pub fn restore_position(window: &slint::Window, geometry: Option<&WindowGeometry>) {
     let Some(geometry) = geometry else {
         return;
@@ -23,32 +23,21 @@ pub fn restore_position(window: &slint::Window, geometry: Option<&WindowGeometry
     window.set_maximized(geometry.maximized);
 }
 
-/// Where the window is now. A maximized window keeps the saved size, which is the size it returns to. When the
-/// system does not report window positions (Wayland), the saved position is kept.
+/// Where the window is now, by the rule of `WindowGeometry::captured`. When the system does not report window
+/// positions (Wayland), the saved position is kept.
 pub fn capture(window: &slint::Window, saved: Option<&WindowGeometry>) -> WindowGeometry {
     let saved = saved.copied().unwrap_or_default();
-    let maximized = window.is_maximized();
-    let (width, height) = if maximized {
-        (saved.width, saved.height)
-    } else {
-        let size = window.size().to_logical(window.scale_factor());
-        (size.width.round() as u32, size.height.round() as u32)
-    };
-    let (x, y) = match window.with_winit_window(WinitWindow::outer_position) {
-        Some(Ok(position)) => (position.x, position.y),
-        Some(Err(_not_supported)) => (saved.x, saved.y),
+    let size = window.size().to_logical(window.scale_factor());
+    let size = (size.width.round() as u32, size.height.round() as u32);
+    let position = match window.with_winit_window(WinitWindow::outer_position) {
+        Some(Ok(position)) => Some((position.x, position.y)),
+        Some(Err(_not_supported)) => None,
         None => {
             log::error!("The window position could not be read: the window has no winit window");
-            (saved.x, saved.y)
+            None
         }
     };
-    WindowGeometry {
-        x,
-        y,
-        width,
-        height,
-        maximized,
-    }
+    saved.captured(window.is_maximized(), size, position)
 }
 
 fn monitor_rects(window: &WinitWindow) -> Vec<MonitorRect> {

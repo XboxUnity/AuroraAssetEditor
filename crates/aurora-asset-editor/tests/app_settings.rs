@@ -281,23 +281,54 @@ fn too_small_saved_size_uses_minimum() {
 }
 
 #[test]
-fn maximized_window_at_the_invisible_border_offset_is_kept() {
-    let maximized_at = |x, y| WindowGeometry {
-        maximized: true,
-        ..geometry_at(x, y)
+fn a_maximized_window_saves_where_it_returns_to() {
+    let saved = WindowGeometry {
+        x: 300,
+        y: 200,
+        width: 900,
+        height: 600,
+        maximized: false,
     };
 
     assert_eq!(
-        maximized_at(-8, -8).visible_position(&[FIRST_MONITOR]),
-        Some((-8, -8))
+        saved.captured(true, (1920, 1040), Some((-8, -8))),
+        WindowGeometry {
+            maximized: true,
+            ..saved
+        },
+        "the maximized origin and size are not saved"
     );
     assert_eq!(
-        maximized_at(1912, -8).visible_position(&[FIRST_MONITOR, SECOND_MONITOR]),
-        Some((1912, -8))
+        saved.captured(false, (1000, 700), Some((50, 60))),
+        WindowGeometry {
+            x: 50,
+            y: 60,
+            width: 1000,
+            height: 700,
+            maximized: false,
+        }
     );
     assert_eq!(
-        maximized_at(5000, -8).visible_position(&[FIRST_MONITOR, SECOND_MONITOR]),
-        None
+        saved.captured(false, (1000, 700), None),
+        WindowGeometry {
+            width: 1000,
+            height: 700,
+            ..saved
+        },
+        "an unknown position keeps the saved one"
     );
-    assert_eq!(maximized_at(-8, -8).visible_position(&[]), None);
+}
+
+#[test]
+fn a_maximized_window_returns_to_its_saved_position() {
+    let maximized = WindowGeometry {
+        maximized: true,
+        ..geometry_at(2000, 50)
+    };
+
+    assert_eq!(
+        maximized.visible_position(&[FIRST_MONITOR, SECOND_MONITOR]),
+        Some((2000, 50))
+    );
+    assert_eq!(maximized.visible_position(&[FIRST_MONITOR]), None);
 }
