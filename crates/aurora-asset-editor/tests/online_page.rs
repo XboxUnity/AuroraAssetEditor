@@ -393,6 +393,46 @@ fn a_second_search_waits_for_the_first() {
 }
 
 #[test]
+fn downloads_of_a_replaced_search_never_fetch() {
+    let mut routes = two_cover_routes();
+    routes.push(listing_route(
+        SECOND_TITLE,
+        &[cover("Other", "/image/other.png", Some("/thumb/other.png"))],
+    ));
+    routes.push(image_route("/thumb/other.png", 8, 8, 50));
+    let server = server_with(routes);
+    let mut harness = harness_for(&server);
+    search_for(&mut harness, FIRST_TITLE);
+    assert!(harness.run_next_job(), "the first search answers");
+    harness.app().select_result(0);
+    assert_eq!(
+        harness.queued_jobs(),
+        3,
+        "two thumbnails and one image wait"
+    );
+
+    search_for(&mut harness, SECOND_TITLE);
+    harness.run_jobs();
+
+    for stale in ["/thumb/one.png", "/thumb/two.png", "/image/one.png"] {
+        assert_eq!(requests_to(&server, stale), 0, "{stale} is never fetched");
+    }
+    let app = harness.app();
+    let tiles = &app.online().results;
+    assert_eq!(tiles.len(), 1);
+    assert_eq!(tiles[0].result.label, label("Other"));
+    assert!(tile_is_loaded(&tiles[0].thumbnail));
+    assert_eq!(app.status().text, format!("1 result for {SECOND_TITLE}"));
+    assert_eq!(app.status().severity, Severity::Info);
+    drop(app);
+    assert_eq!(
+        harness.error_log_text(),
+        "",
+        "a skipped download is no error"
+    );
+}
+
+#[test]
 fn thumbnails_load_lazily_and_failures_show_on_tile() {
     let server = server_with(vec![
         listing_route(

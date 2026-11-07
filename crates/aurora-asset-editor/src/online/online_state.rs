@@ -1,6 +1,6 @@
 use aurora_online::CoverSource;
 
-use super::{ResultTile, SearchMode};
+use super::{ResultTile, SearchGate, SearchMode};
 
 /// The Online page's state: the search box, and the results of the latest search.
 #[derive(Debug)]
@@ -16,7 +16,7 @@ pub struct OnlineState {
     pub last_query: Option<String>,
     /// The search whose results are current; answers of an earlier search, and the images of its results,
     /// are stale.
-    generation: u64,
+    search_gate: SearchGate,
     /// The source the results came from; the page's source can change afterwards.
     searched_source: CoverSource,
 }
@@ -31,7 +31,7 @@ impl OnlineState {
             results: Vec::new(),
             selected: None,
             last_query: None,
-            generation: 0,
+            search_gate: SearchGate::default(),
             searched_source: CoverSource::XboxUnity,
         }
     }
@@ -50,12 +50,12 @@ impl OnlineState {
 
     /// Empties the grid for a new search and returns its generation.
     pub(crate) fn start_search(&mut self, query_text: &str) -> u64 {
-        self.generation += 1;
+        let generation = self.search_gate.start_search();
         self.results.clear();
         self.selected = None;
         self.last_query = Some(query_text.to_owned());
         self.searched_source = self.source;
-        self.generation
+        generation
     }
 
     pub fn searched_source(&self) -> CoverSource {
@@ -63,11 +63,15 @@ impl OnlineState {
     }
 
     pub(crate) fn is_current(&self, generation: u64) -> bool {
-        generation == self.generation
+        !self.search_gate.is_superseded(generation)
     }
 
     pub(crate) fn generation(&self) -> u64 {
-        self.generation
+        self.search_gate.current()
+    }
+
+    pub(crate) fn search_gate(&self) -> &SearchGate {
+        &self.search_gate
     }
 }
 

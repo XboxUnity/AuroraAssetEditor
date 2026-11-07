@@ -115,6 +115,7 @@ impl App {
             generation: self.online.generation(),
             index,
             url,
+            gate: self.online.search_gate().clone(),
         };
         self.submit_download(job, JobPriority::User);
     }
@@ -187,6 +188,9 @@ impl App {
                 index,
                 result,
             } => self.apply_full(generation, index, result),
+            OnlineOutcome::DownloadSkipped { generation } => {
+                self.apply_skipped_download(generation)
+            }
         }
     }
 
@@ -233,6 +237,7 @@ impl App {
                 generation,
                 index,
                 url: tile.thumbnail_source_url().to_owned(),
+                gate: self.online.search_gate().clone(),
             })
             .collect();
         for job in jobs {
@@ -303,6 +308,14 @@ impl App {
                 let log_failure = self.record_error(&context, &error);
                 self.set_error_status(IMAGE_FAILED_TEXT.to_owned(), log_failure);
             }
+        }
+    }
+
+    /// The worker skips only the downloads of a replaced search, so a skip of the current one is a bug.
+    fn apply_skipped_download(&mut self, generation: u64) {
+        self.finish_download();
+        if self.online.is_current(generation) {
+            log::error!("A download of the current search {generation} was skipped as stale");
         }
     }
 

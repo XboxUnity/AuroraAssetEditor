@@ -5,6 +5,8 @@ use aurora_asset::RgbaImage;
 use aurora_image::{ImportError, decode_image};
 use aurora_online::{CoverQuery, CoverResult, CoverSource, OnlineClient, OnlineError};
 
+use crate::online::SearchGate;
+
 /// A request to XboxUnity or the Internet Archive.
 #[derive(Debug)]
 pub enum OnlineJob {
@@ -13,17 +15,19 @@ pub enum OnlineJob {
         source: CoverSource,
         query: CoverQuery,
     },
-    /// Fetches the image shown on a result's tile.
+    /// Fetches the image shown on a result's tile, unless `gate` says a newer search replaced its own.
     Thumbnail {
         generation: u64,
         index: usize,
         url: String,
+        gate: SearchGate,
     },
-    /// Fetches the image of the selected result.
+    /// Fetches the image of the selected result, unless `gate` says a newer search replaced its own.
     Full {
         generation: u64,
         index: usize,
         url: String,
+        gate: SearchGate,
     },
 }
 
@@ -44,6 +48,8 @@ pub enum OnlineOutcome {
         index: usize,
         result: Result<FetchedImage, FetchError>,
     },
+    /// A thumbnail or full image of a replaced search; nothing was fetched.
+    DownloadSkipped { generation: u64 },
 }
 
 /// A downloaded image: decoded for display, with the file it came from.
@@ -94,20 +100,32 @@ impl OnlineJob {
                 generation,
                 index,
                 url,
-            } => OnlineOutcome::Thumbnail {
-                generation,
-                index,
-                result: fetch_image(client, &url),
-            },
+                gate,
+            } => {
+                if gate.is_superseded(generation) {
+                    return OnlineOutcome::DownloadSkipped { generation };
+                }
+                OnlineOutcome::Thumbnail {
+                    generation,
+                    index,
+                    result: fetch_image(client, &url),
+                }
+            }
             OnlineJob::Full {
                 generation,
                 index,
                 url,
-            } => OnlineOutcome::Full {
-                generation,
-                index,
-                result: fetch_image(client, &url),
-            },
+                gate,
+            } => {
+                if gate.is_superseded(generation) {
+                    return OnlineOutcome::DownloadSkipped { generation };
+                }
+                OnlineOutcome::Full {
+                    generation,
+                    index,
+                    result: fetch_image(client, &url),
+                }
+            }
         }
     }
 }
