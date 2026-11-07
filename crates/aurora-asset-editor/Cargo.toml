@@ -5,7 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-arboard = { version = "3.7.0", features = ["wayland-data-control"] }
+arboard = { version = "3.7.0", default-features = false, features = ["wayland-data-control"] }
 async-channel = "2.5.0"
 aurora-asset = { path = "../aurora-asset" }
 aurora-console = { path = "../aurora-console" }
