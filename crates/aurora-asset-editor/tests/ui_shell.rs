@@ -14,11 +14,15 @@ use editor_test_support::{AppHarness, HeadlessUi, asset_file_with};
 use i_slint_backend_testing::ElementHandle;
 use image::{Rgba, RgbaImage};
 use slint::ComponentHandle;
-use slint::platform::PointerEventButton;
+use slint::platform::{Key, PointerEventButton, WindowEvent};
 
 const DARK_BAR: Rgba<u8> = Rgba([0x24, 0x27, 0x2e, 0xff]);
 const LIGHT_BAR: Rgba<u8> = Rgba([0xff, 0xff, 0xff, 0xff]);
-const RED_MARGIN: u8 = 64;
+const DARK_ERROR_TEXT: Rgba<u8> = Rgba([0xf8, 0x71, 0x71, 0xff]);
+const LIGHT_ERROR_TEXT: Rgba<u8> = Rgba([0xb9, 0x1c, 0x1c, 0xff]);
+const DARK_STATUS_BACKGROUND: Rgba<u8> = Rgba([0x20, 0x23, 0x29, 0xff]);
+const LIGHT_STATUS_BACKGROUND: Rgba<u8> = Rgba([0xee, 0xf0, 0xf3, 0xff]);
+const COLOUR_TOLERANCE: u8 = 24;
 const TOP_BAR_PROBE: (u32, u32) = (500, 14);
 /// Right of the sidebar, below the top bar and above the status line.
 const BODY_AREA: (u32, u32, u32, u32) = (140, 40, 880, 600);
@@ -92,11 +96,30 @@ fn crop(image: &RgbaImage, (x, y, width, height): (u32, u32, u32, u32)) -> RgbaI
     image::imageops::crop_imm(image, x, y, width, height).to_image()
 }
 
-/// Anti-aliased 11 px glyphs rarely reach the exact text colour, so this looks for clearly red pixels.
-fn has_red_text(image: &RgbaImage) -> bool {
-    image.pixels().any(|Rgba([red, green, blue, _])| {
-        *red > green.saturating_add(RED_MARGIN) && *red > blue.saturating_add(RED_MARGIN)
-    })
+/// The pixel that differs most from the background: the fully covered part of a glyph.
+fn strongest_text_pixel(image: &RgbaImage, background: Rgba<u8>) -> Rgba<u8> {
+    *image
+        .pixels()
+        .max_by_key(|pixel| distance(**pixel, background))
+        .expect("the area has pixels")
+}
+
+fn distance(first: Rgba<u8>, second: Rgba<u8>) -> u32 {
+    first
+        .0
+        .iter()
+        .zip(second.0)
+        .map(|(a, b)| u32::from(a.abs_diff(b)))
+        .sum()
+}
+
+/// Anti-aliased 11 px glyphs do not quite reach the text colour.
+fn near(pixel: Rgba<u8>, expected: Rgba<u8>) -> bool {
+    pixel
+        .0
+        .iter()
+        .zip(expected.0)
+        .all(|(a, b)| a.abs_diff(b) <= COLOUR_TOLERANCE)
 }
 
 fn top_bar_pixel(shell: &Shell) -> Rgba<u8> {
@@ -230,7 +253,6 @@ fn menus_open_from_state_and_act() {
 
     shell.act(|app| app.toggle_menu(Some(Menu::Open)));
     let open = shell.snapshot();
-    keep_snapshot(&open, "shell-dark-open-menu");
     assert_eq!(shell.model().get_open_menu(), MenuId::Open);
     assert_ne!(open, closed);
 
@@ -244,7 +266,6 @@ fn menus_open_from_state_and_act() {
 
     shell.act(|app| app.toggle_menu(Some(Menu::Gear)));
     assert_eq!(shell.model().get_open_menu(), MenuId::Gear);
-    keep_snapshot(&shell.snapshot(), "shell-dark-gear-menu");
 }
 
 #[test]
@@ -375,25 +396,42 @@ fn image_cache_reports_only_changed_revisions() {
 
 #[test]
 fn status_line_shows_errors_in_error_colour() {
-    let mut harness = AppHarness::new();
-    harness.app().set_current_game(Some(halo()));
-    let shell = Shell::start(&mut harness);
-    let status = shell.element("StatusLine::status-text");
-    assert_eq!(status.accessible_label().as_deref(), Some("Ready"));
-    assert!(!has_red_text(&crop(&shell.snapshot(), STATUS_AREA)));
+    for (theme, background, error_text) in [
+        (ThemeChoice::Dark, DARK_STATUS_BACKGROUND, DARK_ERROR_TEXT),
+        (
+            ThemeChoice::Light,
+            LIGHT_STATUS_BACKGROUND,
+            LIGHT_ERROR_TEXT,
+        ),
+    ] {
+        let mut harness = harness_with_theme(theme);
+        harness.app().set_current_game(Some(halo()));
+        let shell = Shell::start(&mut harness);
+        let status = shell.element("StatusLine::status-text");
+        assert_eq!(status.accessible_label().as_deref(), Some("Ready"));
+        let ready = strongest_text_pixel(&crop(&shell.snapshot(), STATUS_AREA), background);
+        assert!(
+            !near(ready, error_text),
+            "{theme:?}: Ready is not drawn in the error colour"
+        );
 
-    harness.clipboard().fail_with("clipboard is gone");
-    shell.act(|app| app.copy_title_id());
+        harness.clipboard().fail_with("clipboard is gone");
+        shell.act(|app| app.copy_title_id());
 
-    let text = status
-        .accessible_label()
-        .expect("the status text has a label");
-    assert!(
-        text.starts_with("Could not copy TitleID 4D5307E6"),
-        "{text}"
-    );
-    assert!(shell.model().get_status_is_error());
-    assert!(has_red_text(&crop(&shell.snapshot(), STATUS_AREA)));
+        let text = status
+            .accessible_label()
+            .expect("the status text has a label");
+        assert!(
+            text.starts_with("Could not copy TitleID 4D5307E6"),
+            "{text}"
+        );
+        assert!(shell.model().get_status_is_error());
+        let error = strongest_text_pixel(&crop(&shell.snapshot(), STATUS_AREA), background);
+        assert!(
+            near(error, error_text),
+            "{theme:?}: {error:?} is the error colour"
+        );
+    }
 }
 
 #[test]
@@ -417,7 +455,6 @@ fn save_to_console_item_shows_reason_when_not_set_up() {
     );
     assert_eq!(row.accessible_description().as_deref(), Some(reason));
     assert_eq!(row.accessible_enabled(), Some(false));
-    keep_snapshot(&shell.snapshot(), "shell-dark-save-menu");
 }
 
 #[test]
@@ -485,4 +522,72 @@ fn system_theme_reads_the_palette_before_the_first_render() {
 
     theme.update(true);
     assert!(theme.dark);
+}
+
+#[test]
+fn shell_sizes_follow_the_mockup() {
+    let mut harness = AppHarness::new();
+    harness.app().set_current_game(Some(halo()));
+    let shell = Shell::start(&mut harness);
+    let height = |id: &str| shell.element(id).size().height;
+
+    assert_eq!(height("MainWindow::top-bar"), 33.0);
+    assert_eq!(height("MainWindow::status-line"), 24.0);
+    assert_eq!(shell.element("MainWindow::side-bar").size().width, 135.0);
+    for row in [
+        "SideBar::cover-item",
+        "SideBar::screenshots-item",
+        "SideBar::console-item",
+    ] {
+        assert_eq!(height(row), 26.0, "{row}");
+    }
+    for pill in [
+        "TopBar::open-button",
+        "TopBar::save-button",
+        "TopBar::game-chip",
+        "TopBar::gear-button",
+    ] {
+        assert_eq!(height(pill), 20.0, "{pill}");
+    }
+}
+
+#[test]
+fn escape_closes_an_open_menu() {
+    let mut harness = AppHarness::new();
+    let shell = Shell::start(&mut harness);
+    shell
+        .element("TopBar::gear-button")
+        .mock_single_click(PointerEventButton::Left);
+    assert_eq!(shell.app.borrow().open_menu(), Some(Menu::Gear));
+
+    let escape = slint::SharedString::from(Key::Escape);
+    let window = shell.view.window().window();
+    window.dispatch_event(WindowEvent::KeyPressed {
+        text: escape.clone(),
+    });
+    window.dispatch_event(WindowEvent::KeyReleased { text: escape });
+
+    assert_eq!(shell.app.borrow().open_menu(), None);
+}
+
+#[test]
+fn every_menu_renders_in_both_themes() {
+    for (theme, name) in [(ThemeChoice::Dark, "dark"), (ThemeChoice::Light, "light")] {
+        let mut harness = harness_with_theme(theme);
+        harness.app().set_current_game(Some(halo()));
+        let shell = Shell::start(&mut harness);
+        let closed = shell.snapshot();
+        for (menu, menu_name) in [
+            (Menu::Open, "open"),
+            (Menu::Save, "save"),
+            (Menu::Game, "game"),
+            (Menu::Gear, "gear"),
+        ] {
+            shell.act(|app| app.toggle_menu(Some(menu)));
+            let open = shell.snapshot();
+            keep_snapshot(&open, &format!("shell-{name}-{menu_name}-menu"));
+            assert_ne!(open, closed, "{name} {menu_name} menu");
+            shell.act(|app| app.toggle_menu(None));
+        }
+    }
 }

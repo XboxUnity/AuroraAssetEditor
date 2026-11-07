@@ -16,10 +16,10 @@ export { MenuAction, MenuId, PageId, ShellModel, Theme, ThemeOption }
 
 export component MainWindow inherits Window {
     title: ShellModel.window-title;
-    preferred-width: 1024px;
-    preferred-height: 680px;
-    min-width: 760px;
-    min-height: 500px;
+    preferred-width: Theme.window-width;
+    preferred-height: Theme.window-height;
+    min-width: Theme.window-min-width;
+    min-height: Theme.window-min-height;
     default-font-family: Theme.font-family;
     default-font-size: Theme.font-size;
     background: Theme.window-background;
@@ -30,13 +30,13 @@ export component MainWindow inherits Window {
         }
         HorizontalLayout {
             vertical-stretch: 1;
-            SideBar { }
+            side-bar := SideBar { }
             PageHost {
                 horizontal-stretch: 1;
             }
         }
 
-        StatusLine {
+        status-line := StatusLine {
             vertical-stretch: 0;
         }
     }
@@ -44,7 +44,7 @@ export component MainWindow inherits Window {
     MenuOverlay {
         width: 100%;
         height: 100%;
-        menu-top: top-bar.height + 2px;
+        menu-top: top-bar.height + Theme.menu-offset;
         open-button-x: top-bar.open-button-x;
         save-button-x: top-bar.save-button-x;
         game-chip-right: top-bar.game-chip-right;

@@ -4,13 +4,12 @@ import { Theme } from "../theme/theme.slint";
 import { SideBarItem } from "side_bar_item.slint";
 
 export component SideBar inherits Rectangle {
-    // The mockup's 118 px content box, 8 px padding on each side and the 1 px border.
-    width: 135px;
+    width: Theme.sidebar-width;
     background: Theme.sidebar-background;
 
     HorizontalLayout {
         VerticalLayout {
-            padding: 8px;
+            padding: Theme.sidebar-padding;
             alignment: start;
             cover-item := SideBarItem {
                 icon: @image-url("../icons/cover.svg");
@@ -46,7 +45,7 @@ export component SideBar inherits Rectangle {
                 }
             }
             Rectangle {
-                height: 10px;
+                height: Theme.sidebar-sources-gap;
             }
             Text {
                 text: "SOURCES";
@@ -72,7 +71,7 @@ export component SideBar inherits Rectangle {
         }
 
         Rectangle {
-            width: 1px;
+            width: Theme.border-width;
             background: Theme.border;
         }
     }

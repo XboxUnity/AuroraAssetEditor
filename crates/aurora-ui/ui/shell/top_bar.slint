@@ -11,15 +11,16 @@ export component TopBar inherits Rectangle {
     out property <length> game-chip-right: game-chip.x + game-chip.width;
     out property <length> gear-button-right: gear-button.x + gear-button.width;
 
+    height: Theme.top-bar-height;
     background: Theme.bar-background;
 
     VerticalLayout {
         HorizontalLayout {
-            padding-top: 6px;
-            padding-bottom: 6px;
-            padding-left: 10px;
-            padding-right: 10px;
-            spacing: 8px;
+            padding-top: Theme.top-bar-padding-y;
+            padding-bottom: Theme.top-bar-padding-y;
+            padding-left: Theme.top-bar-padding-x;
+            padding-right: Theme.top-bar-padding-x;
+            spacing: Theme.top-bar-gap;
             Text {
                 horizontal-stretch: 0;
                 text: "Aurora Asset Editor";
@@ -63,7 +64,7 @@ export component TopBar inherits Rectangle {
         }
 
         Rectangle {
-            height: 1px;
+            height: Theme.border-width;
             background: Theme.border;
         }
     }

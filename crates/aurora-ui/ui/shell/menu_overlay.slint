@@ -5,7 +5,7 @@ import { GearMenu } from "gear_menu.slint";
 import { OpenMenu } from "open_menu.slint";
 import { SaveMenu } from "save_menu.slint";
 
-// Covers the window while a menu is open: a click outside the menu closes it.
+// Covers the window while a menu is open: a click outside the menu or Escape closes it.
 export component MenuOverlay inherits Rectangle {
     in property <length> menu-top;
     in property <length> open-button-x;
@@ -13,9 +13,22 @@ export component MenuOverlay inherits Rectangle {
     in property <length> game-chip-right;
     in property <length> gear-button-right;
 
-    if ShellModel.open-menu != MenuId.none: TouchArea {
-        clicked => {
-            ShellModel.toggle-menu(MenuId.none);
+    if ShellModel.open-menu != MenuId.none: FocusScope {
+        init => {
+            self.focus();
+        }
+        key-pressed(event) => {
+            if event.text == Key.Escape {
+                ShellModel.toggle-menu(MenuId.none);
+                return accept;
+            }
+            reject
+        }
+
+        TouchArea {
+            clicked => {
+                ShellModel.toggle-menu(MenuId.none);
+            }
         }
     }
     if ShellModel.open-menu == MenuId.open: OpenMenu {

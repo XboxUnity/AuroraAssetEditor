@@ -5,7 +5,7 @@ import { Theme } from "../theme/theme.slint";
 // The page area. Until the pages exist, it shows the page's title where the page header goes.
 export component PageHost inherits Rectangle {
     VerticalLayout {
-        padding: 12px;
+        padding: Theme.body-padding;
         alignment: start;
         page-title := Text {
             text: ShellModel.page == PageId.cover ? "Cover"

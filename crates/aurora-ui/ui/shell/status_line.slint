@@ -4,20 +4,19 @@ import { Theme } from "../theme/theme.slint";
 import { BuildPill } from "build_pill.slint";
 
 export component StatusLine inherits Rectangle {
+    height: Theme.status-height;
     background: Theme.status-background;
 
     VerticalLayout {
         Rectangle {
-            height: 1px;
+            height: Theme.border-width;
             background: Theme.border;
         }
 
         HorizontalLayout {
-            padding-top: 4px;
-            padding-bottom: 4px;
-            padding-left: 10px;
-            padding-right: 10px;
-            spacing: 8px;
+            padding-left: Theme.status-padding-x;
+            padding-right: Theme.status-padding-x;
+            spacing: Theme.status-gap;
             if ShellModel.progress-text != "": Text {
                 horizontal-stretch: 0;
                 text: ShellModel.progress-text;

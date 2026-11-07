@@ -7,16 +7,17 @@ export component PillButton inherits Rectangle {
     in property <bool> accent;
     in property <bool> has-chevron;
     in property <bool> enabled: true;
-    // Status line size: caption font, no vertical padding.
+    // Status line size: caption font, the line's height.
     in property <bool> compact;
     callback clicked();
 
     property <color> foreground: accent ? Theme.accent-text : Theme.pill-text;
 
     horizontal-stretch: 0;
-    border-radius: 4px;
+    height: compact ? self.preferred-height : Theme.pill-height;
+    border-radius: Theme.pill-radius;
     background: accent ? Theme.accent : Theme.pill-background;
-    opacity: enabled ? 1 : 0.5;
+    opacity: enabled ? 1 : Theme.disabled-opacity;
     accessible-role: button;
     accessible-label: text;
     accessible-enabled: enabled;
@@ -25,11 +26,9 @@ export component PillButton inherits Rectangle {
     }
 
     HorizontalLayout {
-        padding-top: compact ? 0px : 2px;
-        padding-bottom: compact ? 0px : 2px;
-        padding-left: compact ? 6px : 8px;
-        padding-right: compact ? 6px : 8px;
-        spacing: 4px;
+        padding-left: compact ? Theme.compact-pill-padding-x : Theme.pill-padding-x;
+        padding-right: compact ? Theme.compact-pill-padding-x : Theme.pill-padding-x;
+        spacing: Theme.icon-gap;
         alignment: center;
         if icon.width > 0: Icon {
             y: (parent.height - self.height) / 2;

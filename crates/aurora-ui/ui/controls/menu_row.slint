@@ -12,7 +12,7 @@ export component MenuRow inherits Rectangle {
     in property <bool> enabled: true;
     callback activated();
 
-    border-radius: 4px;
+    border-radius: Theme.menu-row-radius;
     background: touch.has-hover && enabled ? Theme.pill-background : transparent;
     accessible-role: button;
     accessible-label: text;
@@ -27,13 +27,13 @@ export component MenuRow inherits Rectangle {
     }
 
     HorizontalLayout {
-        padding-top: 5px;
-        padding-bottom: 5px;
-        padding-left: 8px;
-        padding-right: 8px;
-        spacing: 6px;
+        padding-top: Theme.menu-row-padding-y;
+        padding-bottom: Theme.menu-row-padding-y;
+        padding-left: Theme.menu-row-padding-x;
+        padding-right: Theme.menu-row-padding-x;
+        spacing: Theme.sidebar-icon-gap;
         if checkable || indented: Rectangle {
-            width: 14px;
+            width: Theme.icon-size;
             if checked: Icon {
                 y: (parent.height - self.height) / 2;
                 source: @image-url("../icons/check.svg");

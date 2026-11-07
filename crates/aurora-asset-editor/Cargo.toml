@@ -39,3 +39,4 @@ editor-test-support = { path = "../../tools/editor-test-support" }
 i-slint-backend-testing = { version = "=1.18.1", features = ["renderer-software"] }
 image = { version = "0.25.10", default-features = false, features = ["png"] }
 test-servers = { path = "../../tools/test-servers" }
+ttf-parser = "0.25.1"
