@@ -186,3 +186,32 @@ fn suppaftp_warnings_stay_visible() {
 
     assert!(read_log(&log).contains("] suppaftp: transfer stream failed\n\n"));
 }
+
+#[test]
+fn suppaftp_cap_holds_when_the_bridge_level_is_raised() {
+    let (_dir, log) = log_in_temp_dir();
+    let bridge = LogBridge::with_max_level(log.clone(), log::LevelFilter::Trace);
+
+    send(
+        &bridge,
+        Level::Trace,
+        SUPPAFTP_TARGET,
+        "CC OUT: PASS xboxftp",
+    );
+    send(&bridge, Level::Debug, "suppaftp::sync_ftp", "CC IN: secret");
+    send(
+        &bridge,
+        Level::Trace,
+        "aurora_online",
+        "other crates still pass",
+    );
+
+    let text = read_log(&log);
+    assert!(!text.contains("PASS"));
+    assert!(!text.contains("secret"));
+    assert!(text.contains(
+        "] aurora_online: other crates still pass
+
+"
+    ));
+}

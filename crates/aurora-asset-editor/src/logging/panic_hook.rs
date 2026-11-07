@@ -1,4 +1,5 @@
 use super::error_log::ErrorLog;
+use super::log_write_failure::report_log_write_failure;
 use std::panic::{self, PanicHookInfo};
 
 const PANIC_CONTEXT: &str = "panic";
@@ -8,7 +9,7 @@ pub fn install_panic_hook(log: ErrorLog) {
     let previous_hook = panic::take_hook();
     panic::set_hook(Box::new(move |info| {
         if let Err(write_error) = log.record_message(PANIC_CONTEXT, &describe_panic(info)) {
-            eprintln!("could not write to {}: {write_error}", log.path().display());
+            report_log_write_failure(&log, &write_error);
         }
         previous_hook(info);
     }));

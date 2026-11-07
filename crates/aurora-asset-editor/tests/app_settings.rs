@@ -119,10 +119,52 @@ fn wrong_typed_known_key_is_malformed() {
 }
 
 #[test]
-fn unknown_theme_name_is_malformed() {
+fn unknown_theme_name_falls_back_to_default() {
     let dir = temp_dir();
     let path = settings_path(&dir);
-    std::fs::write(&path, r#"{"theme": "sepia"}"#).unwrap();
+    std::fs::write(&path, r#"{"theme": "sepia", "auto_resize": false}"#).unwrap();
+
+    let settings = AppSettings::load(&path).unwrap().unwrap();
+
+    assert_eq!(settings.theme, ThemeChoice::System);
+    assert!(!settings.auto_resize);
+}
+
+#[test]
+fn wrong_typed_theme_is_malformed() {
+    let dir = temp_dir();
+    let path = settings_path(&dir);
+    std::fs::write(&path, r#"{"theme": 3}"#).unwrap();
+
+    assert!(matches!(
+        AppSettings::load(&path),
+        Err(AppSettingsError::Malformed { .. })
+    ));
+}
+
+#[test]
+fn missing_window_fields_take_defaults() {
+    let dir = temp_dir();
+    let path = settings_path(&dir);
+    std::fs::write(&path, r#"{"window": {"x": 40, "width": 900}}"#).unwrap();
+
+    let window = AppSettings::load(&path).unwrap().unwrap().window.unwrap();
+
+    assert_eq!(
+        window,
+        WindowGeometry {
+            x: 40,
+            width: 900,
+            ..WindowGeometry::default()
+        }
+    );
+}
+
+#[test]
+fn wrong_typed_window_field_is_malformed() {
+    let dir = temp_dir();
+    let path = settings_path(&dir);
+    std::fs::write(&path, r#"{"window": {"maximized": "yes"}}"#).unwrap();
 
     assert!(matches!(
         AppSettings::load(&path),
@@ -236,4 +278,26 @@ fn too_small_saved_size_uses_minimum() {
 
     assert_eq!(tiny.clamped_size(), (MIN_WIDTH, MIN_HEIGHT));
     assert_eq!(geometry_at(0, 0).clamped_size(), (1024, 680));
+}
+
+#[test]
+fn maximized_window_at_the_invisible_border_offset_is_kept() {
+    let maximized_at = |x, y| WindowGeometry {
+        maximized: true,
+        ..geometry_at(x, y)
+    };
+
+    assert_eq!(
+        maximized_at(-8, -8).visible_position(&[FIRST_MONITOR]),
+        Some((-8, -8))
+    );
+    assert_eq!(
+        maximized_at(1912, -8).visible_position(&[FIRST_MONITOR, SECOND_MONITOR]),
+        Some((1912, -8))
+    );
+    assert_eq!(
+        maximized_at(5000, -8).visible_position(&[FIRST_MONITOR, SECOND_MONITOR]),
+        None
+    );
+    assert_eq!(maximized_at(-8, -8).visible_position(&[]), None);
 }

@@ -1,5 +1,6 @@
 use super::window_geometry::WindowGeometry;
-use serde::{Deserialize, Serialize};
+use serde::de::Error as _;
+use serde::{Deserialize, Deserializer, Serialize};
 use std::fmt;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -26,13 +27,15 @@ impl ThemeChoice {
     }
 }
 
-/// Missing keys take their defaults and unknown keys are ignored, so a file from a newer version still loads.
-/// A known key holding the wrong type makes the file malformed.
+/// Missing keys take their defaults, unknown keys are ignored and an unknown theme name falls back to the
+/// default (with a warning), so a file from a newer version still loads. A known key holding the wrong JSON type
+/// makes the file malformed.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct AppSettings {
     pub auto_resize: bool,
     pub use_compression: bool,
+    #[serde(deserialize_with = "theme_or_default")]
     pub theme: ThemeChoice,
     pub window: Option<WindowGeometry>,
 }
@@ -45,6 +48,22 @@ impl Default for AppSettings {
             theme: ThemeChoice::System,
             window: None,
         }
+    }
+}
+
+fn theme_or_default<'de, D: Deserializer<'de>>(deserializer: D) -> Result<ThemeChoice, D::Error> {
+    let value = serde_json::Value::deserialize(deserializer)?;
+    match &value {
+        serde_json::Value::String(name) => {
+            let known = ThemeChoice::deserialize(value.clone());
+            Ok(known.unwrap_or_else(|_| {
+                log::warn!("settings key \"theme\" has unknown value {name:?}, using the default");
+                ThemeChoice::default()
+            }))
+        }
+        other => Err(D::Error::custom(format!(
+            "key \"theme\" must be a string, found {other}"
+        ))),
     }
 }
 

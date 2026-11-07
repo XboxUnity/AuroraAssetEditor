@@ -1,6 +1,7 @@
 mod error_chain;
 mod error_log;
 mod log_bridge;
+mod log_write_failure;
 mod panic_hook;
 
 pub use error_chain::error_chain;
