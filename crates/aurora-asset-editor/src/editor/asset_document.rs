@@ -62,9 +62,10 @@ impl AssetDocument {
 
     /// Takes over every entry of the page from a loaded file, keeping this file's offsets.
     pub fn replace_with(&mut self, decoded: DecodedKind) {
-        debug_assert_eq!(
+        assert_eq!(
             decoded.kind, self.kind,
-            "decoded page belongs to another document"
+            "a decoded {:?} page was given to the {:?} document",
+            decoded.kind, self.kind
         );
         self.file.replace_kind(self.kind, &decoded.file);
         for slot in self.kind.slots() {
@@ -77,18 +78,19 @@ impl AssetDocument {
     }
 
     pub fn screenshot_count(&self) -> usize {
-        SCREENSHOT_COUNT - self.free_screenshots().len()
+        ScreenshotNumber::ALL
+            .into_iter()
+            .filter(|number| self.file.get(AssetSlot::Screenshot(*number)).is_some())
+            .count()
     }
 
     /// Empty screenshot positions in order; none on a page that holds no screenshots.
     pub fn free_screenshots(&self) -> Vec<ScreenshotNumber> {
+        if self.kind != AssetKind::Screenshots {
+            return Vec::new();
+        }
         ScreenshotNumber::ALL
             .into_iter()
-            .filter(|number| {
-                self.kind
-                    .slots()
-                    .any(|slot| slot == AssetSlot::Screenshot(*number))
-            })
             .filter(|number| self.file.get(AssetSlot::Screenshot(*number)).is_none())
             .collect()
     }
@@ -96,6 +98,8 @@ impl AssetDocument {
     /// Packs the screenshots into positions 1, 2, 3, ... by moving stored bytes and previews.
     pub fn compact_screenshots(&mut self) {
         self.file.compact_screenshots();
+        // A preview is Empty exactly when its slot holds no texture, so sorting the empty ones
+        // last mirrors what `compact_screenshots` did to the entries.
         self.screenshot_previews()
             .sort_by_key(|preview| matches!(preview, SlotPreview::Empty));
         self.bump_all_screenshots();
@@ -136,7 +140,7 @@ impl AssetDocument {
     }
 
     fn assert_owns(&self, slot: AssetSlot) {
-        debug_assert!(
+        assert!(
             self.kind.slots().any(|owned| owned == slot),
             "{slot:?} does not belong to the {:?} page",
             self.kind

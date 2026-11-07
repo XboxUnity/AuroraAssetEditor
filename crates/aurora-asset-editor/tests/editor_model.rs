@@ -322,3 +322,30 @@ fn texture_caption_names_format() {
         "8 x 8 · Unsupported texture format (kept as is)"
     );
 }
+
+#[test]
+fn screenshot_counts_cover_only_the_screenshots_page() {
+    let mut cover = AssetDocument::new(AssetKind::Cover);
+    cover.set_prepared(AssetSlot::Cover, prepared(8, 8, RED));
+    assert_eq!(cover.screenshot_count(), 0);
+    assert!(cover.free_screenshots().is_empty());
+
+    let gaps = screenshot_document(&[(2, RED), (7, GREEN)]);
+    assert_eq!(gaps.screenshot_count(), 2);
+    assert_eq!(gaps.free_screenshots().len(), 18);
+    assert_eq!(gaps.free_screenshots()[0], number(1));
+}
+
+#[test]
+#[should_panic(expected = "does not belong to the Cover page")]
+fn setting_a_slot_of_another_page_panics() {
+    let mut cover = AssetDocument::new(AssetKind::Cover);
+    cover.set_prepared(shot(1), prepared(8, 8, RED));
+}
+
+#[test]
+#[should_panic(expected = "was given to the")]
+fn replacing_with_another_pages_decode_panics() {
+    let mut cover = AssetDocument::new(AssetKind::Cover);
+    cover.replace_with(decode_kind(&AssetFile::new(), AssetKind::Background));
+}
