@@ -18,4 +18,9 @@ impl FakeFeatures {
             FakeFeatures::MlsdAndUtf8 => Some(&[" MLSD", " UTF8"]),
         }
     }
+
+    pub(crate) fn advertises_mlsd(self) -> bool {
+        self.info_lines()
+            .is_some_and(|lines| lines.iter().any(|line| line.trim() == "MLSD"))
+    }
 }

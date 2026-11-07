@@ -5,7 +5,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use super::ListingStyle;
-use super::console_state::Shared;
+use super::console_state::{Shared, shut_down};
 use super::file_system::{path_key, resolve_path};
 use super::listing_line::listing_line;
 
@@ -29,6 +29,7 @@ enum Flow {
 pub(crate) fn serve(shared: &Shared, stream: TcpStream) {
     let outcome = Session::new(shared, stream).run();
     if let Err(error) = outcome
+        && !shared.stopping.load(Ordering::SeqCst)
         && !CLIENT_GONE.contains(&error.kind())
     {
         eprintln!("fake console: a session failed: {error}");
@@ -96,7 +97,7 @@ impl<'a> Session<'a> {
             "PASS" => self.pass(argument)?,
             "FEAT" => self.feat()?,
             "OPTS" => self.opts(argument)?,
-            "SITE" => self.site()?,
+            "SITE" => self.site(argument)?,
             "NOOP" | "TYPE" => self.reply("200 OK")?,
             "PWD" => self.pwd()?,
             "CWD" => self.cwd(argument)?,
@@ -171,7 +172,10 @@ impl<'a> Session<'a> {
         }
     }
 
-    fn site(&mut self) -> io::Result<()> {
+    fn site(&mut self, argument: &str) -> io::Result<()> {
+        if !argument.eq_ignore_ascii_case("REVISION") {
+            return self.reply("502 Command not implemented");
+        }
         let reply = self
             .shared
             .config
@@ -222,7 +226,8 @@ impl<'a> Session<'a> {
     }
 
     fn mlsd(&mut self, argument: &str) -> io::Result<()> {
-        if self.shared.config.listing_style == ListingStyle::Mlsd {
+        let config = &self.shared.config;
+        if config.listing_style == ListingStyle::Mlsd || config.features.advertises_mlsd() {
             self.send_listing(ListingStyle::Mlsd, argument)
         } else {
             self.reply("500 Unknown command")
@@ -262,7 +267,7 @@ impl<'a> Session<'a> {
         for line in lines {
             data.write_all(format!("{line}\r\n").as_bytes())?;
         }
-        drop(data);
+        shut_down(&data);
         self.reply("226 Transfer complete")
     }
 
@@ -289,7 +294,7 @@ impl<'a> Session<'a> {
         }
         let sent = keep.map_or(bytes.len(), |keep| keep.min(bytes.len()));
         data.write_all(&bytes[..sent])?;
-        drop(data);
+        shut_down(&data);
         self.reply("226 Transfer complete")
     }
 
@@ -331,6 +336,8 @@ impl<'a> Session<'a> {
             match listener.accept() {
                 Ok((data, _)) => {
                     data.set_nonblocking(false)?;
+                    data.set_write_timeout(Some(DATA_CONNECT_TIMEOUT))?;
+                    self.shared.state().data_sockets.push(data.try_clone()?);
                     return Ok(Some(data));
                 }
                 Err(error) if error.kind() == io::ErrorKind::WouldBlock => {

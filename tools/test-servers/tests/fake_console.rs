@@ -164,6 +164,39 @@ fn listing_styles() {
 }
 
 #[test]
+fn advertised_mlsd_answers_in_machine_format_whatever_the_list_style() {
+    let console = FakeConsole::start(FakeConsoleConfig {
+        features: FakeFeatures::MlsdAndUtf8,
+        listing_style: ListingStyle::Unix,
+        ..FakeConsoleConfig::default()
+    });
+    console.add_file("/Game/Data/Content.db", &[0; 2048]);
+    let mut ftp = logged_in(&console);
+    ftp.cwd("/Game/Data").expect("the folder exists");
+
+    let lines = ftp.mlsd(None).expect("MLSD is advertised, so it works");
+
+    assert_eq!(lines.len(), 1, "got {lines:?}");
+    assert!(
+        lines[0].starts_with("type=file;size=2048;"),
+        "got {:?}",
+        lines[0]
+    );
+}
+
+#[test]
+fn site_answers_only_the_revision_command() {
+    let console = FakeConsole::start(FakeConsoleConfig::default());
+    let mut ftp = logged_in(&console);
+
+    let revision = reply_text(ftp.custom_command("site revision", &[Status::CommandOk]));
+    let other = reply_text(ftp.custom_command("SITE HELP", &[Status::CommandOk]));
+
+    assert!(revision.starts_with("200 1234"), "got {revision:?}");
+    assert!(other.starts_with("502"), "got {other:?}");
+}
+
+#[test]
 fn truncated_download_sends_fewer_bytes() {
     let console = FakeConsole::start(FakeConsoleConfig::default());
     console.add_file(ASSET_PATH, &[9; 2048]);
@@ -247,13 +280,7 @@ fn read_reply(control: &mut BufReader<TcpStream>) -> String {
 fn send_command(control: &mut BufReader<TcpStream>, command: &str) -> String {
     control
         .get_mut()
-        .write_all(
-            format!(
-                "{command}
-"
-            )
-            .as_bytes(),
-        )
+        .write_all(format!("{command}\r\n").as_bytes())
         .expect("sending a command");
     read_reply(control)
 }

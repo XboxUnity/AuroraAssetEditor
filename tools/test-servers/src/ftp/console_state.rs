@@ -1,5 +1,6 @@
 use std::collections::HashMap;
-use std::net::TcpStream;
+use std::io;
+use std::net::{Shutdown, TcpStream};
 use std::sync::atomic::AtomicBool;
 use std::sync::{Mutex, MutexGuard};
 use std::thread::JoinHandle;
@@ -26,6 +27,7 @@ pub(crate) struct ConsoleState {
     pub(crate) commands: Vec<String>,
     pub(crate) login_count: usize,
     pub(crate) control_sockets: Vec<TcpStream>,
+    pub(crate) data_sockets: Vec<TcpStream>,
 }
 
 impl Shared {
@@ -43,5 +45,15 @@ impl Shared {
         self.state
             .lock()
             .expect("a fake console thread panicked while holding the state")
+    }
+}
+
+/// Closes the connection for every handle to it, so the peer sees the end of the stream even
+/// while a clone is still registered in the state.
+pub(crate) fn shut_down(socket: &TcpStream) {
+    if let Err(error) = socket.shutdown(Shutdown::Both)
+        && error.kind() != io::ErrorKind::NotConnected
+    {
+        eprintln!("fake console: closing a connection failed: {error}");
     }
 }

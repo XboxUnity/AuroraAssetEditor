@@ -1,12 +1,12 @@
 use std::io;
-use std::net::{Ipv4Addr, Shutdown, TcpListener};
+use std::net::{Ipv4Addr, TcpListener};
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
 use super::FakeConsoleConfig;
-use super::console_state::Shared;
+use super::console_state::{Shared, shut_down};
 use super::file_system::{path_key, resolve_path};
 use super::session;
 
@@ -141,6 +141,10 @@ impl Drop for FakeConsole {
         self.shared.stopping.store(true, Ordering::SeqCst);
         self.join_acceptor();
         self.drop_connections();
+        let data_sockets = std::mem::take(&mut self.shared.state().data_sockets);
+        for socket in data_sockets {
+            shut_down(&socket);
+        }
         let sessions = std::mem::take(
             &mut *self
                 .shared
@@ -153,14 +157,6 @@ impl Drop for FakeConsole {
                 panic!("a fake console session panicked");
             }
         }
-    }
-}
-
-fn shut_down(socket: &std::net::TcpStream) {
-    if let Err(error) = socket.shutdown(Shutdown::Both)
-        && error.kind() != io::ErrorKind::NotConnected
-    {
-        eprintln!("fake console: closing a control connection failed: {error}");
     }
 }
 
