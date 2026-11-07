@@ -3,10 +3,11 @@
 mod content_db;
 mod crafted;
 mod cross_decode;
-mod dds_corpus;
+mod dds_sample;
 mod golden;
 mod minimum_read;
 mod prng;
+mod surface_unit;
 mod synthetic;
 
 use std::path::PathBuf;

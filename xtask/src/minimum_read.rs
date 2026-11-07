@@ -6,6 +6,7 @@ use std::path::Path;
 use anyhow::{Result, ensure};
 
 use crate::golden::{Paths, dll_decode, sha256_hex};
+use crate::surface_unit::SurfaceUnit;
 
 const HEADER_BYTE_LENGTH: usize = 52;
 const DWORD_BYTES: usize = 4;
@@ -13,13 +14,6 @@ const FETCH_0_DWORD: usize = 7;
 const PITCH_SHIFT: u32 = 22;
 const PITCH_BITS: u32 = 9;
 const TEXELS_PER_PITCH_UNIT: usize = 32;
-
-/// What a surface row is made of: 4x4 blocks of 8 or 16 bytes, or 4-byte texels.
-#[derive(Clone, Copy)]
-pub struct SurfaceUnit {
-    pub texels_per_side: usize,
-    pub bytes: usize,
-}
 
 /// The bytes a linear decode reads: every row above the last at the header's row pitch, then
 /// only the visible units of the last row.

@@ -16,7 +16,7 @@ use image::{ImageFormat, RgbaImage};
 use sha2::{Digest, Sha256};
 
 use crate::crafted::{self, CRAFTED_DIRECTORY, Crafted};
-use crate::dds_corpus::{self, DDS_DIRECTORY, DdsSample};
+use crate::dds_sample::{self, DDS_DIRECTORY, DdsSample};
 use crate::synthetic;
 use compression::Compression;
 use encoded::encode_and_decode;
@@ -160,7 +160,7 @@ fn write_goldens(paths: &Paths, inputs_dir: &Path, out_dir: &Path) -> Result<Man
         });
     }
     let crafted = crafted::write_crafted(paths, &work_path, out_dir)?;
-    let dds = dds_corpus::write_dds_samples(paths, &work_path, out_dir)?;
+    let dds = dds_sample::write_dds_samples(paths, &work_path, out_dir)?;
     let manifest = Manifest {
         fixture: fixtures,
         crafted,

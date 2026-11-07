@@ -1,6 +1,6 @@
 use super::HEADER_BYTE_LENGTH;
-use crate::minimum_read::SurfaceUnit;
 use crate::prng::Prng;
+use crate::surface_unit::SurfaceUnit;
 
 const DWORD_BYTES: usize = 4;
 const PRNG_SEED_BASE: u64 = 0x5EED_0000;

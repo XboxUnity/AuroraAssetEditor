@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::crafted::Crafted;
-use crate::dds_corpus::DdsSample;
+use crate::dds_sample::DdsSample;
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub(super) struct Manifest {

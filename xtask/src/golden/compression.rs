@@ -1,5 +1,5 @@
 use super::BYTES_PER_PIXEL;
-use crate::minimum_read::SurfaceUnit;
+use crate::surface_unit::SurfaceUnit;
 
 const BC3_BLOCK_SIDE: usize = 4;
 const BC3_BLOCK_BYTES: usize = 16;
