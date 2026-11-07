@@ -1,6 +1,6 @@
 use super::HexId;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct GameIds {
     pub title_id: HexId,
     pub database_id: HexId,

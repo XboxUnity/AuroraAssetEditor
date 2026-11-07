@@ -3,7 +3,7 @@ use std::fmt;
 const HEX_ID_LEN: usize = 8;
 
 /// Exactly eight hex digits, kept in the case they were given (Aurora's folder and file names use the dialog's text).
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct HexId(String);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
