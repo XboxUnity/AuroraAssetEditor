@@ -51,6 +51,7 @@ const APP_ICON_FAILED: &str = "Could not load the window icon";
 const WINDOW_SETUP_FAILED: &str = "Could not finish setting up the window";
 const HIDE_FAILED: &str = "Could not close the window";
 const MESSAGE_BOX_FAILED: &str = "Could not show the error in a message box";
+const NO_CONSOLE_FOR_VERSION: &str = "There is no console to print the version to";
 
 /// Everything the window needs once it exists on screen.
 struct WindowSetup {
@@ -62,8 +63,7 @@ struct WindowSetup {
 fn main() -> ExitCode {
     let arguments: Vec<OsString> = env::args_os().skip(1).collect();
     if arguments == [VERSION_FLAG] {
-        println!("{}", BuildInfo::current().window_title());
-        return ExitCode::SUCCESS;
+        return print_version();
     }
     let mut problems = Vec::new();
     let config_dir = config_dir(&mut problems);
@@ -139,6 +139,24 @@ fn run(
     }
     runner.shutdown();
     Ok(())
+}
+
+/// A release build is a window app, which Windows starts without a console; when it cannot join the one it
+/// was started from, the version is shown in a message box instead.
+fn print_version() -> ExitCode {
+    let version = BuildInfo::current().window_title();
+    if let Err(error) = aurora_file_dialogs::attach_parent_console() {
+        let text = format!("{NO_CONSOLE_FOR_VERSION}: {error}");
+        return match aurora_file_dialogs::show_startup_error(&version, &text) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(box_error) => {
+                eprintln!("{version}\n{text} ({MESSAGE_BOX_FAILED}: {box_error})");
+                ExitCode::FAILURE
+            }
+        };
+    }
+    println!("{version}");
+    ExitCode::SUCCESS
 }
 
 /// For a failure while no window can show it: it is logged and shown in a message box. When even that fails,

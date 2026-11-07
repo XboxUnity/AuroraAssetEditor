@@ -1,6 +1,7 @@
 use std::ffi::{OsString, c_void};
 use std::io;
 use std::os::windows::ffi::OsStringExt;
+use std::os::windows::io::AsRawHandle;
 use std::path::PathBuf;
 
 use raw_window_handle::RawWindowHandle;
@@ -9,6 +10,7 @@ use windows::Win32::System::Com::{
     CLSCTX_INPROC_SERVER, COINIT_APARTMENTTHREADED, COINIT_DISABLE_OLE1DDE, CoCreateInstance,
     CoInitializeEx, CoTaskMemFree, CoUninitialize,
 };
+use windows::Win32::System::Console::{ATTACH_PARENT_PROCESS, AttachConsole};
 use windows::Win32::UI::Shell::Common::COMDLG_FILTERSPEC;
 use windows::Win32::UI::Shell::{
     FILEOPENDIALOGOPTIONS, FOS_ALLOWMULTISELECT, FOS_FILEMUSTEXIST, FOS_FORCEFILESYSTEM,
@@ -83,6 +85,14 @@ pub fn show_startup_error(title: &str, text: &str) -> io::Result<()> {
         return Err(io::Error::last_os_error());
     }
     Ok(())
+}
+
+/// Output that is redirected, or a console the app already has, is left as it is.
+pub fn attach_parent_console() -> io::Result<()> {
+    if !io::stdout().as_raw_handle().is_null() {
+        return Ok(());
+    }
+    unsafe { AttachConsole(ATTACH_PARENT_PROCESS) }.map_err(io::Error::other)
 }
 
 fn prepare(

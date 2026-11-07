@@ -1,4 +1,4 @@
-// The Windows file dialogs and message box are Win32 APIs, which the `windows` crate only
+// The Windows file dialogs, message box and console calls are Win32 APIs, which the `windows` crate only
 // offers as `unsafe` calls.
 #![deny(unsafe_code)]
 
@@ -51,6 +51,19 @@ pub fn save_file(request: &DialogRequest) -> Result<Option<PathBuf>, DialogError
 /// and macOS show a message box, Linux writes `title: text` to stderr. It returns once the user closed it.
 pub fn show_startup_error(title: &str, text: &str) -> io::Result<()> {
     platform::show_startup_error(title, text)
+}
+
+/// Connects a window app to the console it was started from, so what it prints shows there. Only Windows
+/// starts a window app without one, and only when its output is not redirected; elsewhere this does nothing.
+pub fn attach_parent_console() -> io::Result<()> {
+    #[cfg(windows)]
+    {
+        windows_dialogs::attach_parent_console()
+    }
+    #[cfg(not(windows))]
+    {
+        Ok(())
+    }
 }
 
 /// The folder the user picked; `None` is the user's cancel.
