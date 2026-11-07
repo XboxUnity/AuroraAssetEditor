@@ -1,4 +1,6 @@
-use super::{ChoiceId, ConnectionForm, PendingChoice, TitleIdForm};
+use super::{
+    ChoiceId, ConfirmedAction, ConnectionForm, PendingChoice, TitleIdForm, UploadTargetForm,
+};
 
 /// A dialog the app shows over the window.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -20,6 +22,20 @@ pub enum Modal {
         label: String,
         form: TitleIdForm,
     },
+    /// Save all to console: the game to upload to. OK and Cancel; OK works once both IDs are valid.
+    UploadTarget {
+        title: String,
+        form: UploadTargetForm,
+    },
+    /// A question whose accepted answer runs `action`: a confirm button labelled `confirm_label` (drawn as
+    /// dangerous when `danger`) and Cancel.
+    Confirm {
+        title: String,
+        text: String,
+        confirm_label: String,
+        danger: bool,
+        action: ConfirmedAction,
+    },
     /// The console connection: Test Connection, Save and Cancel.
     Connection {
         form: ConnectionForm,
@@ -29,7 +45,8 @@ pub enum Modal {
 /// How the user closed a modal.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ModalAnswer {
-    /// OK of a form, Save of the connection form; cancels a `Choice`, which has no accept button of its own.
+    /// OK of a form, the confirm button of a `Confirm`, Save of the connection form; cancels a `Choice`,
+    /// which has no accept button of its own.
     Accept,
     Cancel,
     Choice(ChoiceId),
@@ -39,6 +56,8 @@ pub enum ModalAnswer {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ModalField {
     TitleId,
+    UploadTitleId,
+    UploadDatabaseId,
     Host,
     Port,
     Username,

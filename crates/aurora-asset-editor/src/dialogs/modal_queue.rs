@@ -29,7 +29,11 @@ impl ModalQueue {
     pub fn connection_form_mut(&mut self) -> Option<&mut ConnectionForm> {
         self.waiting.iter_mut().find_map(|modal| match modal {
             Modal::Connection { form } => Some(form),
-            Modal::Message { .. } | Modal::Choice { .. } | Modal::TitleId { .. } => None,
+            Modal::Message { .. }
+            | Modal::Choice { .. }
+            | Modal::TitleId { .. }
+            | Modal::UploadTarget { .. }
+            | Modal::Confirm { .. } => None,
         })
     }
 

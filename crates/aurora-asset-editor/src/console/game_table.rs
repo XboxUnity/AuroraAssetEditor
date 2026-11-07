@@ -96,6 +96,10 @@ impl GameTable {
             .unwrap_or(PresenceCell::Unknown)
     }
 
+    pub fn contains(&self, ids: &GameIds) -> bool {
+        self.games.iter().any(|game| &game.ids == ids)
+    }
+
     pub fn set_presence(&mut self, ids: &GameIds, cell: PresenceCell) {
         self.presence.insert(ids.clone(), cell);
     }

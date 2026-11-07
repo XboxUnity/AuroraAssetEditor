@@ -18,7 +18,7 @@ pub const NO_CONSOLE_TEXT: &str = "No console connection is set up. Use Edit con
 pub const REFRESHING_TEXT: &str = "Refreshing the game list…";
 pub const CONNECTION_FAILED_TITLE: &str = "Connection failed";
 pub const TEMP_FILE_NOTE: &str = "temp file left behind (see error.log)";
-const CONNECTION_FAILED_PREFIX: &str = "FTP Connection could not be established";
+pub(super) const CONNECTION_FAILED_PREFIX: &str = "FTP Connection could not be established";
 const CONNECTION_TEST_FAILED: &str = "The connection test failed";
 const NOT_AURORA_TEST_TEXT: &str = "Connection test Failed...";
 const CONNECTION_SAVE_FAILED: &str = "Could not save the connection settings";
@@ -142,6 +142,15 @@ impl App {
             ConsoleOutcome::PresenceSkipped { generation, ids } => {
                 self.apply_presence_skipped(generation, &ids);
             }
+            ConsoleOutcome::Downloaded {
+                ids,
+                after,
+                results,
+            } => {
+                self.apply_downloaded(&ids, after, results);
+            }
+            ConsoleOutcome::Uploaded(report) => self.apply_uploaded(report),
+            ConsoleOutcome::Removed(report) => self.apply_removed(report),
         }
     }
 
@@ -231,6 +240,11 @@ impl App {
             self.report_console_error(REFRESH_FAILED, error);
             return;
         }
+        self.show_connection_failed(error);
+    }
+
+    /// The link is down: the status line and the "Connection failed" dialog say so.
+    pub(super) fn show_connection_failed(&mut self, error: &ConsoleError) {
         self.console.link = ConsoleLink::Failed;
         let text = format!("{CONNECTION_FAILED_PREFIX}: {}", error_sentence(error));
         self.status = StatusLine::error(text.clone());
@@ -251,6 +265,22 @@ impl App {
             };
             self.submit_console_job(settings.clone(), job, JobPriority::Background);
         }
+    }
+
+    /// One check of a game whose assets just changed, ahead of the background checks still waiting.
+    pub(super) fn queue_presence_check(&mut self, ids: &GameIds) {
+        let Some(settings) = self.console.settings.clone() else {
+            return;
+        };
+        if !self.console.table.contains(ids) {
+            return;
+        }
+        let job = ConsoleJob::Presence {
+            generation: self.console.refresh_generation(),
+            ids: ids.clone(),
+            gate: self.console.presence_gate().clone(),
+        };
+        self.submit_console_job(settings, job, JobPriority::User);
     }
 
     fn apply_presence(
@@ -298,12 +328,12 @@ impl App {
     }
 
     /// Logs the error and shows it, with its causes, in the status line.
-    fn report_console_error(&mut self, context: &str, error: &(dyn Error + 'static)) {
+    pub(super) fn report_console_error(&mut self, context: &str, error: &(dyn Error + 'static)) {
         let log_failure = self.record_error(context, error);
         self.set_error_status(format!("{context}: {}", error_sentence(error)), log_failure);
     }
 
-    fn refuse_while_console_busy(&mut self) -> bool {
+    pub(super) fn refuse_while_console_busy(&mut self) -> bool {
         if self.active_work.console.is_none() {
             return false;
         }
@@ -311,7 +341,7 @@ impl App {
         true
     }
 
-    fn submit_console_job(
+    pub(super) fn submit_console_job(
         &mut self,
         settings: FtpSettings,
         job: ConsoleJob,
@@ -342,6 +372,6 @@ fn connected_link(revision: &AuroraRevision) -> ConsoleLink {
 }
 
 /// The error and its causes in one line, the way a user needs them to tell what went wrong.
-fn error_sentence(error: &(dyn Error + 'static)) -> String {
+pub(super) fn error_sentence(error: &(dyn Error + 'static)) -> String {
     error_chain(error).join(": ")
 }

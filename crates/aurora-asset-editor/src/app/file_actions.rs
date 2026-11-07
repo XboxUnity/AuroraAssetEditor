@@ -200,7 +200,7 @@ impl App {
     }
 
     /// Logs the entry and adds its line to the dialog's text.
-    fn note_unread_image(
+    pub(super) fn note_unread_image(
         &mut self,
         path: &Path,
         entry: &str,
@@ -218,7 +218,7 @@ impl App {
         ));
     }
 
-    fn show_unread_images(&mut self, lines: Vec<String>) {
+    pub(super) fn show_unread_images(&mut self, lines: Vec<String>) {
         if lines.is_empty() {
             return;
         }

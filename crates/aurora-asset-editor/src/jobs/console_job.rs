@@ -1,8 +1,11 @@
 use crate::console::PresenceGate;
 
+use aurora_asset::AssetKind;
 use aurora_console::{
     AssetPresence, AuroraRevision, ConsoleError, FtpSettings, GameIds, GameListing,
 };
+
+use super::{AfterDownload, AssetUpload, KindDownload, TransferReport};
 
 /// Work for the console's FTP server, done with `settings`.
 #[derive(Debug)]
@@ -24,6 +27,22 @@ pub enum ConsoleJob {
         ids: GameIds,
         gate: PresenceGate,
     },
+    /// Downloads and decodes `kinds` in order; the first error ends the job.
+    Download {
+        ids: GameIds,
+        kinds: Vec<AssetKind>,
+        after: AfterDownload,
+    },
+    /// Sends the files in order; the first error ends the job.
+    Upload {
+        ids: GameIds,
+        uploads: Vec<AssetUpload>,
+    },
+    /// Replaces the kinds' files with the empty asset; the first error ends the job.
+    Remove {
+        ids: GameIds,
+        kinds: Vec<AssetKind>,
+    },
 }
 
 /// Which kind of console job a progress report belongs to.
@@ -32,6 +51,9 @@ pub enum ConsoleJobKind {
     Test,
     Refresh,
     Presence,
+    Download,
+    Upload,
+    Remove,
 }
 
 impl ConsoleJob {
@@ -40,6 +62,9 @@ impl ConsoleJob {
             ConsoleJob::Test => ConsoleJobKind::Test,
             ConsoleJob::Refresh { .. } => ConsoleJobKind::Refresh,
             ConsoleJob::Presence { .. } => ConsoleJobKind::Presence,
+            ConsoleJob::Download { .. } => ConsoleJobKind::Download,
+            ConsoleJob::Upload { .. } => ConsoleJobKind::Upload,
+            ConsoleJob::Remove { .. } => ConsoleJobKind::Remove,
         }
     }
 }
@@ -62,4 +87,12 @@ pub enum ConsoleOutcome {
         generation: u64,
         ids: GameIds,
     },
+    /// One item per kind that was tried, in order; an error is the last one.
+    Downloaded {
+        ids: GameIds,
+        after: AfterDownload,
+        results: Vec<KindDownload>,
+    },
+    Uploaded(TransferReport),
+    Removed(TransferReport),
 }

@@ -5,6 +5,7 @@
 mod app;
 mod app_environment;
 mod console_actions;
+mod console_transfer_actions;
 mod current_game;
 mod current_game_actions;
 mod file_actions;
@@ -19,6 +20,10 @@ pub use app::{App, DIALOG_FAILED_TITLE, LOG_WRITE_FAILED};
 pub use app_environment::{AppEnvironment, StartupProblem};
 pub use console_actions::{
     CONNECTION_FAILED_TITLE, NO_CONSOLE_TEXT, REFRESHING_TEXT, TEMP_FILE_NOTE,
+};
+pub use console_transfer_actions::{
+    EMPTY_UPLOAD_TITLE, NO_CONSOLE_SET_UP_REASON, NOTHING_TO_UPLOAD_TEXT, REMOVE_CONFIRM_TITLE,
+    SELECT_A_GAME_REASON, UPLOAD_TARGET_TITLE,
 };
 pub use current_game::CurrentGame;
 pub use file_actions::BUSY_TEXT;

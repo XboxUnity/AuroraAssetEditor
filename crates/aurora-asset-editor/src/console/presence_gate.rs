@@ -33,4 +33,10 @@ impl PresenceGate {
             .unreachable_generation
             .store(generation, Ordering::SeqCst);
     }
+
+    /// A transfer that succeeded shows the console answers, so checks may run again. Refresh generations
+    /// start at 1, so 0 matches no check that was queued by a refresh.
+    pub(crate) fn mark_reachable(&self) {
+        self.state.unreachable_generation.store(0, Ordering::SeqCst);
+    }
 }

@@ -96,7 +96,7 @@ impl App {
             );
             return;
         }
-        if self.title_id_not_ready(answer) {
+        if self.form_not_ready(answer) {
             return;
         }
         if answer == ModalAnswer::Accept
@@ -110,6 +110,14 @@ impl App {
         };
         match (modal, answer) {
             (Modal::Message { .. } | Modal::Connection { .. }, _) => {}
+            (Modal::UploadTarget { form, .. }, ModalAnswer::Accept) => {
+                self.save_all_to_console_for_form(&form);
+            }
+            (Modal::Confirm { action, .. }, ModalAnswer::Accept) => self.run_confirmed(action),
+            (
+                Modal::UploadTarget { .. } | Modal::Confirm { .. },
+                ModalAnswer::Cancel | ModalAnswer::Choice(_),
+            ) => {}
             (Modal::TitleId { form, .. }, ModalAnswer::Accept) => self.save_all_for_form(&form),
             (Modal::TitleId { .. }, ModalAnswer::Cancel | ModalAnswer::Choice(_)) => {}
             (Modal::Choice { pending, .. }, ModalAnswer::Choice(choice)) => {
@@ -121,14 +129,16 @@ impl App {
         }
     }
 
-    /// OK on the TitleID prompt does nothing until the form holds eight hex digits; the prompt stays open.
-    fn title_id_not_ready(&self, answer: ModalAnswer) -> bool {
-        let (ModalAnswer::Accept, Some(Modal::TitleId { form, .. })) =
-            (answer, self.modals.current())
-        else {
+    /// OK on a form does nothing until its boxes hold valid IDs; the dialog stays open.
+    fn form_not_ready(&self, answer: ModalAnswer) -> bool {
+        if answer != ModalAnswer::Accept {
             return false;
-        };
-        !form.is_valid()
+        }
+        match self.modals.current() {
+            Some(Modal::TitleId { form, .. }) => !form.is_valid(),
+            Some(Modal::UploadTarget { form, .. }) => !form.is_valid(),
+            _ => false,
+        }
     }
 
     /// The answer's choice when the dialog on screen does not offer it.
@@ -138,7 +148,11 @@ impl App {
         };
         let offered = match self.modals.current()? {
             Modal::Choice { choices, .. } => choices.iter().any(|(offered, _)| *offered == id),
-            Modal::Message { .. } | Modal::TitleId { .. } | Modal::Connection { .. } => false,
+            Modal::Message { .. }
+            | Modal::TitleId { .. }
+            | Modal::UploadTarget { .. }
+            | Modal::Confirm { .. }
+            | Modal::Connection { .. } => false,
         };
         if offered {
             None
@@ -150,6 +164,12 @@ impl App {
     pub fn edit_modal_field(&mut self, field: ModalField, text: &str) {
         match (self.modals.current_mut(), field) {
             (Some(Modal::TitleId { form, .. }), ModalField::TitleId) => form.edit(text),
+            (Some(Modal::UploadTarget { form, .. }), ModalField::UploadTitleId) => {
+                form.edit_title_id(text);
+            }
+            (Some(Modal::UploadTarget { form, .. }), ModalField::UploadDatabaseId) => {
+                form.edit_database_id(text);
+            }
             (Some(Modal::Connection { form }), ModalField::Host) => form.host = text.to_owned(),
             (Some(Modal::Connection { form }), ModalField::Port) => form.port = text.to_owned(),
             (Some(Modal::Connection { form }), ModalField::Username) => {

@@ -1,11 +1,14 @@
 use std::sync::{Arc, Mutex, PoisonError};
 
-use aurora_console::{ConsoleClient, ConsoleStatus, FtpSettings, Timeouts};
+use aurora_asset::AssetKind;
+use aurora_console::{ConsoleClient, ConsoleStatus, FtpSettings, GameIds, Timeouts};
 
 use crate::console::is_connection_failure;
+use crate::editor::decode_kind;
 
 use super::{
-    ConsoleJob, ConsoleJobKind, ConsoleOutcome, ConsoleRequest, JobOutcome, Progress, ProgressSlot,
+    ConsoleJob, ConsoleJobKind, ConsoleOutcome, ConsoleRequest, JobOutcome, KindDownload, Progress,
+    ProgressSlot, TransferReport,
 };
 
 /// Runs console jobs on one `ConsoleClient`, which stays connected between them and is replaced when a
@@ -58,6 +61,34 @@ impl ConsoleWorker {
                     result,
                 }
             }
+            ConsoleJob::Download { ids, kinds, after } => {
+                let results = download_kinds(client, &ids, &kinds);
+                ConsoleOutcome::Downloaded {
+                    ids,
+                    after,
+                    results,
+                }
+            }
+            ConsoleJob::Upload { ids, uploads } => {
+                let mut report = TransferReport::new(ids.clone());
+                for upload in uploads {
+                    let result = client.upload_asset(&ids, upload.kind, &upload.bytes);
+                    if !report.record(upload.kind, result) {
+                        break;
+                    }
+                }
+                ConsoleOutcome::Uploaded(report)
+            }
+            ConsoleJob::Remove { ids, kinds } => {
+                let mut report = TransferReport::new(ids.clone());
+                for kind in kinds {
+                    let result = client.remove_asset(&ids, kind);
+                    if !report.record(kind, result) {
+                        break;
+                    }
+                }
+                ConsoleOutcome::Removed(report)
+            }
         }
     }
 
@@ -82,4 +113,25 @@ impl ConsoleWorker {
             }));
         })
     }
+}
+
+/// A file without entries of its kind counts as missing, like one that is not there (U9).
+fn download_kinds(
+    client: &mut ConsoleClient,
+    ids: &GameIds,
+    kinds: &[AssetKind],
+) -> Vec<KindDownload> {
+    let mut downloads = Vec::new();
+    for &kind in kinds {
+        let result = client.download_asset(ids, kind).map(|file| {
+            file.filter(|file| file.has_entries_for(kind))
+                .map(|file| Box::new(decode_kind(&file, kind)))
+        });
+        let failed = result.is_err();
+        downloads.push(KindDownload { kind, result });
+        if failed {
+            break;
+        }
+    }
+    downloads
 }
