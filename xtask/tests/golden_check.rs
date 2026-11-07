@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use serde::Deserialize;
 
 const HEADER_HEX_LENGTH: usize = 104;
-/// Must equal `MAX_STORED_ARGB_PIXELS` in `xtask/src/golden.rs`, which a test cannot import.
+/// Must equal `MAX_STORED_ARGB_PIXELS` in `xtask/src/golden/mod.rs`, which a test cannot import.
 const MAX_STORED_ARGB_PIXELS: u32 = 65_536;
 
 #[derive(Deserialize)]
