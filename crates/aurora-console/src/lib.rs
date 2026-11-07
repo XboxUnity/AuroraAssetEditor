@@ -8,7 +8,8 @@ mod paths;
 mod settings;
 
 pub use client::{
-    AssetPresence, AuroraRevision, ConsoleClient, ConsoleError, ConsoleStatus, Timeouts,
+    AssetPresence, AuroraRevision, ConsoleClient, ConsoleError, ConsoleStatus, GameListing,
+    TempCleanupError, Timeouts,
 };
 pub use games::{ContentDbError, Game, GameFilter, read_content_db};
 pub use ids::{GameIds, HexId, IdError};

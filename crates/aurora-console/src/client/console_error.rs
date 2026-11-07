@@ -3,6 +3,7 @@ use std::io;
 
 use aurora_asset::AssetError;
 
+use crate::games::ContentDbError;
 use crate::settings::SettingsError;
 
 #[derive(Debug)]
@@ -57,6 +58,10 @@ pub enum ConsoleError {
         file: String,
         source: AssetError,
     },
+    /// The console has no `Content.db`, or an empty one.
+    ContentDbMissing,
+    ContentDb(ContentDbError),
+    TempFile(io::Error),
 }
 
 impl fmt::Display for ConsoleError {
@@ -105,6 +110,9 @@ impl fmt::Display for ConsoleError {
                 }
             }
             Self::InvalidAsset { file, .. } => write!(f, "{file} is not a valid asset file"),
+            Self::ContentDbMissing => write!(f, "the console has no Content.db with any content"),
+            Self::ContentDb(_) => write!(f, "the console's Content.db could not be read"),
+            Self::TempFile(_) => write!(f, "could not save Content.db to a temporary file"),
         }
     }
 }
@@ -116,6 +124,8 @@ impl std::error::Error for ConsoleError {
             Self::Resolve { source, .. } | Self::Connect { source, .. } => Some(source),
             Self::Protocol { source, .. } => Some(source),
             Self::InvalidAsset { source, .. } => Some(source),
+            Self::ContentDb(source) => Some(source),
+            Self::TempFile(source) => Some(source),
             Self::InvalidTimeout { .. }
             | Self::LoginRejected { .. }
             | Self::NotAurora { .. }
@@ -123,7 +133,8 @@ impl std::error::Error for ConsoleError {
             | Self::Refused { .. }
             | Self::ListingTooLarge { .. }
             | Self::FileTooLarge { .. }
-            | Self::SizeMismatch { .. } => None,
+            | Self::SizeMismatch { .. }
+            | Self::ContentDbMissing => None,
         }
     }
 }
