@@ -10,6 +10,8 @@ pub const IMPORT_EXTENSIONS: [&str; 12] = [
     "png", "jpg", "jpeg", "bmp", "gif", "tif", "tiff", "webp", "tga", "ico", "qoi", "dds",
 ];
 pub const MAX_IMPORT_SIDE: u32 = 16_384;
+// Bounds the decoder buffer. The RGBA copy comes on top and can add up to 4x of it
+// (peak about 0.9 GiB for an 11585x11585 RGB image).
 pub const MAX_IMPORT_ALLOC: u64 = 512 * 1024 * 1024;
 
 const DDS_MAGIC: &[u8] = b"DDS ";

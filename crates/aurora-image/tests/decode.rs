@@ -6,6 +6,9 @@ use image::codecs::gif::GifEncoder;
 use image::codecs::jpeg::JpegEncoder;
 use image::{DynamicImage, Frame, ImageFormat, Rgba};
 
+const GRAY: u8 = 0;
+const RGBA: u8 = 6;
+
 const WIDTH: u32 = 7;
 const HEIGHT: u32 = 5;
 
@@ -99,8 +102,8 @@ fn png_header(width: u32, height: u32, bit_depth: u8, colour_type: u8) -> Vec<u8
 
 /// The IHDR plus an empty IDAT chunk: the PNG reader only reports the size once it reaches
 /// the first IDAT, and no pixel data follows.
-fn png_header_without_pixels(width: u32, height: u32) -> Vec<u8> {
-    let mut png = png_header(width, height, 8, 6);
+fn png_header_without_pixels(width: u32, height: u32, bit_depth: u8, colour_type: u8) -> Vec<u8> {
+    let mut png = png_header(width, height, bit_depth, colour_type);
     png.extend(png_chunk(b"IDAT", &[]));
     png
 }
@@ -216,7 +219,7 @@ fn rejects_unknown_format() {
 
 #[test]
 fn rejects_oversized_image_before_decoding() {
-    let png = png_header_without_pixels(20_000, 20_000);
+    let png = png_header_without_pixels(20_000, 20_000, 8, RGBA);
 
     assert!(matches!(
         decode_image(&png, None),
@@ -229,7 +232,7 @@ fn rejects_oversized_image_before_decoding() {
 
 #[test]
 fn rejects_image_over_the_allocation_limit_before_decoding() {
-    let png = png_header_without_pixels(12_000, 12_000);
+    let png = png_header_without_pixels(12_000, 12_000, 8, GRAY);
 
     assert!(matches!(
         decode_image(&png, None),
@@ -326,4 +329,38 @@ fn exif_orientation_is_not_applied() {
     let decoded = decode_image(&with_exif, None).expect("jpeg decodes");
 
     assert_eq!(decoded.dimensions(), (8, 4));
+}
+
+#[test]
+fn decoder_limits_back_up_the_header_check() {
+    // 16-bit RGBA is 8 bytes per pixel natively, so the decoder buffer is over the limit
+    // while the 4-byte RGBA size the header check computes is still within it.
+    let png = png_header_without_pixels(11_585, 11_585, 16, RGBA);
+
+    assert!(matches!(
+        decode_image(&png, None),
+        Err(ImportError::TooLarge {
+            width: 11_585,
+            height: 11_585
+        })
+    ));
+}
+
+#[test]
+fn bmp_with_unused_fourth_byte_decodes_opaque() {
+    let mut bmp = b"BM".to_vec();
+    bmp.extend_from_slice(&(54u32 + 8).to_le_bytes());
+    bmp.extend_from_slice(&[0; 4]);
+    bmp.extend_from_slice(&54u32.to_le_bytes());
+    bmp.extend_from_slice(&40u32.to_le_bytes());
+    bmp.extend_from_slice(&2i32.to_le_bytes());
+    bmp.extend_from_slice(&1i32.to_le_bytes());
+    bmp.extend_from_slice(&1u16.to_le_bytes());
+    bmp.extend_from_slice(&32u16.to_le_bytes());
+    bmp.extend_from_slice(&[0; 24]);
+    bmp.extend_from_slice(&[30, 20, 10, 0, 60, 50, 40, 0]);
+
+    let decoded = decode_image(&bmp, None).expect("bmp decodes");
+
+    assert_eq!(decoded.into_raw(), [10, 20, 30, 255, 40, 50, 60, 255]);
 }
