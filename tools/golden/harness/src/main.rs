@@ -6,9 +6,9 @@
 #![deny(unsafe_code)]
 
 #[cfg(windows)]
-mod cli;
+mod aurora_asset_dll;
 #[cfg(windows)]
-mod dll;
+mod cli;
 
 #[cfg(windows)]
 fn main() {

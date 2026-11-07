@@ -1,4 +1,4 @@
-use crate::dll::AuroraAssetDll;
+use crate::aurora_asset_dll::AuroraAssetDll;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
