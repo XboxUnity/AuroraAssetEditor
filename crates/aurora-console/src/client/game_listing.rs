@@ -1,3 +1,4 @@
+use std::fmt;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::thread;
@@ -28,6 +29,22 @@ pub struct TempCleanupError {
     pub source: io::Error,
 }
 
+impl fmt::Display for TempCleanupError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "could not remove the temporary copy {}",
+            self.path.display()
+        )
+    }
+}
+
+impl std::error::Error for TempCleanupError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.source)
+    }
+}
+
 impl ConsoleClient {
     pub fn list_games(&mut self) -> Result<GameListing, ConsoleError> {
         self.list_games_in(&std::env::temp_dir())
@@ -54,11 +71,7 @@ impl ConsoleClient {
             }),
             Err(read_error) => {
                 if let Some(leftover) = &cleanup_error {
-                    log::warn!(
-                        "could not remove the temporary Content.db copy {}: {}",
-                        leftover.path.display(),
-                        leftover.source
-                    );
+                    log::warn!("{leftover}: {}", leftover.source);
                 }
                 Err(ConsoleError::ContentDb(read_error))
             }
@@ -98,6 +111,23 @@ mod tests {
     use std::time::Instant;
 
     use super::*;
+
+    #[test]
+    fn cleanup_error_names_the_file_and_chains_the_cause() {
+        let error = TempCleanupError {
+            path: PathBuf::from("temp").join("AuroraAssetEditor-1.db"),
+            source: io::Error::from(io::ErrorKind::PermissionDenied),
+        };
+
+        assert_eq!(
+            error.to_string(),
+            format!(
+                "could not remove the temporary copy {}",
+                error.path.display()
+            )
+        );
+        assert!(std::error::Error::source(&error).is_some());
+    }
 
     #[test]
     fn remove_with_retries_treats_missing_as_removed() {
