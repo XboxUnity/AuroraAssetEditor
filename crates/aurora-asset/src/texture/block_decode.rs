@@ -1,5 +1,6 @@
 use image::{Rgba, RgbaImage};
 
+use super::DecodeError;
 use super::endian::GpuEndian;
 use super::format::ChannelOrder;
 use super::layout::SurfaceLayout;
@@ -226,29 +227,26 @@ fn unit_from_byte(value: u8) -> f32 {
 }
 
 /// Decodes the visible `width` x `height` pixels of a block-compressed surface laid out per
-/// `layout`. `surface` must hold at least `layout.padded_len()` bytes.
+/// `layout`. The padding after the last visible block may be missing.
 pub(super) fn decode_surface(
-    surface: &[u8],
+    data: &[u8],
     width: u32,
     height: u32,
     layout: &SurfaceLayout,
     codec: BlockCodec,
     endian: GpuEndian,
     channels: ChannelOrder,
-) -> RgbaImage {
+) -> Result<RgbaImage, DecodeError> {
+    let surface = layout.read_from(data)?;
     let (visible_width, visible_height) = (width as usize, height as usize);
-    let mut unswapped = surface.to_vec();
-    endian.to_native(&mut unswapped);
     let mut image = RgbaImage::new(width, height);
-    for (block_y, row) in unswapped
-        .chunks_exact(layout.row_pitch)
-        .take(visible_height.div_ceil(BLOCK_SIDE))
-        .enumerate()
-    {
-        let blocks = row
-            .chunks_exact(codec.block_bytes())
-            .take(visible_width.div_ceil(BLOCK_SIDE));
-        for (block_x, block) in blocks.enumerate() {
+    for block_y in 0..layout.units_high {
+        for block_x in 0..layout.units_wide {
+            let start = layout.unit_offset(block_x, block_y);
+            let mut buffer = [0u8; BC3_BLOCK_BYTES];
+            let block = &mut buffer[..codec.block_bytes()];
+            block.copy_from_slice(&surface[start..start + block.len()]);
+            endian.to_native(block);
             let texels = codec.decode_block(block);
             for (texel, values) in texels.iter().enumerate() {
                 let x = block_x * BLOCK_SIDE + texel % BLOCK_SIDE;
@@ -260,7 +258,7 @@ pub(super) fn decode_surface(
             }
         }
     }
-    image
+    Ok(image)
 }
 
 #[cfg(test)]

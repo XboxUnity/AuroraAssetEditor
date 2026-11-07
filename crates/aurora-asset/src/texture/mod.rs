@@ -89,29 +89,15 @@ pub fn encode(image: &RgbaImage, compression: Compression) -> Result<EncodedText
     Ok(EncodedTexture { header, data })
 }
 
-/// The header's format and surface layout, once the data is known to be long enough.
-fn checked_layout(texture: &EncodedTexture) -> Result<(TextureFormat, SurfaceLayout), DecodeError> {
+pub fn decode(texture: &EncodedTexture) -> Result<RgbaImage, DecodeError> {
     let header = &texture.header;
     let format = header.format();
     let layout = SurfaceLayout::for_header(header)?;
-    let expected = layout.padded_len();
-    if texture.data.len() < expected {
-        return Err(DecodeError::TruncatedData {
-            expected,
-            actual: texture.data.len(),
-        });
-    }
-    Ok((format, layout))
-}
-
-pub fn decode(texture: &EncodedTexture) -> Result<RgbaImage, DecodeError> {
-    let header = &texture.header;
-    let (format, layout) = checked_layout(texture)?;
     if let Some(codec) = format.block_codec() {
         let channels = header
             .channel_order()
             .ok_or(DecodeError::UnsupportedFormat(format))?;
-        return Ok(block_decode::decode_surface(
+        return block_decode::decode_surface(
             &texture.data,
             header.width(),
             header.height(),
@@ -119,15 +105,12 @@ pub fn decode(texture: &EncodedTexture) -> Result<RgbaImage, DecodeError> {
             codec,
             header.gpu_endian(),
             channels,
-        ));
+        );
     }
     match format {
-        TextureFormat::LinearArgb8888 => Ok(argb::unpack(
-            &texture.data,
-            header.width(),
-            header.height(),
-            &layout,
-        )),
+        TextureFormat::LinearArgb8888 => {
+            argb::unpack(&texture.data, header.width(), header.height(), &layout)
+        }
         _ => Err(DecodeError::UnsupportedFormat(format)),
     }
 }

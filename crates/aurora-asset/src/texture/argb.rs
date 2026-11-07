@@ -1,5 +1,6 @@
 use image::{Rgba, RgbaImage};
 
+use super::DecodeError;
 use super::layout::SurfaceLayout;
 
 const BYTES_PER_PIXEL: usize = 4;
@@ -17,11 +18,17 @@ pub(super) fn pack(image: &RgbaImage, layout: &SurfaceLayout) -> Vec<u8> {
     surface
 }
 
-/// Reverse of [`pack`]; `surface` must hold at least `layout.padded_len()` bytes.
-pub(super) fn unpack(surface: &[u8], width: u32, height: u32, layout: &SurfaceLayout) -> RgbaImage {
-    RgbaImage::from_fn(width, height, |x, y| {
-        let start = y as usize * layout.row_pitch + x as usize * BYTES_PER_PIXEL;
+/// Reverse of [`pack`]. The padding after the last visible pixel may be missing.
+pub(super) fn unpack(
+    data: &[u8],
+    width: u32,
+    height: u32,
+    layout: &SurfaceLayout,
+) -> Result<RgbaImage, DecodeError> {
+    let surface = layout.read_from(data)?;
+    Ok(RgbaImage::from_fn(width, height, |x, y| {
+        let start = layout.unit_offset(x as usize, y as usize);
         let argb = &surface[start..start + BYTES_PER_PIXEL];
         Rgba([argb[1], argb[2], argb[3], argb[0]])
-    })
+    }))
 }

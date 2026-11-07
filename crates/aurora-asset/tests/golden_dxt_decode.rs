@@ -54,6 +54,45 @@ fn dxt_decode_matches_dll_on_all_fixtures() {
 }
 
 #[test]
+fn dxt_decode_needs_only_the_bytes_the_dll_reads() {
+    for fixture in support::manifest().fixture {
+        assert!(
+            fixture.dxt_decodes_at_minimum_len,
+            "{}: the DLL decodes the shortened video differently",
+            fixture.name
+        );
+        support::assert_decodes_at_minimum_len(
+            &dxt_texture(&fixture),
+            support::BC3_BLOCK,
+            &fixture.dxt_decoded_sha256,
+            &fixture.name,
+        );
+    }
+}
+
+#[test]
+fn decode_rejects_a_row_pitch_narrower_than_the_image() {
+    const FETCH_0_OFFSET: usize = 28;
+    const PITCH_SHIFT: u32 = 22;
+    const PITCH_MASK: u32 = 0x1FF;
+    const NARROW_PITCH_UNITS: u32 = 4;
+    let mut texture = zeroed_dxt_texture(130, 70, 32_768);
+    let mut bytes = texture.header.to_bytes();
+    let word_bytes = &mut bytes[FETCH_0_OFFSET..FETCH_0_OFFSET + 4];
+    let word = u32::from_be_bytes((&*word_bytes).try_into().unwrap());
+    let word = (word & !(PITCH_MASK << PITCH_SHIFT)) | (NARROW_PITCH_UNITS << PITCH_SHIFT);
+    word_bytes.copy_from_slice(&word.to_be_bytes());
+    texture.header = TextureHeader::from_bytes(bytes);
+    assert_eq!(
+        decode(&texture).err(),
+        Some(DecodeError::RowPitchTooSmall {
+            pitch_units: NARROW_PITCH_UNITS,
+            required_units: 5
+        })
+    );
+}
+
+#[test]
 fn alpha_zero_decodes_to_black() {
     let fixture = support::manifest()
         .fixture

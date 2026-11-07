@@ -30,10 +30,15 @@ const ARGB_TEXEL: BlockShape = BlockShape {
     bytes: 4,
 };
 
-/// Size of the zero-padded surface the DLL writes for a texture.
+/// How a texture's units (compressed blocks or ARGB texels) lie in its surface: rows of
+/// `row_pitch` bytes, zero-padded by the DLL to `rows` rows.
 pub(crate) struct SurfaceLayout {
     pub row_pitch: usize,
     pub rows: usize,
+    pub unit_bytes: usize,
+    /// The units that hold visible pixels, across and down.
+    pub units_wide: usize,
+    pub units_high: usize,
 }
 
 impl SurfaceLayout {
@@ -61,10 +66,13 @@ impl SurfaceLayout {
                 required_units: required_units as u32,
             });
         }
-        let blocks_high = (header.height() as usize).div_ceil(shape.texels_per_side);
+        let units_high = (header.height() as usize).div_ceil(shape.texels_per_side);
         Ok(Self {
             row_pitch: pitch_units * units_per_pitch_unit * shape.bytes,
-            rows: align(blocks_high, BLOCK_ROWS_ALIGNMENT),
+            rows: align(units_high, BLOCK_ROWS_ALIGNMENT),
+            unit_bytes: shape.bytes,
+            units_wide,
+            units_high,
         })
     }
 
@@ -77,17 +85,40 @@ impl SurfaceLayout {
     }
 
     fn new(width: u32, height: u32, shape: BlockShape) -> Self {
-        let blocks_wide = (width as usize).div_ceil(shape.texels_per_side);
-        let blocks_high = (height as usize).div_ceil(shape.texels_per_side);
-        let row_bytes = align(blocks_wide, BLOCKS_PER_ROW_ALIGNMENT) * shape.bytes;
+        let units_wide = (width as usize).div_ceil(shape.texels_per_side);
+        let units_high = (height as usize).div_ceil(shape.texels_per_side);
+        let row_bytes = align(units_wide, BLOCKS_PER_ROW_ALIGNMENT) * shape.bytes;
         Self {
             row_pitch: align(row_bytes, ROW_PITCH_ALIGNMENT_BYTES),
-            rows: align(blocks_high, BLOCK_ROWS_ALIGNMENT),
+            rows: align(units_high, BLOCK_ROWS_ALIGNMENT),
+            unit_bytes: shape.bytes,
+            units_wide,
+            units_high,
         }
     }
 
     pub(crate) fn padded_len(&self) -> usize {
         self.row_pitch * self.rows
+    }
+
+    pub(crate) fn unit_offset(&self, unit_x: usize, unit_y: usize) -> usize {
+        unit_y * self.row_pitch + unit_x * self.unit_bytes
+    }
+
+    /// The bytes a decode reads: every row above the last visible one, then only the visible
+    /// units of that row. The DLL decodes data that stops there exactly as the padded surface.
+    pub(crate) fn read_len(&self) -> usize {
+        let rows_above_last = self.units_high - 1;
+        rows_above_last * self.row_pitch + self.units_wide * self.unit_bytes
+    }
+
+    /// The start of `data` that a decode reads, or `TruncatedData` when `data` is shorter.
+    pub(crate) fn read_from<'a>(&self, data: &'a [u8]) -> Result<&'a [u8], DecodeError> {
+        let expected = self.read_len();
+        data.get(..expected).ok_or(DecodeError::TruncatedData {
+            expected,
+            actual: data.len(),
+        })
     }
 }
 
@@ -153,6 +184,14 @@ mod tests {
                 required_units: 5
             })
         );
+    }
+
+    #[test]
+    fn read_len_stops_after_the_last_visible_unit() {
+        let dxt = TextureHeader::for_image(130, 70, Compression::Dxt).unwrap();
+        let argb = TextureHeader::for_image(130, 70, Compression::None).unwrap();
+        assert_eq!(SurfaceLayout::for_header(&dxt).unwrap().read_len(), 17_936);
+        assert_eq!(SurfaceLayout::for_header(&argb).unwrap().read_len(), 53_512);
     }
 
     #[test]

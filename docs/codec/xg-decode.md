@@ -62,6 +62,13 @@ A pitch wider than the image needs decodes normally; a pitch too small for one r
 port (`DecodeError::RowPitchTooSmall`). The DLL accepts it but its output depends on memory outside the
 surface, and it crashed the harness with heap corruption, so no golden case exists for it.
 
+The DLL does not check the length of the data. Data that ends right after the last byte the decode
+reads (every row above the last visible block row at the header's pitch, then the visible blocks or
+pixels of that row) decodes exactly like the padded surface; `golden generate` checks this for every
+fixture and every crafted case the port decodes (`*decodes_at_minimum_len` in the manifest). The port
+accepts such data. Below that length the DLL reads past the buffer and its output is not stable, so
+the port refuses it (`DecodeError::TruncatedData`).
+
 ## Decode arithmetic
 
 Found by disassembling `tools/golden/dll/AuroraAsset.dll` (rizin, image base `0x10000000`) and

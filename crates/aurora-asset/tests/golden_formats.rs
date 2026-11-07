@@ -38,6 +38,15 @@ fn format_of(name: &str) -> TextureFormat {
     TextureHeader::from_bytes(support::header_bytes(&crafted_case(name).header)).format()
 }
 
+fn surface_unit(format: TextureFormat) -> support::SurfaceUnit {
+    match format {
+        TextureFormat::LinearDxt1 => support::BC1_BLOCK,
+        TextureFormat::LinearDxt4 | TextureFormat::LinearDxt5 => support::BC3_BLOCK,
+        TextureFormat::LinearArgb8888 => support::ARGB_TEXEL,
+        TextureFormat::Unsupported { .. } => panic!("an unsupported format has no surface unit"),
+    }
+}
+
 fn is_expected_refusal(name: &str) -> bool {
     EXPECTED_REFUSALS
         .iter()
@@ -74,6 +83,18 @@ fn crafted_cases_match_dll() {
                     case.decoded_sha256,
                     "{}",
                     case.name
+                );
+                assert_eq!(
+                    case.decodes_at_minimum_len,
+                    Some(true),
+                    "{}: the DLL decodes the shortened video differently",
+                    case.name
+                );
+                support::assert_decodes_at_minimum_len(
+                    &texture,
+                    surface_unit(texture.header.format()),
+                    &case.decoded_sha256,
+                    &case.name,
                 );
             }
         }

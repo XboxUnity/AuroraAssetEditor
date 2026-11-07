@@ -51,6 +51,24 @@ fn argb_decode_matches_dll() {
 }
 
 #[test]
+fn argb_decode_needs_only_the_bytes_the_dll_reads() {
+    for fixture in support::manifest().fixture {
+        assert!(
+            fixture.argb_decodes_at_minimum_len,
+            "{}: the DLL decodes the shortened video differently",
+            fixture.name
+        );
+        let encoded = encode(&support::input_rgba(&fixture.name), Compression::None).unwrap();
+        support::assert_decodes_at_minimum_len(
+            &encoded,
+            support::ARGB_TEXEL,
+            &fixture.argb_decoded_sha256,
+            &fixture.name,
+        );
+    }
+}
+
+#[test]
 fn rejects_zero_and_oversized_dimensions() {
     for (width, height) in [(0, 10), (MAX_DIMENSION + 1, 1)] {
         let image = RgbaImage::new(width, height);
