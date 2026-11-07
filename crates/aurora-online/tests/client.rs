@@ -134,6 +134,7 @@ fn xboxunity_unknown_title_is_empty() {
 
     assert!(covers.is_empty());
     assert_eq!(server.requests(), ["/api/Covers/FFFFFFFF"]);
+    assert!(server.unmatched().is_empty());
 }
 
 #[test]
@@ -152,6 +153,7 @@ fn xboxunity_http_error_is_reported() {
         Err(OnlineError::HttpStatus { status: 500, .. })
     ));
     assert_eq!(server.requests(), ["/api/Covers/00000001"]);
+    assert!(server.unmatched().is_empty());
 }
 
 #[test]
@@ -161,6 +163,7 @@ fn html_instead_of_json_is_invalid_response() {
     let result = client_for(&server).find_covers(CoverSource::XboxUnity, &title(1));
 
     assert!(matches!(result, Err(OnlineError::InvalidResponse { .. })));
+    assert!(server.unmatched().is_empty());
 }
 
 #[test]
@@ -205,6 +208,7 @@ fn archive_unknown_title_is_empty() {
 
     assert!(covers.is_empty());
     assert_eq!(server.requests(), [format!("{ARCHIVE_PATH}FFFFFFFF/")]);
+    assert!(server.unmatched().is_empty());
 }
 
 #[test]
@@ -216,6 +220,7 @@ fn archive_rejects_keywords() {
 
     assert!(matches!(result, Err(OnlineError::KeywordsNeedXboxUnity)));
     assert!(server.requests().is_empty());
+    assert!(server.unmatched().is_empty());
 }
 
 #[test]
@@ -247,6 +252,7 @@ fn download_follows_redirect() {
 
     assert_eq!(bytes, recorded("xboxunity_thumbnail_225.jpg"));
     assert_eq!(server.requests(), ["/moved", "/api/boxartsm/225"]);
+    assert!(server.unmatched().is_empty());
 }
 
 #[test]
@@ -256,6 +262,7 @@ fn empty_image_is_error() {
     let result = client_for(&server).download_image(&format!("{}/empty.png", server.base_url()));
 
     assert!(matches!(result, Err(OnlineError::EmptyImage { .. })));
+    assert!(server.unmatched().is_empty());
 }
 
 #[test]
@@ -270,6 +277,7 @@ fn truncated_body_is_error() {
     let result = client_for(&server).download_image(&format!("{}/cut.png", server.base_url()));
 
     assert!(matches!(result, Err(OnlineError::Request { .. })));
+    assert!(server.unmatched().is_empty());
 }
 
 #[test]
@@ -283,6 +291,7 @@ fn failed_download_is_not_retried() {
         Err(OnlineError::HttpStatus { status: 404, .. })
     ));
     assert_eq!(server.requests(), ["/gone.png"]);
+    assert!(server.unmatched().is_empty());
 }
 
 #[test]
@@ -305,6 +314,7 @@ fn unresponsive_server_times_out() {
         "gave up after {elapsed:?}"
     );
     assert!(elapsed < Duration::from_secs(3), "took {elapsed:?}");
+    assert!(server.unmatched().is_empty());
 }
 
 #[test]
@@ -340,6 +350,7 @@ fn random_cover_downloads_seeded_choice() {
             format!("/api/boxart/{}", expected_index + 1)
         ]
     );
+    assert!(server.unmatched().is_empty());
 }
 
 #[test]
@@ -356,6 +367,7 @@ fn random_cover_without_results_is_none() {
 
     assert_eq!(cover, None);
     assert_eq!(server.requests(), ["/api/Covers/FFFFFFFF"]);
+    assert!(server.unmatched().is_empty());
 }
 
 #[test]
@@ -397,6 +409,7 @@ fn archive_server_error_is_not_zero_results() {
         result,
         Err(OnlineError::HttpStatus { status: 500, .. })
     ));
+    assert!(server.unmatched().is_empty());
 }
 
 #[test]
@@ -414,6 +427,7 @@ fn body_over_the_size_limit_is_error() {
     let result = client.download_image(&format!("{}/big.png", server.base_url()));
 
     assert!(matches!(result, Err(OnlineError::Request { .. })));
+    assert!(server.unmatched().is_empty());
 }
 
 #[test]
@@ -430,6 +444,7 @@ fn redirect_loop_is_error() {
     let result = client_for(&server).download_image(&format!("{}/loop", server.base_url()));
 
     assert!(matches!(result, Err(OnlineError::Request { .. })));
+    assert!(server.unmatched().is_empty());
 }
 
 #[test]
@@ -461,4 +476,5 @@ fn random_cover_reaches_every_index() {
     }
 
     assert_eq!(reached.len(), 3);
+    assert!(server.unmatched().is_empty());
 }
