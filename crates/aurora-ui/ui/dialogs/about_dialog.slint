@@ -1,0 +1,133 @@
+import { AboutSlint } from "std-widgets.slint";
+import { Theme } from "../theme/theme.slint";
+import { DialogModel } from "../model/dialog_model.slint";
+import { PillButton } from "../controls/pill_button.slint";
+import { DialogFrame } from "dialog_frame.slint";
+
+// Build information, licences, and the "Made with Slint" widget that the Slint royalty-free licence requires in an
+// About screen reachable from the top-level menu.
+export component AboutDialog inherits DialogFrame {
+    title: DialogModel.title;
+    card-width: Theme.about-dialog-width;
+
+    property <bool> notices-shown;
+
+    first-has-focus: copy-button.has-focus;
+    last-has-focus: ok-button.has-focus;
+    focus-first => {
+        copy-button.focus();
+    }
+    focus-last => {
+        ok-button.focus();
+    }
+
+    init => {
+        self.take-focus();
+    }
+
+    Text {
+        text: DialogModel.about-heading;
+        color: Theme.text-strong;
+        font-weight: Theme.semibold-font-weight;
+        wrap: word-wrap;
+    }
+
+    Text {
+        text: DialogModel.about-credits;
+        color: Theme.text;
+        wrap: word-wrap;
+    }
+
+    Text {
+        text: DialogModel.about-commit;
+        color: Theme.text-muted;
+        wrap: word-wrap;
+    }
+
+    Text {
+        text: DialogModel.about-built;
+        color: Theme.text-muted;
+        wrap: word-wrap;
+    }
+
+    if DialogModel.about-run != "": Text {
+        text: DialogModel.about-run;
+        color: Theme.text-muted;
+        wrap: word-wrap;
+    }
+
+    HorizontalLayout {
+        alignment: start;
+
+        copy-button := PillButton {
+            text: "Copy build info";
+            focusable: true;
+            clicked => {
+                DialogModel.copy-build-info();
+            }
+        }
+    }
+
+    Text {
+        text: "Public domain (Unlicense)";
+        color: Theme.text;
+    }
+
+    HorizontalLayout {
+        alignment: start;
+
+        notices-button := PillButton {
+            text: "Third-party notices";
+            has-chevron: true;
+            focusable: true;
+            clicked => {
+                root.notices-shown = !root.notices-shown;
+            }
+        }
+    }
+
+    if root.notices-shown: notices-box := Rectangle {
+        height: Theme.dialog-text-max-height;
+        border-width: Theme.border-width;
+        border-color: Theme.border;
+        border-radius: Theme.dialog-radius;
+        clip: true;
+
+        Flickable {
+            viewport-height: notices.preferred-height;
+
+            notices := Text {
+                x: Theme.dialog-gap;
+                width: parent.width - 2 * Theme.dialog-gap;
+                text: DialogModel.about-notices;
+                color: Theme.text-muted;
+                wrap: word-wrap;
+            }
+        }
+    }
+
+    about-slint := AboutSlint { }
+
+    HorizontalLayout {
+        spacing: Theme.dialog-button-gap;
+
+        log-button := PillButton {
+            text: "Open log folder";
+            focusable: true;
+            clicked => {
+                DialogModel.open-log-folder();
+            }
+        }
+
+        Rectangle { }
+
+        ok-button := PillButton {
+            text: "OK";
+            accent: true;
+            focusable: true;
+            clicked => {
+                DialogModel.accept();
+            }
+        }
+    }
+}

@@ -183,6 +183,10 @@ impl AppHarness {
         self.clipboard.text()
     }
 
+    pub fn folder_opener(&self) -> FakeFolderOpenerHandle {
+        self.folder_opener.clone()
+    }
+
     pub fn opened_folders(&self) -> Vec<PathBuf> {
         self.folder_opener.opened()
     }

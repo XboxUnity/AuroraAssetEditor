@@ -16,8 +16,7 @@ const NO_GAME_TEXT: &str = "no game selected";
 /// Re-renders the whole window after an action.
 pub(super) type Refresh = Rc<dyn Fn(&App)>;
 
-/// Connects the top bar, sidebar, menus and status line to `app`. `show-about` stays with the About dialog's
-/// view, and the gear menu's About item ends there too.
+/// Connects the top bar, sidebar, menus and status line to `app`.
 pub(super) fn connect_shell(window: &MainWindow, app: &Rc<RefCell<App>>, refresh: &Refresh) {
     let shell = window.global::<ShellModel>();
 
@@ -28,16 +27,13 @@ pub(super) fn connect_shell(window: &MainWindow, app: &Rc<RefCell<App>>, refresh
     shell.on_toggle_menu(move |menu| act(&mut |app| app.toggle_menu(menu_of(menu))));
 
     let act = action_runner(app, refresh);
-    let weak_window = window.as_weak();
     shell.on_menu_action(move |item| {
         let action = menu_action_of(item);
         act(&mut |app| app.menu_action(action));
-        if action == MenuAction::About
-            && let Some(window) = weak_window.upgrade()
-        {
-            window.global::<ShellModel>().invoke_show_about();
-        }
     });
+
+    let act = action_runner(app, refresh);
+    shell.on_show_about(move || act(&mut |app| app.show_about()));
 
     let act = action_runner(app, refresh);
     shell.on_stop_bulk(move || act(&mut |app| app.stop_bulk()));

@@ -11,6 +11,7 @@ mod gdiplus_tool;
 mod golden;
 mod gray16_table;
 mod minimum_read;
+mod notices;
 mod prng;
 mod record_online;
 mod srgb_profile;
@@ -20,7 +21,8 @@ mod synthetic;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-const USAGE: &str = "usage: cargo xtask golden <generate [--refresh-inputs] | check>\n       cargo xtask cross-decode [<image files>...]\n       cargo xtask cross-samples\n       cargo xtask content-db-samples";
+const USAGE: &str = "usage: cargo xtask golden <generate [--refresh-inputs] | check>\n       cargo xtask cross-decode [<image files>...]\n       cargo xtask cross-samples\n       cargo xtask content-db-samples
+       cargo xtask notices [--check]";
 
 fn main() -> ExitCode {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
@@ -35,6 +37,8 @@ fn main() -> ExitCode {
         ["gdiplus-report"] => gdiplus_report::write_report(),
         ["gray16-table"] => gray16_table::write_table(),
         ["record-online"] => record_online::record(),
+        ["notices"] => notices::run(false),
+        ["notices", "--check"] => notices::run(true),
         ["cross-decode", files @ ..] => {
             let files: Vec<PathBuf> = files.iter().map(PathBuf::from).collect();
             cross_decode::run(&files)

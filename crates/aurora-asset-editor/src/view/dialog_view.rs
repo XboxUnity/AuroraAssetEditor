@@ -5,7 +5,8 @@ use aurora_online::CoverSource;
 use aurora_ui::{ChoiceView, DialogKind, DialogModel, MainWindow};
 use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
 
-use crate::app::App;
+use crate::about::{BuildInfo, notices_text};
+use crate::app::{ABOUT_TITLE, App};
 use crate::dialogs::{BulkForm, ChoiceId, ConnectionForm, Modal, ModalAnswer, ModalField};
 use crate::status::Severity;
 
@@ -15,6 +16,8 @@ use super::shell_view::{Refresh, action_runner};
 /// Add to free slots).
 const CHOICE_BUTTONS: usize = 2;
 const CONNECTION_TITLE: &str = "Console connection";
+const APP_NAME: &str = "Aurora Asset Editor";
+const ABOUT_CREDITS: &str = "by Swizzy, thanks to MaesterRowen";
 const BULK_TITLE: &str = "Bulk actions";
 const BULK_SOURCES: [CoverSource; 2] = [CoverSource::XboxUnity, CoverSource::InternetArchive];
 const TITLE_ID_FIELDS: [ModalField; 1] = [ModalField::TitleId];
@@ -73,10 +76,16 @@ pub(super) fn connect_dialogs(window: &MainWindow, app: &Rc<RefCell<App>>, refre
 
     let act = action_runner(app, refresh);
     dialog.on_set_bulk_replace(move |replace| act(&mut |app| app.set_bulk_replace(replace)));
+
+    let act = action_runner(app, refresh);
+    dialog.on_copy_build_info(move || act(&mut |app| app.copy_build_info()));
+
+    let act = action_runner(app, refresh);
+    dialog.on_open_log_folder(move || act(&mut |app| app.open_log_folder()));
 }
 
 pub(super) fn render_dialogs(window: &MainWindow, app: &App) {
-    let content = DialogContent::of(app.modal());
+    let content = DialogContent::of(app.modal(), app.build_info());
     let dialog = window.global::<DialogModel>();
     dialog.set_kind(content.kind);
     dialog.set_title(content.title.into());
@@ -90,6 +99,12 @@ pub(super) fn render_dialogs(window: &MainWindow, app: &App) {
     dialog.set_test_status_is_error(content.test_status_is_error);
     dialog.set_bulk_source_index(content.bulk_source_index);
     dialog.set_bulk_replace(content.bulk_replace);
+    dialog.set_about_heading(content.about_heading.into());
+    dialog.set_about_credits(content.about_credits.into());
+    dialog.set_about_commit(content.about_commit.into());
+    dialog.set_about_built(content.about_built.into());
+    dialog.set_about_run(content.about_run.into());
+    dialog.set_about_notices(content.about_notices.into());
 }
 
 /// What the dialog model shows for one modal.
@@ -107,10 +122,16 @@ struct DialogContent {
     test_status_is_error: bool,
     bulk_source_index: i32,
     bulk_replace: bool,
+    about_heading: String,
+    about_credits: String,
+    about_commit: String,
+    about_built: String,
+    about_run: String,
+    about_notices: String,
 }
 
 impl DialogContent {
-    fn of(modal: Option<&Modal>) -> DialogContent {
+    fn of(modal: Option<&Modal>, build: &BuildInfo) -> DialogContent {
         let Some(modal) = modal else {
             return DialogContent::default();
         };
@@ -184,6 +205,7 @@ impl DialogContent {
             },
             Modal::Connection { form } => DialogContent::connection(form, shown),
             Modal::Bulk { form } => DialogContent::bulk(form, shown),
+            Modal::About => DialogContent::about(build, shown),
         }
     }
 
@@ -200,6 +222,24 @@ impl DialogContent {
                 .to_vec(),
             test_status,
             test_status_is_error,
+            ..shown
+        }
+    }
+
+    fn about(build: &BuildInfo, shown: DialogContent) -> DialogContent {
+        let run = match &build.run_url {
+            Some(url) => format!("Run {url}"),
+            None => String::new(),
+        };
+        DialogContent {
+            kind: DialogKind::About,
+            title: ABOUT_TITLE.to_owned(),
+            about_heading: format!("{APP_NAME} {}", build.pill_text()),
+            about_credits: ABOUT_CREDITS.to_owned(),
+            about_commit: format!("Commit {}", build.full_hash),
+            about_built: format!("Built {} for {}", build.build_date, build.target),
+            about_run: run,
+            about_notices: notices_text(),
             ..shown
         }
     }

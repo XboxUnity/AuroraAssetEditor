@@ -1,10 +1,11 @@
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 use std::collections::HashSet;
 use std::path::PathBuf;
 use std::rc::Rc;
 
 use aurora_asset::{AssetSlot, Compression, ScreenshotNumber};
 use aurora_asset_editor::app::{App, CurrentGame, Menu, Page};
+use aurora_asset_editor::dialogs::{Modal, ModalAnswer};
 use aurora_asset_editor::platform::SystemTheme;
 use aurora_asset_editor::settings::ThemeChoice;
 use aurora_asset_editor::view::{ImageCache, MainWindowView};
@@ -390,19 +391,17 @@ fn build_pill_shows_pill_text() {
 }
 
 #[test]
-fn build_pill_and_gear_about_ask_for_the_about_dialog() {
+fn build_pill_and_gear_about_show_the_about_dialog() {
     let mut harness = AppHarness::new();
     let shell = Shell::start(&mut harness);
-    let requests = Rc::new(Cell::new(0));
-    let counter = Rc::clone(&requests);
-    shell
-        .model()
-        .on_show_about(move || counter.set(counter.get() + 1));
 
     shell
         .element("StatusLine::build-pill")
         .mock_single_click(PointerEventButton::Left);
-    assert_eq!(requests.get(), 1);
+    assert!(matches!(shell.app.borrow().modal(), Some(Modal::About)));
+    shell.app.borrow_mut().answer_modal(ModalAnswer::Accept);
+    assert!(shell.app.borrow().modal().is_none());
+    shell.view.render(&shell.app.borrow());
 
     shell
         .element("TopBar::gear-button")
@@ -412,7 +411,7 @@ fn build_pill_and_gear_about_ask_for_the_about_dialog() {
         .next()
         .expect("the gear menu has an About item");
     about.invoke_accessible_default_action();
-    assert_eq!(requests.get(), 2);
+    assert!(matches!(shell.app.borrow().modal(), Some(Modal::About)));
     assert_eq!(shell.app.borrow().open_menu(), None);
 }
 

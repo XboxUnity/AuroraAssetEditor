@@ -1,0 +1,34 @@
+# Licences the dependency tree needs. Slint's royalty-free licence is listed before any GPL, and no GPL is ever accepted.
+accepted = [
+    "LicenseRef-Slint-Royalty-free-2.0",
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "Unicode-3.0",
+    "MPL-2.0",
+    "CC0-1.0",
+    "BSL-1.0",
+    "0BSD",
+    "Unlicense",
+    "OFL-1.1",
+    "LicenseRef-UFL-1.0",
+    "CDLA-Permissive-2.0",
+]
+targets = [
+    "x86_64-pc-windows-msvc",
+    "x86_64-apple-darwin",
+    "aarch64-apple-darwin",
+    "x86_64-unknown-linux-gnu",
+    "aarch64-unknown-linux-gnu",
+]
+ignore-build-dependencies = true
+ignore-dev-dependencies = true
+
+# ring ships one composite licence file; cargo-about has a built-in workaround for it.
+workarounds = ["ring"]
+
+

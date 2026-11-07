@@ -7,35 +7,50 @@ use aurora_asset_editor::platform::FolderOpener;
 
 /// Records the folders the app asked to show.
 pub struct FakeFolderOpener {
-    opened: Rc<RefCell<Vec<PathBuf>>>,
+    state: Rc<RefCell<FolderOpenerState>>,
+}
+
+#[derive(Default)]
+struct FolderOpenerState {
+    opened: Vec<PathBuf>,
+    failure: Option<String>,
 }
 
 #[derive(Clone)]
 pub struct FakeFolderOpenerHandle {
-    opened: Rc<RefCell<Vec<PathBuf>>>,
+    state: Rc<RefCell<FolderOpenerState>>,
 }
 
 impl FakeFolderOpener {
     pub fn new() -> (FakeFolderOpener, FakeFolderOpenerHandle) {
-        let opened = Rc::new(RefCell::new(Vec::new()));
+        let state = Rc::new(RefCell::new(FolderOpenerState::default()));
         (
             FakeFolderOpener {
-                opened: Rc::clone(&opened),
+                state: Rc::clone(&state),
             },
-            FakeFolderOpenerHandle { opened },
+            FakeFolderOpenerHandle { state },
         )
     }
 }
 
 impl FakeFolderOpenerHandle {
     pub fn opened(&self) -> Vec<PathBuf> {
-        self.opened.borrow().clone()
+        self.state.borrow().opened.clone()
+    }
+
+    /// Every later open fails with an error that carries `message`.
+    pub fn fail_with(&self, message: &str) {
+        self.state.borrow_mut().failure = Some(message.to_owned());
     }
 }
 
 impl FolderOpener for FakeFolderOpener {
     fn open_folder(&mut self, path: &Path) -> io::Result<()> {
-        self.opened.borrow_mut().push(path.to_path_buf());
+        let mut state = self.state.borrow_mut();
+        if let Some(message) = &state.failure {
+            return Err(io::Error::other(message.clone()));
+        }
+        state.opened.push(path.to_path_buf());
         Ok(())
     }
 }

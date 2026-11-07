@@ -17,6 +17,20 @@ pub struct BuildInfo {
 }
 
 impl BuildInfo {
+    /// The build this program is: the values `build.rs` captured when it was compiled.
+    pub fn current() -> BuildInfo {
+        let run_url = env!("AURORA_BUILD_RUN_URL");
+        BuildInfo {
+            version: env!("CARGO_PKG_VERSION").to_owned(),
+            short_hash: env!("AURORA_GIT_HASH").to_owned(),
+            full_hash: env!("AURORA_GIT_HASH_FULL").to_owned(),
+            dirty: env!("AURORA_GIT_DIRTY") == "true",
+            build_date: env!("AURORA_BUILD_DATE").to_owned(),
+            target: env!("AURORA_TARGET").to_owned(),
+            run_url: (!run_url.is_empty()).then(|| run_url.to_owned()),
+        }
+    }
+
     /// "2.0.7 (a1b2c3d)", or "2.0.7 (a1b2c3d.dirty)" for a dirty tree.
     pub fn pill_text(&self) -> String {
         let dirty_mark = if self.dirty { DIRTY_MARK } else { "" };

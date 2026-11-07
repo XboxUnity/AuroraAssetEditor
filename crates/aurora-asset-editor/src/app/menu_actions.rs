@@ -36,7 +36,7 @@ impl App {
                 self.set_use_compression(!self.settings.use_compression)
             }
             MenuAction::Theme(theme) => self.set_theme(theme),
-            MenuAction::About => {}
+            MenuAction::About => self.show_about(),
             MenuAction::Download(choice) => self.download(choice),
             MenuAction::Upload(choice) => self.upload_current(choice),
             MenuAction::Remove(choice) => self.remove_from_console(choice),

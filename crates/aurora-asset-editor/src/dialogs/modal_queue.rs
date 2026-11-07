@@ -34,7 +34,8 @@ impl ModalQueue {
             | Modal::TitleId { .. }
             | Modal::UploadTarget { .. }
             | Modal::Confirm { .. }
-            | Modal::Bulk { .. } => None,
+            | Modal::Bulk { .. }
+            | Modal::About => None,
         })
     }
 
@@ -47,7 +48,8 @@ impl ModalQueue {
             | Modal::TitleId { .. }
             | Modal::UploadTarget { .. }
             | Modal::Confirm { .. }
-            | Modal::Connection { .. } => None,
+            | Modal::Connection { .. }
+            | Modal::About => None,
         })
     }
 

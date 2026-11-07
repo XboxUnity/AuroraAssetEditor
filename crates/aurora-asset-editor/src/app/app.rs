@@ -123,7 +123,7 @@ impl App {
             return;
         };
         match (modal, answer) {
-            (Modal::Message { .. } | Modal::Connection { .. }, _) => {}
+            (Modal::Message { .. } | Modal::Connection { .. } | Modal::About, _) => {}
             (Modal::Bulk { form }, ModalAnswer::Accept) => self.start_bulk(&form),
             (Modal::Bulk { .. }, ModalAnswer::Cancel | ModalAnswer::Choice(_)) => {}
             (Modal::UploadTarget { form, .. }, ModalAnswer::Accept) => {
@@ -169,7 +169,8 @@ impl App {
             | Modal::UploadTarget { .. }
             | Modal::Confirm { .. }
             | Modal::Connection { .. }
-            | Modal::Bulk { .. } => false,
+            | Modal::Bulk { .. }
+            | Modal::About => false,
         };
         if offered {
             None

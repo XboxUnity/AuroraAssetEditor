@@ -1,5 +1,6 @@
 import { DialogKind } from "../model/dialog_kind.slint";
 import { DialogModel } from "../model/dialog_model.slint";
+import { AboutDialog } from "about_dialog.slint";
 import { BulkDialog } from "bulk_dialog.slint";
 import { ChoiceDialog } from "choice_dialog.slint";
 import { ConfirmDialog } from "confirm_dialog.slint";
@@ -17,4 +18,5 @@ export component DialogHost inherits Rectangle {
     if DialogModel.kind == DialogKind.upload-target: UploadTargetDialog { }
     if DialogModel.kind == DialogKind.connection: ConnectionDialog { }
     if DialogModel.kind == DialogKind.bulk: BulkDialog { }
+    if DialogModel.kind == DialogKind.about: AboutDialog { }
 }

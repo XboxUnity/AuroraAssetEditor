@@ -1,3 +1,4 @@
+mod about_actions;
 #[allow(
     clippy::module_inception,
     reason = "each file is named after the type it holds"
@@ -22,6 +23,7 @@ mod save_actions;
 mod settings_actions;
 mod startup_settings;
 
+pub use about_actions::{ABOUT_TITLE, COPY_BUILD_INFO_FAILED, OPEN_LOG_FOLDER_FAILED};
 pub use app::{App, DIALOG_FAILED_TITLE, LOG_WRITE_FAILED};
 pub use app_environment::{AppEnvironment, StartupProblem};
 pub use bulk_actions::{BULK_FINISHED_TITLE, BULK_TITLE, NO_ASSETS_TEXT};

@@ -41,6 +41,8 @@ pub enum Modal {
     Connection {
         form: ConnectionForm,
     },
+    /// Build information and licences: OK closes it; the buttons copy the build info and open the log folder.
+    About,
     /// Bulk covers: Start (accept) and Cancel.
     Bulk {
         form: BulkForm,
