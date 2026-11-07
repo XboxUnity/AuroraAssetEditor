@@ -6,12 +6,12 @@
 
 use std::path::Path;
 
-use anyhow::{Context, Result, ensure};
+use anyhow::Result;
+use aurora_asset::{TextureFormat, TextureHeader};
 use serde::{Deserialize, Serialize};
 
-use crate::golden::{
-    Paths, bgra_to_rgba, os, run_harness, run_harness_allowing_refusal, sha256_hex,
-};
+use crate::golden::{Paths, dll_decode, os, run_harness, sha256_hex};
+use crate::minimum_read::{self, LinearTexture, SurfaceUnit};
 use crate::synthetic::Prng;
 
 pub const CRAFTED_DIRECTORY: &str = "crafted";
@@ -113,6 +113,10 @@ pub struct Crafted {
     /// The case whose decoded pixels this one equals, so no pixels are stored for it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     same_as: Option<String>,
+    /// For a header the port decodes: whether the DLL decodes the video cut to the bytes it reads
+    /// to the same pixels.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    decodes_at_minimum_len: Option<bool>,
 }
 
 impl Crafted {
@@ -158,6 +162,13 @@ impl Surface {
             Self::Bc1 => DXT1_BLOCK_BYTES,
             Self::Bc3 => BC3_BLOCK_BYTES,
             Self::Argb => ARGB_BYTES,
+        }
+    }
+
+    fn unit(self) -> SurfaceUnit {
+        SurfaceUnit {
+            texels_per_side: self.texels_per_side(),
+            bytes: self.unit_bytes(),
         }
     }
 
@@ -508,62 +519,6 @@ fn crafted_header(base: [u8; HEADER_BYTE_LENGTH], case: &Case) -> [u8; HEADER_BY
     header
 }
 
-/// The DLL's RGBA decode of the case, or `None` when it refuses the header.
-fn dll_decode(
-    paths: &Paths,
-    work_dir: &Path,
-    case: &Case,
-    header: &[u8; HEADER_BYTE_LENGTH],
-    video: &[u8],
-) -> Result<Option<Vec<u8>>> {
-    let header_path = work_dir.join("crafted.header");
-    let video_path = work_dir.join("crafted.video");
-    let decoded_path = work_dir.join("crafted.bgra");
-    std::fs::write(&header_path, header)?;
-    std::fs::write(&video_path, video)?;
-    if decoded_path.exists() {
-        std::fs::remove_file(&decoded_path)?;
-    }
-    let report = run_harness_allowing_refusal(
-        paths,
-        &[
-            os("decode"),
-            os("--dll"),
-            paths.dll().into(),
-            os("--header"),
-            header_path.into(),
-            os("--video"),
-            video_path.into(),
-            os("--out"),
-            decoded_path.clone().into(),
-        ],
-    )
-    .with_context(|| format!("crafted case {}", case.name))?;
-    let Some(report) = report else {
-        return Ok(None);
-    };
-    let bgra = std::fs::read(&decoded_path)?;
-    let reported_pixels = report
-        .split_whitespace()
-        .map(str::parse::<usize>)
-        .product::<Result<usize, _>>()
-        .with_context(|| {
-            format!(
-                "{}: unreadable decode report {:?}",
-                case.name,
-                report.trim()
-            )
-        })?;
-    ensure!(
-        bgra.len() == reported_pixels * BYTES_PER_PIXEL,
-        "{}: decode report {:?} does not match {} output bytes",
-        case.name,
-        report.trim(),
-        bgra.len()
-    );
-    Ok(Some(bgra_to_rgba(&bgra)))
-}
-
 /// Decodes every crafted case with the DLL and writes the videos and decoded pixels.
 pub fn write_crafted(paths: &Paths, work_dir: &Path, out_dir: &Path) -> Result<Vec<Crafted>> {
     let crafted_dir = out_dir.join(CRAFTED_DIRECTORY);
@@ -581,8 +536,29 @@ pub fn write_crafted(paths: &Paths, work_dir: &Path, out_dir: &Path) -> Result<V
         let video_file = format!("{CRAFTED_DIRECTORY}/{}", case.video_file_name());
         std::fs::write(out_dir.join(&video_file), &video)?;
 
-        let decoded = dll_decode(paths, work_dir, case, &header, &video)?;
+        let decoded = dll_decode(paths, work_dir, &case.name, &header, &video)?;
         let decoded_sha256 = decoded.as_deref().map(sha256_hex).unwrap_or_default();
+        let port_decodes = !matches!(
+            TextureHeader::from_bytes(header).format(),
+            TextureFormat::Unsupported { .. }
+        );
+        let decodes_at_minimum_len = if decoded.is_some() && port_decodes {
+            let texture = LinearTexture {
+                header: &header,
+                video: &video,
+                size: (case.width, case.height),
+                unit: case.surface.unit(),
+            };
+            Some(minimum_read::decodes_at_minimum_len(
+                paths,
+                work_dir,
+                &case.name,
+                &texture,
+                &decoded_sha256,
+            )?)
+        } else {
+            None
+        };
         let same_as = case
             .baseline
             .as_ref()
@@ -599,6 +575,7 @@ pub fn write_crafted(paths: &Paths, work_dir: &Path, out_dir: &Path) -> Result<V
             dll_accepted: decoded.is_some(),
             decoded_sha256,
             same_as,
+            decodes_at_minimum_len,
         });
     }
     Ok(crafted)

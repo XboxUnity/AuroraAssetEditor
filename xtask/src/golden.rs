@@ -12,6 +12,7 @@ use sha2::{Digest, Sha256};
 
 use crate::crafted::{self, Crafted};
 use crate::dds_corpus::{self, DdsSample};
+use crate::minimum_read::{self, LinearTexture, SurfaceUnit};
 use crate::synthetic;
 
 const HARNESS_TARGET: &str = "i686-pc-windows-msvc";
@@ -21,6 +22,8 @@ const MAX_STORED_ARGB_PIXELS: u32 = 65_536;
 const DXT_DECODED_STORED_NAMES: [&str; 2] = ["alphagrad", "alphanoise"];
 const DXT_DECODED_STORED_PREFIX: &str = "odd_";
 const BYTES_PER_PIXEL: usize = 4;
+const BC3_BLOCK_SIDE: usize = 4;
+const BC3_BLOCK_BYTES: usize = 16;
 const HEADER_BYTE_LENGTH: usize = 52;
 const HARNESS_ENCODE_REFUSED_EXIT_CODE: i32 = 4;
 const HARNESS_DECODE_REFUSED_EXIT_CODE: i32 = 5;
@@ -58,6 +61,9 @@ struct Fixture {
     argb_decoded_sha256: String,
     argb_video_stored: bool,
     dxt_decoded_stored: bool,
+    /// Whether the DLL decodes the video cut to the bytes it reads to the same pixels.
+    dxt_decodes_at_minimum_len: bool,
+    argb_decodes_at_minimum_len: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -73,12 +79,26 @@ impl Compression {
             Compression::None => "none",
         }
     }
+
+    fn surface_unit(self) -> SurfaceUnit {
+        match self {
+            Compression::Dxt => SurfaceUnit {
+                texels_per_side: BC3_BLOCK_SIDE,
+                bytes: BC3_BLOCK_BYTES,
+            },
+            Compression::None => SurfaceUnit {
+                texels_per_side: 1,
+                bytes: BYTES_PER_PIXEL,
+            },
+        }
+    }
 }
 
 struct Encoded {
-    header_hex: String,
+    header: [u8; HEADER_BYTE_LENGTH],
     video: Vec<u8>,
     decoded_rgba: Vec<u8>,
+    decodes_at_minimum_len: bool,
 }
 
 /// The DLL's DXT decode is stored for the fixtures where our decode is compared pixel by pixel:
@@ -279,17 +299,82 @@ fn encode_and_decode(
     );
 
     let header = std::fs::read(&header_path)?;
-    ensure!(
-        header.len() == HEADER_BYTE_LENGTH,
-        "header is {} bytes, expected {HEADER_BYTE_LENGTH}",
-        header.len()
-    );
-    let decoded_bgra = std::fs::read(&decoded_path)?;
+    let header: [u8; HEADER_BYTE_LENGTH] = header.try_into().map_err(|header: Vec<u8>| {
+        anyhow::anyhow!(
+            "header is {} bytes, expected {HEADER_BYTE_LENGTH}",
+            header.len()
+        )
+    })?;
+    let video = std::fs::read(&video_path)?;
+    let decoded_rgba = bgra_to_rgba(&std::fs::read(&decoded_path)?);
+    let texture = LinearTexture {
+        header: &header,
+        video: &video,
+        size: (width, height),
+        unit: compression.surface_unit(),
+    };
+    let decodes_at_minimum_len = minimum_read::decodes_at_minimum_len(
+        paths,
+        work_dir,
+        compression.harness_name(),
+        &texture,
+        &sha256_hex(&decoded_rgba),
+    )?;
     Ok(Encoded {
-        header_hex: hex::encode(&header),
-        video: std::fs::read(&video_path)?,
-        decoded_rgba: bgra_to_rgba(&decoded_bgra),
+        header,
+        video,
+        decoded_rgba,
+        decodes_at_minimum_len,
     })
+}
+
+/// The DLL's RGBA decode of a texture, or `None` when it refuses it.
+pub(crate) fn dll_decode(
+    paths: &Paths,
+    work_dir: &Path,
+    label: &str,
+    header: &[u8],
+    video: &[u8],
+) -> Result<Option<Vec<u8>>> {
+    let header_path = work_dir.join("decode.header");
+    let video_path = work_dir.join("decode.video");
+    let decoded_path = work_dir.join("decode.bgra");
+    std::fs::write(&header_path, header)?;
+    std::fs::write(&video_path, video)?;
+    if decoded_path.exists() {
+        std::fs::remove_file(&decoded_path)?;
+    }
+    let report = run_harness_allowing_refusal(
+        paths,
+        &[
+            os("decode"),
+            os("--dll"),
+            paths.dll().into(),
+            os("--header"),
+            header_path.into(),
+            os("--video"),
+            video_path.into(),
+            os("--out"),
+            decoded_path.clone().into(),
+        ],
+    )
+    .with_context(|| format!("decoding {label}"))?;
+    let Some(report) = report else {
+        return Ok(None);
+    };
+    let bgra = std::fs::read(&decoded_path)?;
+    let reported_pixels = report
+        .split_whitespace()
+        .map(str::parse::<usize>)
+        .product::<Result<usize, _>>()
+        .with_context(|| format!("{label}: unreadable decode report {:?}", report.trim()))?;
+    ensure!(
+        bgra.len() == reported_pixels * BYTES_PER_PIXEL,
+        "{label}: decode report {:?} does not match {} output bytes",
+        report.trim(),
+        bgra.len()
+    );
+    Ok(Some(bgra_to_rgba(&bgra)))
 }
 
 fn sorted_input_pngs(inputs_dir: &Path) -> Result<Vec<PathBuf>> {
@@ -351,14 +436,16 @@ fn write_goldens(paths: &Paths, inputs_dir: &Path, out_dir: &Path) -> Result<Man
             name,
             width,
             height,
-            dxt_header: dxt.header_hex,
+            dxt_header: hex::encode(dxt.header),
             dxt_video_sha256: sha256_hex(&dxt.video),
             dxt_decoded_sha256: sha256_hex(&dxt.decoded_rgba),
-            argb_header: argb.header_hex,
+            argb_header: hex::encode(argb.header),
             argb_video_sha256: sha256_hex(&argb.video),
             argb_decoded_sha256: sha256_hex(&argb.decoded_rgba),
             argb_video_stored,
             dxt_decoded_stored,
+            dxt_decodes_at_minimum_len: dxt.decodes_at_minimum_len,
+            argb_decodes_at_minimum_len: argb.decodes_at_minimum_len,
         });
     }
     let crafted = crafted::write_crafted(paths, &work_path, out_dir)?;

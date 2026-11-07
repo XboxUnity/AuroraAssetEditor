@@ -10,6 +10,8 @@ argb_video_sha256 = "ccc3caed3e7a709d8b21b98d7f8b5ba4ecf9263d57518d96c99b07b9d78
 argb_decoded_sha256 = "90c2ba6db41cec59b006f269d29a0cfa69b661c4eb4a3f083169bf24e65d642a"
 argb_video_stored = true
 dxt_decoded_stored = false
+dxt_decodes_at_minimum_len = true
+argb_decodes_at_minimum_len = true
 
 [[fixture]]
 name = "alpha_zero"
@@ -23,6 +25,8 @@ argb_video_sha256 = "1d07781f0f7be98315bd59056315c7d8ca9223bee8875b84e9892a05fee
 argb_decoded_sha256 = "451e05ac9198b44d14d2d9fa44c9cacc22b749f693d01cb70a34755aa27b20f6"
 argb_video_stored = true
 dxt_decoded_stored = false
+dxt_decodes_at_minimum_len = true
+argb_decodes_at_minimum_len = true
 
 [[fixture]]
 name = "alphagrad"
@@ -36,6 +40,8 @@ argb_video_sha256 = "325f58545b40a31ceef725a94ce535be29fc854a671c05df3ab2a1d229b
 argb_decoded_sha256 = "f2bc10c4932b7314f5712947f8137a602e2ef70c0577780d2ec3786b6f08706c"
 argb_video_stored = true
 dxt_decoded_stored = true
+dxt_decodes_at_minimum_len = true
+argb_decodes_at_minimum_len = true
 
 [[fixture]]
 name = "alphanoise"
@@ -49,6 +55,8 @@ argb_video_sha256 = "89682ebf97be5e55a0ba05bb60eff8573cc6795d5a472fefb2cbe38d707
 argb_decoded_sha256 = "e2b7e9353031df648515ee0fbbc73c58d9f4ee1c17a1f90d8290212a5b73e84b"
 argb_video_stored = true
 dxt_decoded_stored = true
+dxt_decodes_at_minimum_len = true
+argb_decodes_at_minimum_len = true
 
 [[fixture]]
 name = "checker_1px"
@@ -62,6 +70,8 @@ argb_video_sha256 = "40576f5f24bd150063f7ada8104e0f428af7df84af2d4e096e2eb4131cb
 argb_decoded_sha256 = "4b613ffacbef35a53b571ad2b5b76576fdf395a61be80c968f70591a9e0c21f1"
 argb_video_stored = true
 dxt_decoded_stored = false
+dxt_decodes_at_minimum_len = true
+argb_decodes_at_minimum_len = true
 
 [[fixture]]
 name = "color_underrun_step_1"
@@ -75,6 +85,8 @@ argb_video_sha256 = "0ff7733c61c96c5f8f9a0476e7a51067db9613ea59e6681e3852cb717d3
 argb_decoded_sha256 = "8857c62bdf2bf8b8a3d2e356bf055210c11e386b96efa55adeb72cba30fd3dc3"
 argb_video_stored = true
 dxt_decoded_stored = false
+dxt_decodes_at_minimum_len = true
+argb_decodes_at_minimum_len = true
 
 [[fixture]]
 name = "grad"
@@ -88,6 +100,8 @@ argb_video_sha256 = "7826c9dbc7575bcf888186364d2e9a36b20e249390c33bce88a040716db
 argb_decoded_sha256 = "c26746e688605d31a4025d70977827ac7e612bacf56890d21786e938ec37a845"
 argb_video_stored = true
 dxt_decoded_stored = false
+dxt_decodes_at_minimum_len = true
+argb_decodes_at_minimum_len = true
 
 [[fixture]]
 name = "near_black"
@@ -101,6 +115,8 @@ argb_video_sha256 = "c7f02867d7c964cce4e496ef0ba2c051bf2cb62335cfc4ed64dbdf2e8f8
 argb_decoded_sha256 = "3d955a28c6da45adcaacd58e48478e33b9bdeb69a67fda7245448e7f9cf638ec"
 argb_video_stored = true
 dxt_decoded_stored = false
+dxt_decodes_at_minimum_len = true
+argb_decodes_at_minimum_len = true
 
 [[fixture]]
 name = "near_white"
@@ -114,6 +130,8 @@ argb_video_sha256 = "c57375d72c1eff206e6175e8f64f6e0aaeb26020848581323bfbb9b3fee
 argb_decoded_sha256 = "620c2dc9ffc4ece1bd877a4eec0ce442f8aa23d9b13543cbc339947476e7a7be"
 argb_video_stored = true
 dxt_decoded_stored = false
+dxt_decodes_at_minimum_len = true
+argb_decodes_at_minimum_len = true
 
 [[fixture]]
 name = "noise"
@@ -127,6 +145,8 @@ argb_video_sha256 = "4343ef4ab890fd39fc003c8b051c520255fea089da6625ffa10457d4847
 argb_decoded_sha256 = "51f3c0e759bfb6193f87248313a2dc46b00bff2eda1e75b57e66afd7c6a2d58c"
 argb_video_stored = true
 dxt_decoded_stored = false
+dxt_decodes_at_minimum_len = true
+argb_decodes_at_minimum_len = true
 
 [[fixture]]
 name = "odd_130x70"
@@ -140,6 +160,8 @@ argb_video_sha256 = "bc8d2baa1665dd1fc3d77758696048b19a81896b0df7b575765404e958e
 argb_decoded_sha256 = "da41b281a7f04c3fc09a0cf7fafb098057fa8fc87a610c9f3d9c0d073cecf7e9"
 argb_video_stored = true
 dxt_decoded_stored = true
+dxt_decodes_at_minimum_len = true
+argb_decodes_at_minimum_len = true
 
 [[fixture]]
 name = "odd_1x1"
@@ -153,6 +175,8 @@ argb_video_sha256 = "48ab978f67e0d8627a2001e7bcbcaa81b8f46e214ae0925fec9aa118b36
 argb_decoded_sha256 = "b20bc6de5f3dd7d590ac2b4da49b70768f55ee0ab922b135ff2f63010743a91d"
 argb_video_stored = true
 dxt_decoded_stored = true
+dxt_decodes_at_minimum_len = true
+argb_decodes_at_minimum_len = true
 
 [[fixture]]
 name = "odd_3x5"
@@ -166,6 +190,8 @@ argb_video_sha256 = "2484755c9d61955af6a0f66555e291bd2226780e66efc19d15c34b2344b
 argb_decoded_sha256 = "8dcb47b76555508302866f02cf0340f21ac5db76087f9eda9cb3f828a2ae79af"
 argb_video_stored = true
 dxt_decoded_stored = true
+dxt_decodes_at_minimum_len = true
+argb_decodes_at_minimum_len = true
 
 [[fixture]]
 name = "odd_5x3"
@@ -179,6 +205,8 @@ argb_video_sha256 = "f15c2b2301aab76a08cbef9ca33758ad5e892c0429f51ae564746660698
 argb_decoded_sha256 = "f0cbffbeb87d364a67c83f50d38687bc9ce53a0998a26aa55c506354ebaaa221"
 argb_video_stored = true
 dxt_decoded_stored = true
+dxt_decodes_at_minimum_len = true
+argb_decodes_at_minimum_len = true
 
 [[fixture]]
 name = "odd_63x65"
@@ -192,6 +220,8 @@ argb_video_sha256 = "58a07fd1c371fb62ada4149b10aaa6f6a9e1bba1a4b849e1952be762b57
 argb_decoded_sha256 = "c1fd35d2fb5a8ab4762b0e33d1d97224920f402dfdb4403e7bcf1e32fb23481d"
 argb_video_stored = true
 dxt_decoded_stored = true
+dxt_decodes_at_minimum_len = true
+argb_decodes_at_minimum_len = true
 
 [[fixture]]
 name = "ph_background"
@@ -205,6 +235,8 @@ argb_video_sha256 = "e136a060b07a8f492bcb6643ec365ed0ba6a930ce68f995582afa7e8694
 argb_decoded_sha256 = "699440e719fd18fc1e1393dc4eacef06a0197e2af315648dcd5be5cfc9511940"
 argb_video_stored = false
 dxt_decoded_stored = false
+dxt_decodes_at_minimum_len = true
+argb_decodes_at_minimum_len = true
 
 [[fixture]]
 name = "ph_banner"
@@ -218,6 +250,8 @@ argb_video_sha256 = "822638c28190605dc304d3ed1ca5fdcce33512c7212cad0d984f54d238e
 argb_decoded_sha256 = "204f9670258c73a705c984bb71b98d58a603f8b7ff3621b97a35c49aeaab65f8"
 argb_video_stored = true
 dxt_decoded_stored = false
+dxt_decodes_at_minimum_len = true
+argb_decodes_at_minimum_len = true
 
 [[fixture]]
 name = "ph_cover"
@@ -231,6 +265,8 @@ argb_video_sha256 = "d8565e6be1c895ee763a19e9880da627b901ea3379ad971c88ebc64fc87
 argb_decoded_sha256 = "becc1926d7d9d4bea29bb5ef888af6a31f219e75524a4ac3dadc1fb9543e7d9c"
 argb_video_stored = false
 dxt_decoded_stored = false
+dxt_decodes_at_minimum_len = true
+argb_decodes_at_minimum_len = true
 
 [[fixture]]
 name = "ph_icon"
@@ -244,6 +280,8 @@ argb_video_sha256 = "cedb4d577d023dadacb81eb016f4f786133006345deb03744a3b2509cf6
 argb_decoded_sha256 = "1df6f332b1420485674335c90ec2f7f36b0ef0341cfc910803d459b1c7c80442"
 argb_video_stored = true
 dxt_decoded_stored = false
+dxt_decodes_at_minimum_len = true
+argb_decodes_at_minimum_len = true
 
 [[fixture]]
 name = "ph_screenshot"
@@ -257,6 +295,8 @@ argb_video_sha256 = "582ec7c77d5db1ea85fac99d9fc85c9f889df3145501a86f186bdb5dcdf
 argb_decoded_sha256 = "d67dea076e67d62073f7299456a8b5e90dff8a13e2af524e44bcebf65e9a9abf"
 argb_video_stored = false
 dxt_decoded_stored = false
+dxt_decodes_at_minimum_len = true
+argb_decodes_at_minimum_len = true
 
 [[fixture]]
 name = "sines"
@@ -270,6 +310,8 @@ argb_video_sha256 = "0c145214d8a87458133d65ad94a82e072cf09aadaf326d40d731d24957f
 argb_decoded_sha256 = "a25921dab4cecf6543c15c6598ffa341984997a14fb302e95875102f0d75e860"
 argb_video_stored = true
 dxt_decoded_stored = false
+dxt_decodes_at_minimum_len = true
+argb_decodes_at_minimum_len = true
 
 [[fixture]]
 name = "solid_mid"
@@ -283,6 +325,8 @@ argb_video_sha256 = "cc7e06769502b383769378f66264b526325aba641cb71b65b54d1d88830
 argb_decoded_sha256 = "32f27e5387ecd7f787968cce9291ac453edb943af7dab5744994d7c5c982262b"
 argb_video_stored = true
 dxt_decoded_stored = false
+dxt_decodes_at_minimum_len = true
+argb_decodes_at_minimum_len = true
 
 [[fixture]]
 name = "two_tone"
@@ -296,6 +340,8 @@ argb_video_sha256 = "e952312a9bf9c29768564358dd7c1b98d216255c072407c59961cff207f
 argb_decoded_sha256 = "da9da549f2d73851f42d274e30fe8439c1076e2d8667bfe44cac13203bcffa90"
 argb_video_stored = true
 dxt_decoded_stored = false
+dxt_decodes_at_minimum_len = true
+argb_decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt1_e0_rgba_32x32"
@@ -303,6 +349,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc1_32x32.vid"
 decoded_sha256 = "47ebad492dfcec936e48fba53db245608ae2eda0268abfbd8d9426b4a9be3df0"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt1_e0_bgra_32x32"
@@ -310,6 +357,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc1_32x32.vid"
 decoded_sha256 = "1b39c94c97da52816ac8025243e72cc1faf1283531fa893415601415c2738ba5"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt1_e1_rgba_32x32"
@@ -317,6 +365,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc1_32x32.vid"
 decoded_sha256 = "0b5587c329a43283c283c54a7e0698fa7e72d5313e1755150659b6327f3ce211"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt1_e1_bgra_32x32"
@@ -324,6 +373,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc1_32x32.vid"
 decoded_sha256 = "6cc18c02a9f54ff337ff40322ce1c6a579182ccaa9c8831971a9947c401516ae"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt1_e2_rgba_32x32"
@@ -331,6 +381,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc1_32x32.vid"
 decoded_sha256 = "76bcd929575492bf21a45f005e0524f974340420b088ca5e9d840cdfd0f50705"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt1_e2_bgra_32x32"
@@ -338,6 +389,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc1_32x32.vid"
 decoded_sha256 = "848fac20a38ef370d091d409d36cdd714557ac4c70491b56d59b55ef5e8c702f"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt1_e3_rgba_32x32"
@@ -345,6 +397,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc1_32x32.vid"
 decoded_sha256 = "70f79ef9dab0e221615bd92f197c1428596125e8eee865aacba2e09000bc3e0c"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt1_e3_bgra_32x32"
@@ -352,6 +405,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc1_32x32.vid"
 decoded_sha256 = "a3e92dd0e8f2169b0f0fe280013a78c1d89782b20fcbbd59097ced539c0f0483"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt2_3_e0_rgba_32x32"
@@ -415,6 +469,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc3_32x32.vid"
 decoded_sha256 = "6c284de98c7ddb7626fcca997eefe5416829aeea3c6c65cbcc08532a21d30151"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt4_5_e0_bgra_32x32"
@@ -422,6 +477,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc3_32x32.vid"
 decoded_sha256 = "5ed0c4ee1651792e4bcd8aca4e375999fa6ed073f121bfc4c348e172e6bb2cc6"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt4_5_e1_rgba_32x32"
@@ -429,6 +485,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc3_32x32.vid"
 decoded_sha256 = "1b21a64cf62b9a15a476fcf40b458ddc10c9d93e3deb375cfffabedd701816fb"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt4_5_e1_bgra_32x32"
@@ -436,6 +493,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc3_32x32.vid"
 decoded_sha256 = "48faff816bc656f2793038e28f3d59cb0b7ada0bbb05490104998cf76744d9b6"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt4_5_e2_rgba_32x32"
@@ -443,6 +501,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc3_32x32.vid"
 decoded_sha256 = "81c5f4616c5bed8939a7a7bace336b567d6ce67cc15c77d30043855dab542122"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt4_5_e2_bgra_32x32"
@@ -450,6 +509,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc3_32x32.vid"
 decoded_sha256 = "9352751c23e40c9302bf8f69bcb251fb5213068c5baee87f8727f4e8bb1e6c40"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt4_5_e3_rgba_32x32"
@@ -457,6 +517,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc3_32x32.vid"
 decoded_sha256 = "95e64badbdb5579e2498ebd4fc40a66928676278ca907c7109a550888dad2583"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt4_5_e3_bgra_32x32"
@@ -464,6 +525,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc3_32x32.vid"
 decoded_sha256 = "7c9faea21b4531c667a09f48c9021d8d0ee2b284277f0e9737c74a46b05a869c"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt1_e1_rgba_130x70"
@@ -471,6 +533,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000002000002000000
 video = "crafted/random_bc1_130x70.vid"
 decoded_sha256 = "e27e5be02ebd352f0316d5e6f2bbb2675d9ae95027245f4098e13f3116a202ce"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt1_e1_bgra_130x70"
@@ -478,6 +541,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000002000002000000
 video = "crafted/random_bc1_130x70.vid"
 decoded_sha256 = "8a0a5394bd365b83bf874ac435a235d2dba41bafa87a4d3ec518025acf13cf9b"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt2_3_e1_rgba_130x70"
@@ -499,6 +563,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000002000002000000
 video = "crafted/random_bc3_130x70.vid"
 decoded_sha256 = "cf57e3cc8b8b4b246c93fdf417ecf13de9482cd14a1c17c6df29ff144bd05b3b"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt4_5_e1_bgra_130x70"
@@ -506,6 +571,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000002000002000000
 video = "crafted/random_bc3_130x70.vid"
 decoded_sha256 = "77837cddb397a78b7c15428f81a7d2783f78d7b15d31038d5e289de8bff85f84"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt1_e1_rgba_tiled_32x32"
@@ -520,6 +586,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc1_32x32.vid"
 decoded_sha256 = "0b5587c329a43283c283c54a7e0698fa7e72d5313e1755150659b6327f3ce211"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt1_e1_rgba_signed_32x32"
@@ -527,6 +594,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000156000000
 video = "crafted/random_bc1_32x32.vid"
 decoded_sha256 = "0b5587c329a43283c283c54a7e0698fa7e72d5313e1755150659b6327f3ce211"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt1_e1_rgba_gamma_32x32"
@@ -576,6 +644,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc3_32x32.vid"
 decoded_sha256 = "dcdd7682684b3bff28a3cb8d030267edb2bbb361ac8cf3c33839ac21b68cd8e2"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt4_5_e1_rgba_signed_32x32"
@@ -583,6 +652,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000156000000
 video = "crafted/random_bc3_32x32.vid"
 decoded_sha256 = "dcdd7682684b3bff28a3cb8d030267edb2bbb361ac8cf3c33839ac21b68cd8e2"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt4_5_e1_rgba_gamma_32x32"
@@ -597,6 +667,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000003000002000000
 video = "crafted/random_bc1_130x70_pitch12.vid"
 decoded_sha256 = "9da53c18ba5eb440690ca50790a541c52fc629af53b9d621dc85e0f80d518f66"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt1_e1_rgba_equal_endpoints_32x32"
@@ -604,6 +675,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/equal_endpoints_bc1_32x32.vid"
 decoded_sha256 = "57f0c1b3c67e8d61246596b48a6a264c4528488be910349739f0dea3fce19b3f"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt4_5_e1_rgba_pitch12_130x70"
@@ -611,6 +683,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000003000002000000
 video = "crafted/random_bc3_130x70_pitch12.vid"
 decoded_sha256 = "56a1640657f01d62fabfc188eb1e78347db504c02c3062174dd32523cbd01d7d"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt4_5_e1_rgba_equal_endpoints_32x32"
@@ -618,6 +691,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/equal_endpoints_bc3_32x32.vid"
 decoded_sha256 = "00bcfb0b58809ed86629d83955b203fb8593ae39b75a2c06aec94249685f4e71"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "argb_e2_bgra_40x24"
@@ -625,6 +699,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000000800002000000
 video = "crafted/random_argb_40x24.vid"
 decoded_sha256 = "0e9f5ef649ef5b6260095af3281af7493f806172145ade4b856028f7e7f25e2f"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "argb_e2_bgra_pitch4_40x24"
@@ -632,6 +707,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_argb_40x24_pitch4.vid"
 decoded_sha256 = "e09ebe22dcd392c0e1d23e56c173e4c749e5a58e9c02d891e80638df0be77808"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt1_e1_rgba_8x8"
@@ -639,6 +715,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc1_8x8.vid"
 decoded_sha256 = "0b38e64e6af4065ec1a7d7ca5fc426ff6af4210637642f977fe16d05db4b450c"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt1_e1_swz0132_8x8"
@@ -646,6 +723,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc1_8x8.vid"
 decoded_sha256 = "4a04ec575f431f89e45218e048c4e49b373bdfb29be2018ded306f09db185e36"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt1_e1_swz0213_8x8"
@@ -653,6 +731,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc1_8x8.vid"
 decoded_sha256 = "86536ede4a10a32e6eedbc9e175de368ce147a5d83b3bfd916b6f31e69fdc200"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt1_e1_swz0231_8x8"
@@ -660,6 +739,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc1_8x8.vid"
 decoded_sha256 = "a46757e92176047a0c61dcc33c1c4368c97ba0135da391702fe275111fd0899e"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt1_e1_swz0312_8x8"
@@ -667,6 +747,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc1_8x8.vid"
 decoded_sha256 = "bef5f234ff95b66511e8d59dadb940ca5b374a546dd09e36ea468bc0908a1736"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt1_e1_swz0321_8x8"
@@ -674,6 +755,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc1_8x8.vid"
 decoded_sha256 = "e29f5869377d5cbf86c4b09c5f012084388623f8f67568107f9a26526d171ca5"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt1_e1_swz1023_8x8"
@@ -681,6 +763,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc1_8x8.vid"
 decoded_sha256 = "9e0dcf8ceef492d7cbd3389adcf957bf3792d02b1f0994a7fb44d11413d1a434"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt1_e1_swz1032_8x8"
@@ -688,6 +771,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc1_8x8.vid"
 decoded_sha256 = "41b4cd4e35a9615d48b64d494fc9777f58ddad9bb4a824a46055575de2b7ae0d"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt1_e1_swz1203_8x8"
@@ -695,6 +779,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc1_8x8.vid"
 decoded_sha256 = "3e2359a505233aabef6b56747faed8a6f329b314a059f4dcc2122829e673e6e6"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt1_e1_swz1230_8x8"
@@ -702,6 +787,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc1_8x8.vid"
 decoded_sha256 = "687f43e71adc4b58dedba90cf9df3a17647b8e3c7aff9bf569b9afa60895aeb9"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt1_e1_swz1302_8x8"
@@ -709,6 +795,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc1_8x8.vid"
 decoded_sha256 = "d04cd3c3f2dab1239b0a9ad82ca010529d9f3f6d147ffdc6ef005e56b7549e8e"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt1_e1_swz1320_8x8"
@@ -716,6 +803,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc1_8x8.vid"
 decoded_sha256 = "98a2eb4cf30222b26f2814d40962683e941cc51799d3ea67a8e938dc3ce9e5f5"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt1_e1_swz2013_8x8"
@@ -723,6 +811,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc1_8x8.vid"
 decoded_sha256 = "b847846fbce9a4ac129149ff2f50880844286cd2e6690acb5e515ec3b6fa456c"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt1_e1_swz2031_8x8"
@@ -730,6 +819,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc1_8x8.vid"
 decoded_sha256 = "77a8861598cc7690cbe41ad954bafa7c5de7cdeca4cd75b61ab0fcf4d26a02b2"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt1_e1_swz2103_8x8"
@@ -737,6 +827,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc1_8x8.vid"
 decoded_sha256 = "3e27677090cf47cae53d089b4b86337dc433cefcce18ea7a150e26db28a43e67"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt1_e1_swz2130_8x8"
@@ -744,6 +835,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc1_8x8.vid"
 decoded_sha256 = "8ca162e475479c33ea78d3aeb95f22e707edffed6b47c635aa84895247fe27a6"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt1_e1_swz2301_8x8"
@@ -751,6 +843,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc1_8x8.vid"
 decoded_sha256 = "414ad72d324c36853102b5e1422cc6f4fa1647babd163d8a716658626e599640"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt1_e1_swz2310_8x8"
@@ -758,6 +851,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc1_8x8.vid"
 decoded_sha256 = "4328ceb3b5fe6f65e750a1bd0c9c7b9e448b316d1d318406f90eaa4eb11a3c59"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt1_e1_swz3012_8x8"
@@ -765,6 +859,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc1_8x8.vid"
 decoded_sha256 = "949e0ce231d4dfdbb36269d846379886170b8fbe51b39fa216b218693176faad"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt1_e1_swz3021_8x8"
@@ -772,6 +867,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc1_8x8.vid"
 decoded_sha256 = "ad7b2f4b2ea1b4957fa9521d9d3e59a4e9e057a6788d8c2f4e717323da90828b"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt1_e1_swz3102_8x8"
@@ -779,6 +875,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc1_8x8.vid"
 decoded_sha256 = "ead70c15756fa09ce2a55cf743374b65adc8c73db688560f7b30368365531ee6"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt1_e1_swz3120_8x8"
@@ -786,6 +883,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc1_8x8.vid"
 decoded_sha256 = "b0e234e6d75bff0c21f72169ce5777e7c13c3fc10533478ae44ff647db7d8e3d"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt1_e1_swz3201_8x8"
@@ -793,6 +891,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc1_8x8.vid"
 decoded_sha256 = "479f66ddce7e564605e8aa9e7f99a6d635e12d83889bec19a3d132675ba0c61c"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt1_e1_swz3210_8x8"
@@ -800,6 +899,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc1_8x8.vid"
 decoded_sha256 = "a90f1411d0e1609c6807b80de3130c3e2ca91721be438ecba2322a32c1fcdf2b"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt1_e1_swz0003_8x8"
@@ -807,6 +907,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc1_8x8.vid"
 decoded_sha256 = "e862bc144179ce264ba11272fe89603ceeae8805df31510887064b8840c79a47"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt1_e1_swz3333_8x8"
@@ -814,6 +915,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc1_8x8.vid"
 decoded_sha256 = "2ea5a9d65ec1e56f7123c172a1be5fafacb4db1571427f9f292c0f345be4b899"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt1_e1_swz0124_8x8"
@@ -828,6 +930,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc3_8x8.vid"
 decoded_sha256 = "a3092d43921ad3a13bb5513623e1875f486b7b70f10322a5a45a8b02b2b3d7f8"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt4_5_e1_swz0132_8x8"
@@ -835,6 +938,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc3_8x8.vid"
 decoded_sha256 = "7343201af0f5fd6e40a3527ef056c45c9813a6010d945c525d6dc637e02580f0"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt4_5_e1_swz0213_8x8"
@@ -842,6 +946,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc3_8x8.vid"
 decoded_sha256 = "e0c7d746d36ddb601fde7cbf23567cf7ad0b1c32a5397b6e358ec77273f37ed5"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt4_5_e1_swz0231_8x8"
@@ -849,6 +954,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc3_8x8.vid"
 decoded_sha256 = "3ed90a6ecbc3699a0a4d217842dc48919ea66a2c86d9394f9d7bb16abf0ad766"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt4_5_e1_swz0312_8x8"
@@ -856,6 +962,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc3_8x8.vid"
 decoded_sha256 = "07114111e189a8c1ae9a764ee93383e4ec5767c0251b1aa43d05acfd9581f9a3"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt4_5_e1_swz0321_8x8"
@@ -863,6 +970,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc3_8x8.vid"
 decoded_sha256 = "e09514541ee61bd4fe4b80879146450209767bf31bec11d6aef66f84a9b1104b"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt4_5_e1_swz1023_8x8"
@@ -870,6 +978,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc3_8x8.vid"
 decoded_sha256 = "07a2e59e85a5e8262939167eac8fc00c13149f197c0ee55b3f771955c86ca2f2"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt4_5_e1_swz1032_8x8"
@@ -877,6 +986,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc3_8x8.vid"
 decoded_sha256 = "5fdbaed9b4646d5f29aaf1f902b2537fad0e15c08b1932e34bc08738966a90e9"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt4_5_e1_swz1203_8x8"
@@ -884,6 +994,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc3_8x8.vid"
 decoded_sha256 = "58f0aa0e928dbcec96539e5608b772b5b0cc34dbdac0c66672a4bfcf78b21ad6"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt4_5_e1_swz1230_8x8"
@@ -891,6 +1002,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc3_8x8.vid"
 decoded_sha256 = "bd4939e02d07a4ed480945e3599a616d482c9f81cd3d90ea6300c49bba54bcd0"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt4_5_e1_swz1302_8x8"
@@ -898,6 +1010,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc3_8x8.vid"
 decoded_sha256 = "f18a2ac66e312cba0b13d27e633f5bb63b16172ac016f87c7117cf697807720c"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt4_5_e1_swz1320_8x8"
@@ -905,6 +1018,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc3_8x8.vid"
 decoded_sha256 = "4bb90e38837f99e5007e5ac37278365472f0c5e88845da14dedf0da287511a2f"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt4_5_e1_swz2013_8x8"
@@ -912,6 +1026,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc3_8x8.vid"
 decoded_sha256 = "9a554dac5e1baf97303ffa7df2c5dfca0a9263f523b4e03c5b046f1c2a764a3e"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt4_5_e1_swz2031_8x8"
@@ -919,6 +1034,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc3_8x8.vid"
 decoded_sha256 = "062571d6abfc17e63c01577db7acdcf6241de8d47d9f994938ac3d287febb677"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt4_5_e1_swz2103_8x8"
@@ -926,6 +1042,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc3_8x8.vid"
 decoded_sha256 = "1deb2b22c7179bb1dae1abccfccfe714a9b78e3216c05d04451be6d4162dafb8"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt4_5_e1_swz2130_8x8"
@@ -933,6 +1050,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc3_8x8.vid"
 decoded_sha256 = "976f62ea62649f8adaf219d1bbbe547f28ea65f5514c68510d0dc5e709ded5dd"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt4_5_e1_swz2301_8x8"
@@ -940,6 +1058,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc3_8x8.vid"
 decoded_sha256 = "e0ed8cb622d8da4225d889dc390eeb059fe6d06ccdee048c77a33e10ee005253"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt4_5_e1_swz2310_8x8"
@@ -947,6 +1066,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc3_8x8.vid"
 decoded_sha256 = "d5e0756c4d208ccd80b4d5838879a327ada005f14b5669bb73ae8dc07e36ec9a"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt4_5_e1_swz3012_8x8"
@@ -954,6 +1074,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc3_8x8.vid"
 decoded_sha256 = "1b73652ab822f8c3a3c5f081e9ef7cfcec035eb111c7409f3ccd9694a7175a0b"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt4_5_e1_swz3021_8x8"
@@ -961,6 +1082,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc3_8x8.vid"
 decoded_sha256 = "0e84ddf5023acf68f1d166b849025658003a0c61d57d4e11f7b3af12fab52215"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt4_5_e1_swz3102_8x8"
@@ -968,6 +1090,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc3_8x8.vid"
 decoded_sha256 = "eeab9b5bc90ea008398e37b199ddcb0e9a7dfc30aacba2eca9e02150b3f320f5"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt4_5_e1_swz3120_8x8"
@@ -975,6 +1098,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc3_8x8.vid"
 decoded_sha256 = "c9a936b2c1e6d7317090404da2d73c8df10357d83d38ab683b20f30a93d467f1"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt4_5_e1_swz3201_8x8"
@@ -982,6 +1106,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc3_8x8.vid"
 decoded_sha256 = "2ebe948c772334cc79261bb90738a30001ab61bfb513d8a0fa23e55807c124b1"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt4_5_e1_swz3210_8x8"
@@ -989,6 +1114,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc3_8x8.vid"
 decoded_sha256 = "a5ef0af2d81fbd6b93d9519c6d1197a93b0267b6f02094e29000dd110a48f35a"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt4_5_e1_swz0003_8x8"
@@ -996,6 +1122,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc3_8x8.vid"
 decoded_sha256 = "b2fdc995e3b504a31d8c8ffb1b371bb84e83fbe446e9cb43c06de396a3911f89"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt4_5_e1_swz3333_8x8"
@@ -1003,6 +1130,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000001000002000000
 video = "crafted/random_bc3_8x8.vid"
 decoded_sha256 = "9b13b5ad532aceb71868ef401da64205c153121dde90e641bc414970a2dcf2d1"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt4_5_e1_swz0124_8x8"
@@ -1018,6 +1146,7 @@ video = "crafted/random_bc3_8x8.vid"
 decoded_sha256 = "a3092d43921ad3a13bb5513623e1875f486b7b70f10322a5a45a8b02b2b3d7f8"
 dll_accepted = true
 same_as = "dxt4_5_e1_rgba_8x8"
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt4_5_e1_rgba_probe_gpu_runtime_8x8"
@@ -1026,6 +1155,7 @@ video = "crafted/random_bc3_8x8.vid"
 decoded_sha256 = "a3092d43921ad3a13bb5513623e1875f486b7b70f10322a5a45a8b02b2b3d7f8"
 dll_accepted = true
 same_as = "dxt4_5_e1_rgba_8x8"
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt4_5_e1_rgba_probe_fetch0_misc_8x8"
@@ -1034,6 +1164,7 @@ video = "crafted/random_bc3_8x8.vid"
 decoded_sha256 = "a3092d43921ad3a13bb5513623e1875f486b7b70f10322a5a45a8b02b2b3d7f8"
 dll_accepted = true
 same_as = "dxt4_5_e1_rgba_8x8"
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt4_5_e1_rgba_probe_fetch1_misc_8x8"
@@ -1042,6 +1173,7 @@ video = "crafted/random_bc3_8x8.vid"
 decoded_sha256 = "a3092d43921ad3a13bb5513623e1875f486b7b70f10322a5a45a8b02b2b3d7f8"
 dll_accepted = true
 same_as = "dxt4_5_e1_rgba_8x8"
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt4_5_e1_rgba_probe_fetch2_depth_8x8"
@@ -1050,6 +1182,7 @@ video = "crafted/random_bc3_8x8.vid"
 decoded_sha256 = "a3092d43921ad3a13bb5513623e1875f486b7b70f10322a5a45a8b02b2b3d7f8"
 dll_accepted = true
 same_as = "dxt4_5_e1_rgba_8x8"
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt4_5_e1_rgba_probe_fetch3_filters_8x8"
@@ -1058,6 +1191,7 @@ video = "crafted/random_bc3_8x8.vid"
 decoded_sha256 = "a3092d43921ad3a13bb5513623e1875f486b7b70f10322a5a45a8b02b2b3d7f8"
 dll_accepted = true
 same_as = "dxt4_5_e1_rgba_8x8"
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt4_5_e1_rgba_probe_fetch4_8x8"
@@ -1066,6 +1200,7 @@ video = "crafted/random_bc3_8x8.vid"
 decoded_sha256 = "a3092d43921ad3a13bb5513623e1875f486b7b70f10322a5a45a8b02b2b3d7f8"
 dll_accepted = true
 same_as = "dxt4_5_e1_rgba_8x8"
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt4_5_e1_rgba_probe_fetch5_misc_8x8"
@@ -1074,6 +1209,7 @@ video = "crafted/random_bc3_8x8.vid"
 decoded_sha256 = "a3092d43921ad3a13bb5513623e1875f486b7b70f10322a5a45a8b02b2b3d7f8"
 dll_accepted = true
 same_as = "dxt4_5_e1_rgba_8x8"
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt4_5_e1_rgba_probe_border_8x8"
@@ -1089,6 +1225,7 @@ video = "crafted/random_bc1_8x8.vid"
 decoded_sha256 = "0b38e64e6af4065ec1a7d7ca5fc426ff6af4210637642f977fe16d05db4b450c"
 dll_accepted = true
 same_as = "dxt1_e1_rgba_8x8"
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt1_e1_rgba_probe_gpu_runtime_8x8"
@@ -1097,6 +1234,7 @@ video = "crafted/random_bc1_8x8.vid"
 decoded_sha256 = "0b38e64e6af4065ec1a7d7ca5fc426ff6af4210637642f977fe16d05db4b450c"
 dll_accepted = true
 same_as = "dxt1_e1_rgba_8x8"
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt1_e1_rgba_probe_fetch0_misc_8x8"
@@ -1105,6 +1243,7 @@ video = "crafted/random_bc1_8x8.vid"
 decoded_sha256 = "0b38e64e6af4065ec1a7d7ca5fc426ff6af4210637642f977fe16d05db4b450c"
 dll_accepted = true
 same_as = "dxt1_e1_rgba_8x8"
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt1_e1_rgba_probe_fetch1_misc_8x8"
@@ -1113,6 +1252,7 @@ video = "crafted/random_bc1_8x8.vid"
 decoded_sha256 = "0b38e64e6af4065ec1a7d7ca5fc426ff6af4210637642f977fe16d05db4b450c"
 dll_accepted = true
 same_as = "dxt1_e1_rgba_8x8"
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt1_e1_rgba_probe_fetch2_depth_8x8"
@@ -1121,6 +1261,7 @@ video = "crafted/random_bc1_8x8.vid"
 decoded_sha256 = "0b38e64e6af4065ec1a7d7ca5fc426ff6af4210637642f977fe16d05db4b450c"
 dll_accepted = true
 same_as = "dxt1_e1_rgba_8x8"
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt1_e1_rgba_probe_fetch3_filters_8x8"
@@ -1129,6 +1270,7 @@ video = "crafted/random_bc1_8x8.vid"
 decoded_sha256 = "0b38e64e6af4065ec1a7d7ca5fc426ff6af4210637642f977fe16d05db4b450c"
 dll_accepted = true
 same_as = "dxt1_e1_rgba_8x8"
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt1_e1_rgba_probe_fetch4_8x8"
@@ -1137,6 +1279,7 @@ video = "crafted/random_bc1_8x8.vid"
 decoded_sha256 = "0b38e64e6af4065ec1a7d7ca5fc426ff6af4210637642f977fe16d05db4b450c"
 dll_accepted = true
 same_as = "dxt1_e1_rgba_8x8"
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt1_e1_rgba_probe_fetch5_misc_8x8"
@@ -1145,6 +1288,7 @@ video = "crafted/random_bc1_8x8.vid"
 decoded_sha256 = "0b38e64e6af4065ec1a7d7ca5fc426ff6af4210637642f977fe16d05db4b450c"
 dll_accepted = true
 same_as = "dxt1_e1_rgba_8x8"
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "dxt1_e1_rgba_probe_border_8x8"
@@ -1159,6 +1303,7 @@ header = "0000000300000001000000000000000000000000ffff0000ffff000000800002000000
 video = "crafted/random_argb_8x8.vid"
 decoded_sha256 = "13a003546a8b9fbd907841d24c2e057ad50bfc595624b4630f185feca5b15777"
 dll_accepted = true
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "argb_e2_bgra_probe_common_flags_8x8"
@@ -1167,6 +1312,7 @@ video = "crafted/random_argb_8x8.vid"
 decoded_sha256 = "13a003546a8b9fbd907841d24c2e057ad50bfc595624b4630f185feca5b15777"
 dll_accepted = true
 same_as = "argb_e2_bgra_8x8"
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "argb_e2_bgra_probe_gpu_runtime_8x8"
@@ -1175,6 +1321,7 @@ video = "crafted/random_argb_8x8.vid"
 decoded_sha256 = "13a003546a8b9fbd907841d24c2e057ad50bfc595624b4630f185feca5b15777"
 dll_accepted = true
 same_as = "argb_e2_bgra_8x8"
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "argb_e2_bgra_probe_fetch0_misc_8x8"
@@ -1183,6 +1330,7 @@ video = "crafted/random_argb_8x8.vid"
 decoded_sha256 = "13a003546a8b9fbd907841d24c2e057ad50bfc595624b4630f185feca5b15777"
 dll_accepted = true
 same_as = "argb_e2_bgra_8x8"
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "argb_e2_bgra_probe_fetch1_misc_8x8"
@@ -1191,6 +1339,7 @@ video = "crafted/random_argb_8x8.vid"
 decoded_sha256 = "13a003546a8b9fbd907841d24c2e057ad50bfc595624b4630f185feca5b15777"
 dll_accepted = true
 same_as = "argb_e2_bgra_8x8"
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "argb_e2_bgra_probe_fetch2_depth_8x8"
@@ -1199,6 +1348,7 @@ video = "crafted/random_argb_8x8.vid"
 decoded_sha256 = "13a003546a8b9fbd907841d24c2e057ad50bfc595624b4630f185feca5b15777"
 dll_accepted = true
 same_as = "argb_e2_bgra_8x8"
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "argb_e2_bgra_probe_fetch3_filters_8x8"
@@ -1207,6 +1357,7 @@ video = "crafted/random_argb_8x8.vid"
 decoded_sha256 = "13a003546a8b9fbd907841d24c2e057ad50bfc595624b4630f185feca5b15777"
 dll_accepted = true
 same_as = "argb_e2_bgra_8x8"
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "argb_e2_bgra_probe_fetch4_8x8"
@@ -1215,6 +1366,7 @@ video = "crafted/random_argb_8x8.vid"
 decoded_sha256 = "13a003546a8b9fbd907841d24c2e057ad50bfc595624b4630f185feca5b15777"
 dll_accepted = true
 same_as = "argb_e2_bgra_8x8"
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "argb_e2_bgra_probe_fetch5_misc_8x8"
@@ -1223,6 +1375,7 @@ video = "crafted/random_argb_8x8.vid"
 decoded_sha256 = "13a003546a8b9fbd907841d24c2e057ad50bfc595624b4630f185feca5b15777"
 dll_accepted = true
 same_as = "argb_e2_bgra_8x8"
+decodes_at_minimum_len = true
 
 [[crafted]]
 name = "argb_e2_bgra_probe_border_8x8"

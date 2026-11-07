@@ -2,6 +2,7 @@ mod crafted;
 mod cross_decode;
 mod dds_corpus;
 mod golden;
+mod minimum_read;
 mod synthetic;
 
 use std::path::PathBuf;
