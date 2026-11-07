@@ -19,6 +19,7 @@ pub use header::{TEXTURE_HEADER_LEN, TextureHeader};
 
 pub const MAX_DIMENSION: u32 = 8192;
 
+/// Why an image cannot be encoded.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EncodeError {
     DimensionsOutOfRange { width: u32, height: u32 },
@@ -38,13 +39,14 @@ impl fmt::Display for EncodeError {
 
 impl std::error::Error for EncodeError {}
 
+/// Why a texture cannot be decoded.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DecodeError {
+    /// The header describes a format the port does not decode.
     UnsupportedFormat(TextureFormat),
-    TruncatedData {
-        expected: usize,
-        actual: usize,
-    },
+    /// The data ends before the last byte the decode reads.
+    TruncatedData { expected: usize, actual: usize },
+    /// The header's row pitch is narrower than one row of the image.
     RowPitchTooSmall {
         pitch_units: u32,
         required_units: u32,
@@ -82,6 +84,8 @@ pub struct EncodedTexture {
     pub data: Vec<u8>,
 }
 
+/// Encodes an image byte for byte as AuroraAsset.dll does: the header it writes and its
+/// zero-padded surface, BC3 (DXT4) for `Compression::Dxt` or A8R8G8B8 for `Compression::None`.
 pub fn encode(image: &RgbaImage, compression: Compression) -> Result<EncodedTexture, EncodeError> {
     let header = TextureHeader::for_image(image.width(), image.height(), compression)?;
     let layout = SurfaceLayout::for_compression(image.width(), image.height(), compression);
@@ -92,6 +96,7 @@ pub fn encode(image: &RgbaImage, compression: Compression) -> Result<EncodedText
     Ok(EncodedTexture { header, data })
 }
 
+/// Decodes a texture to straight-alpha RGBA pixels equal to AuroraAsset.dll's decode.
 pub fn decode(texture: &EncodedTexture) -> Result<RgbaImage, DecodeError> {
     let header = &texture.header;
     let format = header.format();

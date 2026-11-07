@@ -72,8 +72,8 @@ pub fn dxt_decoded_rgba(name: &str) -> Vec<u8> {
     .unwrap()
 }
 
-pub fn rgba_sha256(bgra_or_rgba: &[u8]) -> String {
-    hex::encode(Sha256::digest(bgra_or_rgba))
+pub fn rgba_sha256(bytes: &[u8]) -> String {
+    hex::encode(Sha256::digest(bytes))
 }
 
 pub fn header_bytes(hex_text: &str) -> [u8; 52] {
