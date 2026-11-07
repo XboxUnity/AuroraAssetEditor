@@ -30,6 +30,7 @@ const GENERATED_DIRECTORIES: [&str; 5] = [
 ];
 const HARNESS_PACKAGE: &str = "golden-harness";
 const MASTER_PLACEHOLDER_DIRECTORY: &str = "AuroraAssetEditor/Resources/Placeholders";
+/// ARGB videos of larger fixtures are checked by hash only, keeping the corpus under 10 MB.
 const MAX_STORED_ARGB_PIXELS: u32 = 65_536;
 const DXT_DECODED_STORED_NAMES: [&str; 2] = ["alphagrad", "alphanoise"];
 const DXT_DECODED_STORED_PREFIX: &str = "odd_";
