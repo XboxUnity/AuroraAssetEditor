@@ -26,8 +26,8 @@ pub enum ContentDbError {
 impl fmt::Display for ContentDbError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Open(_) => write!(f, "cannot open the Content.db file"),
-            Self::Query(_) => write!(f, "cannot read the ContentItems table of Content.db"),
+            Self::Open(_) => write!(f, "could not open the Content.db file"),
+            Self::Query(_) => write!(f, "could not read the ContentItems table of Content.db"),
             Self::MissingColumn { column, .. } => write!(f, "Content.db has no {column} column"),
             Self::BadValue { row, column, .. } => write!(
                 f,

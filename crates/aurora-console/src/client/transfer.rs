@@ -5,8 +5,8 @@ use crate::ftp::{ListingEntry, find_entry, parse_listing};
 use crate::ids::GameIds;
 use crate::paths::{asset_file_name, asset_folder};
 
-/// 20 uncompressed 1000x562 screenshots are about 47 MB.
 pub(crate) const MAX_LISTING_BYTES: u64 = 64 * 1024 * 1024;
+/// 20 uncompressed 1000x562 screenshots are about 47 MB.
 pub(crate) const MAX_ASSET_FILE_BYTES: u64 = 256 * 1024 * 1024;
 pub(crate) const MAX_CONTENT_DB_BYTES: u64 = 512 * 1024 * 1024;
 
