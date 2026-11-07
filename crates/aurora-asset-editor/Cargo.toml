@@ -10,6 +10,7 @@ arboard = { version = "3.7.0", default-features = false, features = ["wayland-da
 async-channel = "2.5.0"
 aurora-asset = { path = "../aurora-asset" }
 aurora-console = { path = "../aurora-console" }
+aurora-file-dialogs = { path = "../aurora-file-dialogs" }
 aurora-image = { path = "../aurora-image" }
 aurora-online = { path = "../aurora-online" }
 aurora-ui = { path = "../aurora-ui" }
@@ -19,6 +20,7 @@ flate2 = { version = "1.1.11", default-features = false, features = ["rust_backe
 fastrand = "2.5.0"
 log = "0.4.35"
 open = "5.4.5"
+raw-window-handle = "0.6.2"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
 slint = { version = "=1.18.1", default-features = false, features = [

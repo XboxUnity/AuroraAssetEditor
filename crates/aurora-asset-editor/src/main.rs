@@ -1,9 +1,300 @@
 #![forbid(unsafe_code)]
+// A release build is a window app: no console window opens with it on Windows.
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use std::cell::{Cell, RefCell};
+use std::env;
+use std::error::Error;
+use std::ffi::OsString;
+use std::io;
+use std::path::{Path, PathBuf};
+use std::process::ExitCode;
+use std::rc::Rc;
+use std::time::Duration;
+
+use async_channel::Receiver;
+use aurora_asset_editor::about::BuildInfo;
+use aurora_asset_editor::app::{App, AppEnvironment, StartupProblem, StartupSettings};
+use aurora_asset_editor::jobs::{JobOutcome, JobWorkers, ThreadRunner};
+use aurora_asset_editor::logging::{ErrorLog, LogBridge, install_panic_hook};
+use aurora_asset_editor::platform::{
+    DropSignal, FileDropCollector, NativeFileDialogs, SystemClipboard, SystemClock,
+    SystemFolderOpener, SystemTheme, window_placement,
+};
+use aurora_asset_editor::settings::WindowGeometry;
+use aurora_asset_editor::view::MainWindowView;
+use aurora_console::{
+    FTP_SETTINGS_FILE, FtpSettings, Timeouts, app_config_dir, local_subnet_prefix,
+};
+use aurora_online::{DEFAULT_TIMEOUT, Endpoints, OnlineClient};
 use aurora_ui::MainWindow;
-use slint::{ComponentHandle, PlatformError};
+use slint::winit_030::winit::event::WindowEvent;
+use slint::winit_030::winit::window::{Icon, Theme};
+use slint::winit_030::{EventResult, WinitWindowAccessor};
+use slint::{CloseRequestResponse, ComponentHandle, Timer};
 
-fn main() -> Result<(), PlatformError> {
+const VERSION_FLAG: &str = "--version";
+const APP_ICON: &[u8] = include_bytes!("../../aurora-ui/ui/app_icon.ico");
+const APP_ICON_NAME: &str = "app_icon.ico";
+
+const STARTUP_FAILED: &str = "The app could not start";
+const NO_CONFIG_DIR: &str =
+    "The system has no folder for app settings, so the current folder is used";
+const LOGGER_FAILED: &str = "Could not send log messages to error.log";
+const FTP_SETTINGS_FAILED: &str = "Could not load the console connection settings";
+const SUBNET_PREFIX_FAILED: &str = "Could not find the local network to suggest a console address";
+const APP_ICON_FAILED: &str = "Could not load the window icon";
+const WINDOW_SETUP_FAILED: &str = "Could not finish setting up the window";
+
+/// Everything the window needs once it exists on screen.
+struct WindowSetup {
+    icon: Option<Icon>,
+    geometry: Option<WindowGeometry>,
+    paths: Vec<PathBuf>,
+}
+
+fn main() -> ExitCode {
+    let arguments: Vec<OsString> = env::args_os().skip(1).collect();
+    if arguments == [VERSION_FLAG] {
+        println!("{}", BuildInfo::current().window_title());
+        return ExitCode::SUCCESS;
+    }
+    let mut problems = Vec::new();
+    let config_dir = config_dir(&mut problems);
+    let error_log = ErrorLog::in_dir(&config_dir);
+    install_panic_hook(error_log.clone());
+    if let Err(error) = LogBridge::install(error_log.clone()) {
+        problems.push(startup_problem(LOGGER_FAILED, error));
+    }
+    let paths = arguments.into_iter().map(PathBuf::from).collect();
+    match run(config_dir, error_log.clone(), paths, problems) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => {
+            if let Err(write_error) = error_log.record(STARTUP_FAILED, error.as_ref()) {
+                eprintln!("{STARTUP_FAILED}: {error} (error.log: {write_error})");
+            }
+            ExitCode::FAILURE
+        }
+    }
+}
+
+fn run(
+    config_dir: PathBuf,
+    error_log: ErrorLog,
+    paths: Vec<PathBuf>,
+    mut problems: Vec<StartupProblem>,
+) -> Result<(), Box<dyn Error>> {
+    let startup = StartupSettings::load(&config_dir);
+    problems.extend(startup.problem);
+    let ftp_settings = load_ftp_settings(&config_dir, &mut problems);
+    let subnet_prefix = subnet_prefix(&mut problems);
+    let icon = app_icon(&mut problems);
+    let geometry = startup.settings.window;
+
     let window = MainWindow::new()?;
-    window.run()
+    let (outcomes, outcome_receiver) = async_channel::unbounded();
+    let timeouts = Timeouts::default();
+    let online = OnlineClient::new(Endpoints::live(), DEFAULT_TIMEOUT);
+    let runner = ThreadRunner::new(|| JobWorkers::new(timeouts, online.clone()), outcomes)?;
+    let environment = AppEnvironment {
+        config_dir,
+        settings: startup.settings,
+        keep_settings_file: startup.keep_file,
+        ftp_settings,
+        subnet_prefix,
+        build: BuildInfo::current(),
+        error_log,
+        dialogs: Box::new(NativeFileDialogs::new(window.as_weak())),
+        clipboard: Box::new(SystemClipboard::default()),
+        folder_opener: Box::new(SystemFolderOpener),
+        clock: Box::new(SystemClock),
+        jobs: Box::new(runner.submitter()),
+        startup_problems: problems,
+    };
+    let app = Rc::new(RefCell::new(App::new(environment)));
+    let view = Rc::new(MainWindowView::new(window));
+    let system_theme = Rc::new(Cell::new(SystemTheme::default()));
+    view.connect(Rc::clone(&app));
+    receive_outcomes(outcome_receiver, &app, &view)?;
+    watch_window_events(&app, &view, &system_theme);
+    save_geometry_on_close(&app, &view);
+
+    window_placement::restore_size(view.window().window(), geometry.as_ref());
+    view.window().show()?;
+    let setup = WindowSetup {
+        icon,
+        geometry,
+        paths,
+    };
+    finish_window_setup(&app, &view, &system_theme, setup)?;
+    slint::run_event_loop()?;
+    view.window().hide()?;
+    // A bulk run would otherwise keep the closed app running until its last game.
+    app.borrow_mut().stop_bulk();
+    runner.shutdown();
+    Ok(())
+}
+
+/// Like the old app, which kept `ftp.json` next to itself, the current folder is used when the system has none.
+fn config_dir(problems: &mut Vec<StartupProblem>) -> PathBuf {
+    match app_config_dir() {
+        Some(dir) => dir,
+        None => {
+            problems.push(startup_problem(
+                NO_CONFIG_DIR,
+                io::Error::new(
+                    io::ErrorKind::NotFound,
+                    "no config folder is known for this user",
+                ),
+            ));
+            PathBuf::new()
+        }
+    }
+}
+
+fn load_ftp_settings(config_dir: &Path, problems: &mut Vec<StartupProblem>) -> Option<FtpSettings> {
+    match FtpSettings::load(&config_dir.join(FTP_SETTINGS_FILE)) {
+        Ok(settings) => settings,
+        Err(error) => {
+            problems.push(startup_problem(FTP_SETTINGS_FAILED, error));
+            None
+        }
+    }
+}
+
+/// Pre-fills the console address; without one the host starts empty.
+fn subnet_prefix(problems: &mut Vec<StartupProblem>) -> String {
+    match local_subnet_prefix() {
+        Ok(prefix) => prefix,
+        Err(error) => {
+            problems.push(startup_problem(SUBNET_PREFIX_FAILED, error));
+            String::new()
+        }
+    }
+}
+
+/// ICO is an import format, and the decoder picks the icon's largest image.
+fn app_icon(problems: &mut Vec<StartupProblem>) -> Option<Icon> {
+    let decoded = aurora_image::decode_image(APP_ICON, Some(APP_ICON_NAME))
+        .map_err(|error| startup_problem(APP_ICON_FAILED, error))
+        .and_then(|image| {
+            let (width, height) = image.dimensions();
+            Icon::from_rgba(image.into_raw(), width, height)
+                .map_err(|error| startup_problem(APP_ICON_FAILED, error))
+        });
+    match decoded {
+        Ok(icon) => Some(icon),
+        Err(problem) => {
+            problems.push(problem);
+            None
+        }
+    }
+}
+
+fn startup_problem(
+    context: &str,
+    error: impl Into<Box<dyn Error + Send + Sync>>,
+) -> StartupProblem {
+    StartupProblem {
+        context: context.to_owned(),
+        error: error.into(),
+    }
+}
+
+fn receive_outcomes(
+    receiver: Receiver<JobOutcome>,
+    app: &Rc<RefCell<App>>,
+    view: &Rc<MainWindowView>,
+) -> Result<(), slint::EventLoopError> {
+    let app = Rc::clone(app);
+    let view = Rc::clone(view);
+    slint::spawn_local(async move {
+        while let Ok(outcome) = receiver.recv().await {
+            app.borrow_mut().on_job_outcome(outcome);
+            view.render(&app.borrow());
+        }
+    })?;
+    Ok(())
+}
+
+/// Dropped files and theme changes come from winit, which reports each dropped file as its own event.
+fn watch_window_events(
+    app: &Rc<RefCell<App>>,
+    view: &Rc<MainWindowView>,
+    system_theme: &Rc<Cell<SystemTheme>>,
+) {
+    let app = Rc::clone(app);
+    let events_view = Rc::clone(view);
+    let system_theme = Rc::clone(system_theme);
+    let collector = Rc::new(RefCell::new(FileDropCollector::default()));
+    view.window()
+        .window()
+        .on_winit_window_event(move |_window, event| {
+            if let WindowEvent::ThemeChanged(theme) = event {
+                let mut changed = system_theme.get();
+                changed.update(*theme == Theme::Dark);
+                system_theme.set(changed);
+                events_view.set_system_theme(changed);
+                events_view.render(&app.borrow());
+                return EventResult::Propagate;
+            }
+            let signal = collector.borrow_mut().on_event(event);
+            match signal {
+                DropSignal::None => {}
+                DropSignal::Hover(hover) => {
+                    app.borrow_mut().set_drop_hover(hover);
+                    events_view.render(&app.borrow());
+                }
+                DropSignal::FirstFile => {
+                    let app = Rc::clone(&app);
+                    let view = Rc::clone(&events_view);
+                    let collector = Rc::clone(&collector);
+                    // Runs after the event loop has delivered the drop's other files, so one drop is one batch.
+                    Timer::single_shot(Duration::ZERO, move || {
+                        let paths = collector.borrow_mut().take();
+                        app.borrow_mut().files_dropped(paths);
+                        view.render(&app.borrow());
+                    });
+                }
+            }
+            EventResult::Propagate
+        });
+}
+
+fn save_geometry_on_close(app: &Rc<RefCell<App>>, view: &Rc<MainWindowView>) {
+    let app = Rc::clone(app);
+    let close_view = Rc::clone(view);
+    view.window().window().on_close_requested(move || {
+        let saved = app.borrow().settings().window;
+        let geometry = window_placement::capture(close_view.window().window(), saved.as_ref());
+        app.borrow_mut().save_window_geometry(geometry);
+        CloseRequestResponse::HideWindow
+    });
+}
+
+/// Waits for the system window, which exists only once the event loop runs: the icon and position need it,
+/// and the OS theme is read before the first render, which overwrites the palette it is read from.
+fn finish_window_setup(
+    app: &Rc<RefCell<App>>,
+    view: &Rc<MainWindowView>,
+    system_theme: &Rc<Cell<SystemTheme>>,
+    setup: WindowSetup,
+) -> Result<(), slint::EventLoopError> {
+    let app = Rc::clone(app);
+    let view = Rc::clone(view);
+    let system_theme = Rc::clone(system_theme);
+    slint::spawn_local(async move {
+        match view.window().window().winit_window().await {
+            Ok(winit_window) => winit_window.set_window_icon(setup.icon),
+            Err(error) => log::error!("{WINDOW_SETUP_FAILED}: {error}"),
+        }
+        window_placement::restore_position(view.window().window(), setup.geometry.as_ref());
+        let initial_theme = SystemTheme::read_initial(view.window());
+        system_theme.set(initial_theme);
+        view.set_system_theme(initial_theme);
+        view.render(&app.borrow());
+        app.borrow_mut().open_paths(setup.paths);
+        view.render(&app.borrow());
+    })?;
+    Ok(())
 }

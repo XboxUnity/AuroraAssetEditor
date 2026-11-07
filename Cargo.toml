@@ -4,6 +4,7 @@ members = [
     "crates/aurora-asset",
     "crates/aurora-asset-editor",
     "crates/aurora-console",
+    "crates/aurora-file-dialogs",
     "crates/aurora-image",
     "crates/aurora-online",
     "crates/aurora-ui",

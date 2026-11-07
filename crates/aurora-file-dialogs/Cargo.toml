@@ -1,0 +1,29 @@
+[package]
+name = "aurora-file-dialogs"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+raw-window-handle = "0.6.2"
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "=0.62.2", features = [
+    "Win32_Foundation",
+    "Win32_System_Com",
+    "Win32_UI_Shell",
+    "Win32_UI_Shell_Common",
+] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+ashpd = { version = "=0.14.0", default-features = false, features = [
+    "async-io",
+    "file_chooser",
+    "raw_handle",
+    "wayland",
+] }
+async-io = "2.6.0"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+rfd = { version = "=0.18.0", default-features = false }
