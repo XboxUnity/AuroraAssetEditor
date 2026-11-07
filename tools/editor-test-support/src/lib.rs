@@ -22,6 +22,7 @@ pub use headless_ui::HeadlessUi;
 pub use queued_runner::QueuedRunner;
 pub use sample_assets::{asset_file_with, placeholder};
 pub use screenshots::{
-    PixelBounds, PixelComparison, PixelDifference, PngFileError, changed_pixels, compare_pixels,
+    DIFF_BOUNDS_COLOUR, DIFF_CHANGED_COLOUR, DIFF_GAP_COLOUR, DIFF_PANEL_GAP, PixelBounds,
+    PixelComparison, PixelDifference, PngFileError, changed_pixels, compare_pixels, diff_image,
     read_png, write_opaque_png,
 };

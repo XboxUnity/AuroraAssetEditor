@@ -1,5 +1,6 @@
 use editor_test_support::{
-    PixelBounds, PixelComparison, PixelDifference, PngFileError, changed_pixels, compare_pixels,
+    DIFF_BOUNDS_COLOUR, DIFF_CHANGED_COLOUR, DIFF_GAP_COLOUR, DIFF_PANEL_GAP, PixelBounds,
+    PixelComparison, PixelDifference, PngFileError, changed_pixels, compare_pixels, diff_image,
     read_png, write_opaque_png,
 };
 use image::{ColorType, ImageReader, Rgba, RgbaImage};
@@ -228,4 +229,111 @@ fn comparison_reads_as_one_sentence() {
         many.to_string(),
         "1,234 pixels differ in x 0..=9, y 0..=9 (largest channel difference 7)"
     );
+}
+
+fn dimmed_grey(pixel: Rgba<u8>) -> Rgba<u8> {
+    let [red, green, blue, _] = pixel.0;
+    let grey = (299 * u32::from(red) + 587 * u32::from(green) + 114 * u32::from(blue)) / 1000;
+    let level = u8::try_from(grey * 30 / 100).expect("a dimmed channel fits in a byte");
+    Rgba([level, level, level, 255])
+}
+
+fn image_with_changed_pixels(base: &RgbaImage, changed: &[(u32, u32)]) -> RgbaImage {
+    let mut image = base.clone();
+    for &(x, y) in changed {
+        image.put_pixel(x, y, Rgba([200, 100, 50, 255]));
+    }
+    image
+}
+
+#[test]
+fn diff_image_shows_reference_actual_and_changes_side_by_side() {
+    let reference = plain_image(10, 6);
+    let actual = image_with_changed_pixels(&reference, &[(3, 2)]);
+
+    let diff = diff_image(&reference, &actual);
+
+    assert_eq!(diff.dimensions(), (3 * 10 + 2 * DIFF_PANEL_GAP, 6));
+    let panel_step = 10 + DIFF_PANEL_GAP;
+    assert_eq!(*diff.get_pixel(0, 0), *reference.get_pixel(0, 0));
+    assert_eq!(*diff.get_pixel(3, 2), *reference.get_pixel(3, 2));
+    assert_eq!(*diff.get_pixel(panel_step + 3, 2), *actual.get_pixel(3, 2));
+    assert_eq!(*diff.get_pixel(panel_step + 9, 5), *actual.get_pixel(9, 5));
+    for gap_start in [10, 2 * 10 + DIFF_PANEL_GAP] {
+        for x in gap_start..gap_start + DIFF_PANEL_GAP {
+            assert_eq!(*diff.get_pixel(x, 3), DIFF_GAP_COLOUR);
+        }
+    }
+}
+
+#[test]
+fn changed_pixels_are_magenta_on_a_dimmed_copy() {
+    let reference = plain_image(10, 6);
+    let actual = image_with_changed_pixels(&reference, &[(3, 2)]);
+
+    let diff = diff_image(&reference, &actual);
+
+    let changes_left = 2 * (10 + DIFF_PANEL_GAP);
+    assert_eq!(*diff.get_pixel(changes_left + 3, 2), DIFF_CHANGED_COLOUR);
+    assert_eq!(
+        *diff.get_pixel(changes_left + 9, 5),
+        dimmed_grey(*actual.get_pixel(9, 5))
+    );
+}
+
+#[test]
+fn difference_bounds_are_outlined_on_every_panel() {
+    let reference = plain_image(10, 8);
+    let actual = image_with_changed_pixels(&reference, &[(3, 2), (6, 4)]);
+
+    let diff = diff_image(&reference, &actual);
+
+    let panel_step = 10 + DIFF_PANEL_GAP;
+    for panel in 0..3 {
+        let left = panel * panel_step;
+        for x in 2..=7 {
+            assert_eq!(*diff.get_pixel(left + x, 1), DIFF_BOUNDS_COLOUR);
+            assert_eq!(*diff.get_pixel(left + x, 5), DIFF_BOUNDS_COLOUR);
+        }
+        for y in 1..=5 {
+            assert_eq!(*diff.get_pixel(left + 2, y), DIFF_BOUNDS_COLOUR);
+            assert_eq!(*diff.get_pixel(left + 7, y), DIFF_BOUNDS_COLOUR);
+        }
+    }
+    let changes_left = 2 * panel_step;
+    assert_eq!(*diff.get_pixel(changes_left + 3, 2), DIFF_CHANGED_COLOUR);
+    assert_eq!(*diff.get_pixel(changes_left + 6, 4), DIFF_CHANGED_COLOUR);
+}
+
+#[test]
+fn an_outline_at_the_image_edge_is_clipped_to_its_panel() {
+    let reference = plain_image(4, 4);
+    let actual = image_with_changed_pixels(&reference, &[(0, 0)]);
+
+    let diff = diff_image(&reference, &actual);
+
+    let panel_step = 4 + DIFF_PANEL_GAP;
+    assert_eq!(*diff.get_pixel(1, 1), DIFF_BOUNDS_COLOUR);
+    assert_eq!(*diff.get_pixel(0, 1), DIFF_BOUNDS_COLOUR);
+    assert_eq!(*diff.get_pixel(1, 0), DIFF_BOUNDS_COLOUR);
+    assert_eq!(*diff.get_pixel(panel_step + 1, 1), DIFF_BOUNDS_COLOUR);
+    assert_eq!(*diff.get_pixel(4, 0), DIFF_GAP_COLOUR);
+}
+
+#[test]
+fn diff_of_different_sizes_keeps_both_whole() {
+    let reference = plain_image(4, 4);
+    let actual = plain_image(6, 3);
+
+    let diff = diff_image(&reference, &actual);
+
+    assert_eq!(diff.dimensions(), (3 * 6 + 2 * DIFF_PANEL_GAP, 4));
+    let panel_step = 6 + DIFF_PANEL_GAP;
+    assert_eq!(*diff.get_pixel(5, 0), DIFF_GAP_COLOUR);
+    assert_eq!(*diff.get_pixel(0, 3), *reference.get_pixel(0, 3));
+    assert_eq!(*diff.get_pixel(panel_step, 3), DIFF_GAP_COLOUR);
+    assert_eq!(*diff.get_pixel(panel_step + 5, 2), *actual.get_pixel(5, 2));
+    let changes_left = 2 * panel_step;
+    assert_eq!(*diff.get_pixel(changes_left + 5, 1), DIFF_CHANGED_COLOUR);
+    assert_eq!(*diff.get_pixel(changes_left, 3), DIFF_CHANGED_COLOUR);
 }
