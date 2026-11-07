@@ -2,7 +2,9 @@ use std::fmt;
 
 use dotnet_number_text::trim_number_text;
 
-const TITLE_ID_DIGITS: usize = 8;
+use super::QueryError;
+
+pub(super) const TITLE_ID_DIGITS: usize = 8;
 const HEX_RADIX: u32 = 16;
 const HEX_DIGIT_BITS: u32 = 4;
 
@@ -10,28 +12,6 @@ const HEX_DIGIT_BITS: u32 = 4;
 /// leading zeros beyond eight digits, where `HexId` wants exactly eight digits.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TitleId(u32);
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum QueryError {
-    Empty,
-    NotHex { text: String },
-    TooLong { len: usize },
-}
-
-impl fmt::Display for QueryError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Empty => f.write_str("enter something to search for"),
-            Self::NotHex { text } => write!(f, "\"{text}\" is not made of hex digits"),
-            Self::TooLong { len } => write!(
-                f,
-                "a TitleID has at most {TITLE_ID_DIGITS} hex digits, not {len}"
-            ),
-        }
-    }
-}
-
-impl std::error::Error for QueryError {}
 
 impl TitleId {
     pub fn new(value: u32) -> TitleId {
