@@ -92,7 +92,7 @@ pub(crate) struct Paths {
 }
 
 impl Paths {
-    fn new() -> Result<Self> {
+    pub(crate) fn new() -> Result<Self> {
         let xtask_directory = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let root = xtask_directory
             .parent()
@@ -106,7 +106,7 @@ impl Paths {
         self.root.join("fixtures").join("codec")
     }
 
-    fn inputs(&self) -> PathBuf {
+    pub(crate) fn inputs(&self) -> PathBuf {
         self.corpus().join("inputs")
     }
 
@@ -139,7 +139,7 @@ pub(crate) fn absolute(path: &Path) -> Result<PathBuf> {
     }
 }
 
-fn require_windows() -> Result<()> {
+pub(crate) fn require_windows() -> Result<()> {
     ensure!(
         cfg!(windows),
         "the golden corpus can only be generated or checked on Windows"
@@ -151,7 +151,7 @@ fn cargo_command() -> Command {
     Command::new(std::env::var_os("CARGO").unwrap_or_else(|| OsString::from("cargo")))
 }
 
-fn build_harness(paths: &Paths) -> Result<()> {
+pub(crate) fn build_harness(paths: &Paths) -> Result<()> {
     let status = cargo_command()
         .current_dir(&paths.root)
         .args([
@@ -217,7 +217,7 @@ pub(crate) fn bgra_to_rgba(bgra: &[u8]) -> Vec<u8> {
     rgba
 }
 
-fn rgba_to_argb(rgba: &[u8]) -> Vec<u8> {
+pub(crate) fn rgba_to_argb(rgba: &[u8]) -> Vec<u8> {
     let mut argb = Vec::with_capacity(rgba.len());
     for pixel in rgba.as_chunks::<BYTES_PER_PIXEL>().0.iter() {
         argb.extend_from_slice(&[pixel[3], pixel[0], pixel[1], pixel[2]]);

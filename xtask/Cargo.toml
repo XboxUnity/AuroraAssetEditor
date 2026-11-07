@@ -7,8 +7,9 @@ publish = false
 
 [dependencies]
 anyhow = "1"
+aurora-asset = { path = "../crates/aurora-asset" }
 hex = "0.4"
-image = { version = "0.25", default-features = false, features = ["png"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp"] }
 serde = { version = "1", features = ["derive"] }
 sha2 = "0.10"
 tempfile = "3"
