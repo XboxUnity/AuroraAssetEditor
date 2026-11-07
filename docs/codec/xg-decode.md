@@ -100,3 +100,38 @@ Theories ruled out on the way:
   crafted cases. That writer is not on the decode path.
 - x87 truncation in the endpoint expansion: it fixed some of those and broke DXT1 cases that had
   matched.
+
+## DDS files
+
+`ConvertDDSToImage` decodes the DDS images found in FSD files (`[[dds]]` in the manifest, made by
+`xtask/src/dds_corpus.rs`). Found by decoding the samples and larger probe files with the DLL; not
+disassembled. `dds::decode` returns the top mip level, as the DLL does.
+
+What the DLL does with each format:
+
+- **DXT1 and DXT5:** the same block decode as `ConvertAssetToImage` (the arithmetic above): DXT5
+  colour uses the three-colour form too, and its alpha comes from the alpha block. The port calls
+  the same block decoders; probes of 4096 random DXT1 and DXT5 blocks match every texel.
+- **A8R8G8B8:** copied unchanged.
+- **X8R8G8B8:** copied unchanged, so the unused byte becomes alpha. The port makes these pixels
+  opaque instead: an image that is transparent only by accident would stay transparent in the
+  `.asset` file Aurora reads.
+- **DXT3, R8G8B8, R5G6B5, A1R5G5B5, A4R4G4B4 and L8:** accepted, but never decoded: the output is a
+  raw copy of the pixel data followed by uninitialised memory, and two decodes of one file differ.
+  There is nothing stable to match, so the port refuses them (`DdsError::Unsupported`) and the
+  manifest marks them `dll_output_unstable` with no hash.
+
+Defects of the DLL that the port does not reproduce:
+
+- **Reported length.** The DLL reports the header's `dwPitchOrLinearSize` as the image length (128
+  bytes for a 16x16 DXT1), but always writes `width * height * 4` bytes. The old app allocated the
+  reported length, so the DLL overran its buffer; the harness allocates the larger of the two.
+- **Byte order.** The DLL builds the image in ARGB byte order and swaps only the first reported
+  length to BGRA. With a pitch below 4 nothing is swapped, which is why an A8R8G8B8 file with such a
+  pitch came out byte-reversed. The port returns every pixel in one order. The golden hash is the
+  DLL's buffer with the swap completed (`decoded_sha256`), and the region the DLL did swap must
+  equal the port byte for byte (`verbatim_sha256`).
+- **Widths not a multiple of 4 (block formats).** The DLL writes the partial block column at the
+  right edge into the start of the next row, so the image is scrambled. The port crops the edge
+  blocks in place. For those samples the manifest records `dll_layout_scrambled` and only the DLL's
+  acceptance; a unit test in `dds.rs` pins the crop against the block decoder.

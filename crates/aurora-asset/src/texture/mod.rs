@@ -12,6 +12,7 @@ use image::RgbaImage;
 
 use layout::SurfaceLayout;
 
+pub(crate) use block_decode::{decode_bc1_block, decode_bc3_block};
 pub use format::{Compression, TextureFormat};
 pub use header::{TEXTURE_HEADER_LEN, TextureHeader};
 

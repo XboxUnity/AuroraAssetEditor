@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 
 mod container;
+pub mod dds;
 mod texture;
 
 pub use container::{AssetError, AssetFile, AssetKind, AssetSlot, ScreenshotNumber};

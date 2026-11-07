@@ -144,6 +144,9 @@ pub struct DdsSample {
     dll_accepted: bool,
     /// The DLL's output past the pixel data is uninitialised memory, so no hash is recorded.
     dll_output_unstable: bool,
+    /// The DLL writes the partial block column of a width that is not a multiple of 4 into the
+    /// next row; the port crops instead, so only acceptance is recorded.
+    dll_layout_scrambled: bool,
     /// Length the DLL reports for the image; only this prefix is converted to BGRA by the DLL.
     reported_len: usize,
     /// Hash of the RGBA conversion of the DLL's first `reported_len` bytes, verbatim.
@@ -247,15 +250,17 @@ fn sample_bytes(layout: Layout, width: u32, height: u32, with_mips: bool, seed: 
     bytes
 }
 
-/// How the DLL treats a format, as found by probing it.
+fn dll_layout_scrambled(layout: Layout, width: u32) -> bool {
+    matches!(layout, Layout::Blocks { .. }) && !width.is_multiple_of(BLOCK_SIDE_TEXELS)
+}
+
+/// How the DLL treats a format, as found by probing it. Every decoded buffer is in ARGB byte
+/// order except its first reported-length bytes, which the DLL swaps to BGRA.
 #[derive(Clone, Copy, PartialEq)]
 enum DllBehavior {
-    /// Decoded to BGRA only over the reported length, ARGB beyond it.
-    Block,
-    /// Raw copy, alpha kept.
-    Argb32,
-    /// Raw copy; the DLL keeps the unused byte as alpha, the port makes it opaque.
-    Xrgb32,
+    Decoded,
+    /// Decoded, but the DLL keeps the unused byte as alpha; the port makes it opaque.
+    DecodedWithUnusedAlpha,
     /// Raw copy followed by uninitialised memory; DXT3 is never decoded.
     Unstable,
 }
@@ -266,11 +271,11 @@ fn dll_behavior(layout: Layout) -> DllBehavior {
             fourcc: DXT3_FOURCC,
             ..
         } => DllBehavior::Unstable,
-        Layout::Blocks { .. } => DllBehavior::Block,
+        Layout::Blocks { .. } => DllBehavior::Decoded,
         Layout::Pixels {
             bits: 32, masks, ..
-        } if masks[3] != 0 => DllBehavior::Argb32,
-        Layout::Pixels { bits: 32, .. } => DllBehavior::Xrgb32,
+        } if masks[3] != 0 => DllBehavior::Decoded,
+        Layout::Pixels { bits: 32, .. } => DllBehavior::DecodedWithUnusedAlpha,
         Layout::Pixels { .. } => DllBehavior::Unstable,
     }
 }
@@ -328,23 +333,19 @@ fn dll_decode(
     }))
 }
 
-/// Completes the DLL's ARGB to BGRA swap past the reported length (block formats), or makes the
-/// unused byte opaque (X8R8G8B8).
+/// Completes the DLL's ARGB to BGRA swap past the reported length, and makes the unused byte of
+/// X8R8G8B8 opaque.
 fn intended_bgra(behavior: DllBehavior, decode: &DllDecode) -> Vec<u8> {
     let mut bgra = decode.buffer.clone();
-    match behavior {
-        DllBehavior::Block => {
-            let first_unswapped = decode.reported_len.next_multiple_of(BYTES_PER_PIXEL);
-            for pixel in bgra[first_unswapped..].chunks_exact_mut(BYTES_PER_PIXEL) {
-                pixel.reverse();
-            }
+    // The DLL swaps whole pixels only: a reported length below 4 leaves every pixel in ARGB.
+    let first_unswapped = decode.reported_len / BYTES_PER_PIXEL * BYTES_PER_PIXEL;
+    for pixel in bgra[first_unswapped..].as_chunks_mut::<BYTES_PER_PIXEL>().0 {
+        pixel.reverse();
+    }
+    if behavior == DllBehavior::DecodedWithUnusedAlpha {
+        for pixel in bgra.as_chunks_mut::<BYTES_PER_PIXEL>().0 {
+            pixel[3] = u8::MAX;
         }
-        DllBehavior::Xrgb32 => {
-            for pixel in bgra.chunks_exact_mut(BYTES_PER_PIXEL) {
-                pixel[3] = u8::MAX;
-            }
-        }
-        DllBehavior::Argb32 | DllBehavior::Unstable => {}
     }
     bgra
 }
@@ -372,6 +373,7 @@ pub fn write_dds_samples(paths: &Paths, work_dir: &Path, out_dir: &Path) -> Resu
                     decoded_sha256: String::new(),
                     dll_accepted: false,
                     dll_output_unstable: false,
+                    dll_layout_scrambled: false,
                     reported_len: 0,
                     verbatim_sha256: String::new(),
                 };
@@ -380,10 +382,12 @@ pub fn write_dds_samples(paths: &Paths, work_dir: &Path, out_dir: &Path) -> Resu
                     sample.reported_len = decode.reported_len;
                     if behavior == DllBehavior::Unstable {
                         sample.dll_output_unstable = true;
+                    } else if dll_layout_scrambled(layout, width) {
+                        sample.dll_layout_scrambled = true;
                     } else {
                         let intended = intended_bgra(behavior, &decode);
                         sample.decoded_sha256 = sha256_hex(&bgra_to_rgba(&intended));
-                        if behavior != DllBehavior::Xrgb32 {
+                        if behavior == DllBehavior::Decoded {
                             let verbatim = &decode.buffer[..decode.reported_len];
                             sample.verbatim_sha256 = sha256_hex(&bgra_to_rgba(verbatim));
                         }

@@ -11,6 +11,7 @@ use sha2::{Digest, Sha256};
 pub struct Manifest {
     pub fixture: Vec<Fixture>,
     pub crafted: Vec<Crafted>,
+    pub dds: Vec<DdsSample>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -100,4 +101,20 @@ pub fn crafted_rgba_file(name: &str) -> Vec<u8> {
 /// The DLL's decode of the case; a case equal to another stores no pixels of its own.
 pub fn crafted_decoded_rgba(case: &Crafted) -> Vec<u8> {
     crafted_rgba_file(case.same_as.as_deref().unwrap_or(&case.name))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct DdsSample {
+    pub name: String,
+    pub file: String,
+    pub decoded_sha256: String,
+    pub dll_accepted: bool,
+    pub dll_output_unstable: bool,
+    pub dll_layout_scrambled: bool,
+    pub reported_len: usize,
+    pub verbatim_sha256: String,
+}
+
+pub fn dds_bytes(sample: &DdsSample) -> Vec<u8> {
+    fs::read(codec_fixtures_dir().join(&sample.file)).unwrap()
 }

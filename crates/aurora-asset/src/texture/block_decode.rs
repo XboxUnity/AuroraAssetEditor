@@ -67,7 +67,6 @@ fn block_array<const BYTES: usize>(block: &[u8]) -> [u8; BYTES] {
 }
 
 /// Decodes a BC1 colour block (little-endian words) to RGBA texels, row-major within the block.
-#[cfg(test)]
 pub(crate) fn decode_bc1_block(block: &[u8; 8]) -> [Texel; TEXELS_PER_BLOCK] {
     decode_bc1_block_values(block).map(texel_to_bytes)
 }
@@ -113,7 +112,6 @@ fn step_between(first: FloatColour, second: FloatColour, weight: f32) -> FloatCo
 }
 
 /// Decodes a BC3 block to RGBA texels, row-major within the block.
-#[cfg(test)]
 pub(crate) fn decode_bc3_block(block: &[u8; 16], divide_alpha: bool) -> [Texel; TEXELS_PER_BLOCK] {
     decode_bc3_block_values(block, divide_alpha).map(texel_to_bytes)
 }
