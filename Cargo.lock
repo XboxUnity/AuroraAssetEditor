@@ -962,6 +962,9 @@ dependencies = [
 [[package]]
 name = "test-servers"
 version = "0.1.0"
+dependencies = [
+ "suppaftp",
+]
 
 [[package]]
 name = "thiserror"
