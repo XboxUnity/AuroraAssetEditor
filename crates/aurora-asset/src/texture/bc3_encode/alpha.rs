@@ -4,6 +4,8 @@ use super::x87::Fpu;
 use super::{Bc3Options, TEXELS_PER_BLOCK, Texel, diffuse_error, end_weights, spread_error};
 
 const ALPHA_HALF_BYTES: usize = 8;
+/// The two endpoint bytes come first, then the indices.
+const INDEX_BYTES_START: usize = 2;
 const INDEX_BYTES_PER_SET: usize = 3;
 const TEXELS_PER_INDEX_SET: usize = 8;
 const INDEX_BITS: u32 = 3;
@@ -15,6 +17,7 @@ const ALPHA_LEVEL_STEP: f32 = 1.0 / 255.0;
 const ALPHA_MIN: f32 = 0.0;
 const ALPHA_MAX: f32 = 1.0;
 const ROUNDING: f32 = 0.5;
+const ALPHA_CHANNEL: usize = 3;
 
 const SIX_STEP_COUNT: usize = 6;
 const EIGHT_STEP_COUNT: usize = 8;
@@ -47,7 +50,7 @@ pub(super) fn encode_alpha_block(
     texels: &[Texel; TEXELS_PER_BLOCK],
     options: &Bc3Options,
 ) -> [u8; ALPHA_HALF_BYTES] {
-    let alphas: [f32; TEXELS_PER_BLOCK] = std::array::from_fn(|index| texels[index][3]);
+    let alphas: [f32; TEXELS_PER_BLOCK] = std::array::from_fn(|index| texels[index][ALPHA_CHANNEL]);
     let quantized = quantize_alpha(&alphas, options.dither);
 
     let mut block = [0u8; ALPHA_HALF_BYTES];
@@ -296,7 +299,7 @@ fn assign_alpha_indices(
         let mut packed = 0u32;
         let first_texel = set * TEXELS_PER_INDEX_SET;
         for index in first_texel..first_texel + TEXELS_PER_INDEX_SET {
-            let mut alpha = texels[index][3];
+            let mut alpha = texels[index][ALPHA_CHANNEL];
             if dither {
                 alpha = (fpu.load(errors[index]) + alpha).store();
             }
@@ -328,7 +331,7 @@ fn assign_alpha_indices(
             }
         }
 
-        let start = 2 + set * INDEX_BYTES_PER_SET;
+        let start = INDEX_BYTES_START + set * INDEX_BYTES_PER_SET;
         block[start..start + INDEX_BYTES_PER_SET]
             .copy_from_slice(&packed.to_le_bytes()[..INDEX_BYTES_PER_SET]);
     }

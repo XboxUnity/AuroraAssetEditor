@@ -14,6 +14,10 @@ const BC3_BLOCK_BYTES: usize = 16;
 const ALPHA_ENDPOINTS: std::ops::Range<usize> = 0..2;
 const ALPHA_INDEX_BYTES: std::ops::Range<usize> = 2..8;
 const COLOR_BLOCK_START: usize = 8;
+/// Byte ranges inside a BC1 block, which is also the color half of a BC3 block.
+const COLOR_FIRST_ENDPOINT: std::ops::Range<usize> = 0..2;
+const COLOR_SECOND_ENDPOINT: std::ops::Range<usize> = 2..4;
+const COLOR_INDEX_BYTES: std::ops::Range<usize> = 4..8;
 const ALPHA_INDEX_BITS: u32 = 3;
 const COLOR_INDEX_BITS: u32 = 2;
 
@@ -74,8 +78,8 @@ fn opaque([red, green, blue]: FloatColor) -> FloatTexel {
 /// endpoint is greater than the second, otherwise the two endpoints, their midpoint and
 /// transparent black.
 fn dxt1_palette(block: &[u8; 8]) -> [FloatTexel; 4] {
-    let first_packed = u16::from_le_bytes([block[0], block[1]]);
-    let second_packed = u16::from_le_bytes([block[2], block[3]]);
+    let first_packed = u16::from_le_bytes(block_array(&block[COLOR_FIRST_ENDPOINT]));
+    let second_packed = u16::from_le_bytes(block_array(&block[COLOR_SECOND_ENDPOINT]));
     let first = expand_565(first_packed);
     let second = expand_565(second_packed);
     if first_packed > second_packed {
@@ -154,18 +158,13 @@ fn index_at(packed: u64, bits_per_index: u32, texel: usize) -> usize {
 }
 
 fn color_indices(color_block: &[u8; 8]) -> [usize; TEXELS_PER_BLOCK] {
-    let bits = u32::from_le_bytes([
-        color_block[4],
-        color_block[5],
-        color_block[6],
-        color_block[7],
-    ]);
+    let bits = u32::from_le_bytes(block_array(&color_block[COLOR_INDEX_BYTES]));
     std::array::from_fn(|texel| index_at(u64::from(bits), COLOR_INDEX_BITS, texel))
 }
 
 fn alpha_indices(block: &[u8; 16]) -> [usize; TEXELS_PER_BLOCK] {
-    let mut bytes = [0u8; 8];
-    bytes[..6].copy_from_slice(&block[ALPHA_INDEX_BYTES]);
+    let mut bytes = [0u8; size_of::<u64>()];
+    bytes[..ALPHA_INDEX_BYTES.len()].copy_from_slice(&block[ALPHA_INDEX_BYTES]);
     let bits = u64::from_le_bytes(bytes);
     std::array::from_fn(|texel| index_at(bits, ALPHA_INDEX_BITS, texel))
 }
@@ -235,13 +234,14 @@ mod tests {
     use super::*;
 
     fn block_with(color: u16, color_bits: u32, alpha: [u8; 2], alpha_bits: u64) -> [u8; 16] {
-        let mut block = [0u8; 16];
-        block[0] = alpha[0];
-        block[1] = alpha[1];
-        block[2..8].copy_from_slice(&alpha_bits.to_le_bytes()[..6]);
-        block[8..10].copy_from_slice(&color.to_le_bytes());
-        block[10..12].copy_from_slice(&color.to_le_bytes());
-        block[12..16].copy_from_slice(&color_bits.to_le_bytes());
+        let mut block = [0u8; BC3_BLOCK_BYTES];
+        block[ALPHA_ENDPOINTS].copy_from_slice(&alpha);
+        block[ALPHA_INDEX_BYTES]
+            .copy_from_slice(&alpha_bits.to_le_bytes()[..ALPHA_INDEX_BYTES.len()]);
+        let color_half = &mut block[COLOR_BLOCK_START..];
+        color_half[COLOR_FIRST_ENDPOINT].copy_from_slice(&color.to_le_bytes());
+        color_half[COLOR_SECOND_ENDPOINT].copy_from_slice(&color.to_le_bytes());
+        color_half[COLOR_INDEX_BYTES].copy_from_slice(&color_bits.to_le_bytes());
         block
     }
 
@@ -293,7 +293,9 @@ mod tests {
     #[test]
     fn bc3_color_half_uses_the_three_color_palette_without_transparency() {
         let mut block = block_with(0xFFFF, 0b11, [255, 255], 0);
-        block[8..12].copy_from_slice(&[0x00, 0x00, 0xFF, 0xFF]);
+        let color_half = &mut block[COLOR_BLOCK_START..];
+        color_half[COLOR_FIRST_ENDPOINT].copy_from_slice(&0x0000u16.to_le_bytes());
+        color_half[COLOR_SECOND_ENDPOINT].copy_from_slice(&0xFFFFu16.to_le_bytes());
         assert_eq!(decode_bc3_block(&block, false)[0], [0, 0, 0, 255]);
     }
 
