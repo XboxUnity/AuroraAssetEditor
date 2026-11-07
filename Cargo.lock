@@ -467,6 +467,7 @@ dependencies = [
  "dotnet-number-text",
  "editor-test-support",
  "fastrand",
+ "flate2",
  "i-slint-backend-testing",
  "image",
  "log",

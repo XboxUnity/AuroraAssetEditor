@@ -15,6 +15,7 @@ aurora-online = { path = "../aurora-online" }
 aurora-ui = { path = "../aurora-ui" }
 chrono = { version = "0.4.45", default-features = false, features = ["clock", "std"] }
 dotnet-number-text = { path = "../dotnet-number-text" }
+flate2 = { version = "1.1.11", default-features = false, features = ["rust_backend"] }
 fastrand = "2.5.0"
 log = "0.4.35"
 open = "5.4.5"
@@ -34,6 +35,7 @@ tempfile = "3.27.0"
 
 [build-dependencies]
 chrono = { version = "0.4.45", default-features = false, features = ["clock", "std"] }
+flate2 = { version = "1.1.11", default-features = false, features = ["rust_backend"] }
 
 [dev-dependencies]
 editor-test-support = { path = "../../tools/editor-test-support" }

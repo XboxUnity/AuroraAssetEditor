@@ -9,6 +9,19 @@ const NOTICES_FOLDER: &str = "crates/aurora-asset-editor/notices";
 const CONFIG_FILE: &str = "about.toml";
 const TEMPLATE_FILE: &str = "about.hbs";
 const OUTPUT_FILE: &str = "third-party.txt";
+const HANDWRITTEN_FILE: &str = "handwritten.txt";
+const SLINT_LICENSE: &str = "LicenseRef-Slint-Royalty-free-2.0";
+const SLINT_CRATES: [&str; 9] = [
+    "i-slint-backend-selector",
+    "i-slint-backend-winit",
+    "i-slint-common",
+    "i-slint-compiler",
+    "i-slint-core",
+    "i-slint-core-macros",
+    "i-slint-renderer-software",
+    "slint",
+    "slint-macros",
+];
 
 /// Writes `third-party.txt` with `cargo about`. With `check` it only compares the result with the file in the
 /// repository and fails on any difference.
@@ -22,6 +35,7 @@ pub fn run(check: bool) -> Result<()> {
     let scratch = tempfile::tempdir().context("could not create a temporary folder")?;
     let regenerated_path = scratch.path().join(OUTPUT_FILE);
     generate(&root, &notices, &regenerated_path)?;
+    check_slint_text(&root, &notices)?;
     let committed = read_normalized(&committed_path)?;
     let regenerated = read_normalized(&regenerated_path)?;
     if committed != regenerated {
@@ -32,7 +46,7 @@ pub fn run(check: bool) -> Result<()> {
 }
 
 fn generate(root: &Path, notices: &Path, output: &Path) -> Result<()> {
-    let status = Command::new("cargo")
+    let output = Command::new("cargo")
         .arg("about")
         .arg("generate")
         .arg("--config")
@@ -42,10 +56,59 @@ fn generate(root: &Path, notices: &Path, output: &Path) -> Result<()> {
         .arg("--output-file")
         .arg(output)
         .arg(notices.join(TEMPLATE_FILE))
-        .status()
+        .output()
         .context("could not run `cargo about`; install it with `cargo install cargo-about --version 0.9.3 --locked --features cli`")?;
-    if !status.success() {
-        bail!("`cargo about generate` failed with {status}");
+    for line in String::from_utf8_lossy(&output.stderr).lines() {
+        if !is_expected_warning(line) {
+            eprintln!("{line}");
+        }
+    }
+    if !output.status.success() {
+        bail!("`cargo about generate` failed with {}", output.status);
+    }
+    Ok(())
+}
+
+/// cargo-about cannot find the Slint royalty-free licence text for the Slint crates, so it leaves them out of the
+/// generated file; `handwritten.txt` carries that text instead (see `check_slint_text`). Every other warning is
+/// printed.
+fn is_expected_warning(line: &str) -> bool {
+    line.contains(SLINT_LICENSE)
+        && line.contains("has no license file for crate")
+        && SLINT_CRATES
+            .iter()
+            .any(|name| line.contains(&format!("'{name} ")))
+}
+
+/// `handwritten.txt` must hold the Slint licence exactly as the `slint` crate in use ships it.
+fn check_slint_text(root: &Path, notices: &Path) -> Result<()> {
+    let metadata = Command::new("cargo")
+        .args(["metadata", "--format-version", "1", "--manifest-path"])
+        .arg(root.join(EDITOR_CRATE).join("Cargo.toml"))
+        .output()
+        .context("could not run `cargo metadata`")?;
+    if !metadata.status.success() {
+        bail!("`cargo metadata` failed with {}", metadata.status);
+    }
+    let metadata: serde_json::Value = serde_json::from_slice(&metadata.stdout)
+        .context("`cargo metadata` printed invalid JSON")?;
+    let manifest = metadata["packages"]
+        .as_array()
+        .and_then(|packages| packages.iter().find(|package| package["name"] == "slint"))
+        .and_then(|package| package["manifest_path"].as_str())
+        .context("the dependency tree has no `slint` package")?;
+    let licence_path = Path::new(manifest)
+        .parent()
+        .context("the slint manifest has no folder")?
+        .join("LICENSES")
+        .join(format!("{SLINT_LICENSE}.md"));
+    let licence = read_normalized(&licence_path)?;
+    let handwritten = read_normalized(&notices.join(HANDWRITTEN_FILE))?;
+    if !handwritten.contains(licence.trim()) {
+        bail!(
+            "{HANDWRITTEN_FILE} does not hold the text of {}",
+            licence_path.display()
+        );
     }
     Ok(())
 }
