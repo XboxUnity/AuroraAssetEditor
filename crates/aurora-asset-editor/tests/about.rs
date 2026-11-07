@@ -208,6 +208,46 @@ fn open_log_folder_opens_config_dir() {
 }
 
 #[test]
+fn open_log_folder_creates_a_missing_config_dir() {
+    let mut harness = AppHarness::new();
+    harness.with_config_dir_not_created();
+    harness.app().show_about();
+    assert!(!harness.config_dir().exists());
+
+    harness.app().open_log_folder();
+
+    assert!(harness.config_dir().is_dir());
+    assert_eq!(
+        harness.opened_folders(),
+        vec![harness.config_dir().to_path_buf()]
+    );
+    assert!(matches!(harness.app().modal(), Some(Modal::About)));
+}
+
+#[test]
+fn open_log_folder_shows_why_the_folder_cannot_be_created() {
+    let mut harness = AppHarness::new();
+    harness.with_config_dir_not_created();
+    std::fs::write(harness.config_dir(), b"a file where the folder belongs")
+        .expect("the blocking file can be written");
+    harness.app().show_about();
+
+    harness.app().open_log_folder();
+
+    assert!(harness.opened_folders().is_empty());
+    match harness.app().modal() {
+        Some(Modal::Message { title, text }) => {
+            assert_eq!(title, OPEN_LOG_FOLDER_FAILED);
+            assert!(
+                text.starts_with(&format!("{OPEN_LOG_FOLDER_FAILED}: ")),
+                "{text}"
+            );
+        }
+        other => panic!("expected the error dialog, got {other:?}"),
+    }
+}
+
+#[test]
 fn open_log_folder_failure_is_shown() {
     let mut harness = AppHarness::new();
     harness.folder_opener().fail_with("no file manager");

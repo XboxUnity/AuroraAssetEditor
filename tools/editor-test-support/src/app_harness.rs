@@ -28,6 +28,7 @@ const TEST_ONLINE_TIMEOUT: Duration = Duration::from_secs(5);
 /// a refused connect takes about 2 s).
 const REFUSING_URL: &str = "http://127.0.0.1:9/";
 const FAKE_CONSOLE_HOST: &str = "127.0.0.1";
+const FRESH_CONFIG_FOLDER: &str = "AuroraAssetEditor";
 
 /// A client that refuses every destination but the local machine, so no test reaches the internet.
 fn loopback_only_client(endpoints: Endpoints) -> OnlineClient {
@@ -77,7 +78,9 @@ struct Running {
 /// An `App` with fake platform services in a temporary config folder. The app is built on the first call
 /// to `app()`; the `with_*` methods change what it is built with and must come first.
 pub struct AppHarness {
-    config_dir: TempDir,
+    temp_dir: TempDir,
+    /// The app's config folder: the temporary folder, or a folder in it that does not exist yet.
+    config_dir: PathBuf,
     dialogs: FakeDialogsHandle,
     clipboard: FakeClipboardHandle,
     folder_opener: FakeFolderOpenerHandle,
@@ -88,13 +91,13 @@ pub struct AppHarness {
 
 impl AppHarness {
     pub fn new() -> AppHarness {
-        let config_dir = TempDir::new().expect("tests need a temp folder for the config files");
+        let temp_dir = TempDir::new().expect("tests need a temp folder for the config files");
         let (dialogs, dialogs_handle) = FakeDialogs::new();
         let (clipboard, clipboard_handle) = FakeClipboard::new();
         let (folder_opener, folder_opener_handle) = FakeFolderOpener::new();
         let jobs = QueuedRunner::new();
         let environment = AppEnvironment {
-            config_dir: config_dir.path().to_path_buf(),
+            config_dir: temp_dir.path().to_path_buf(),
             settings: AppSettings {
                 theme: ThemeChoice::Dark,
                 ..AppSettings::default()
@@ -103,7 +106,7 @@ impl AppHarness {
             ftp_settings: None,
             subnet_prefix: TEST_SUBNET_PREFIX.to_owned(),
             build: test_build_info(),
-            error_log: ErrorLog::in_dir(config_dir.path()),
+            error_log: ErrorLog::in_dir(temp_dir.path()),
             dialogs: Box::new(dialogs),
             clipboard: Box::new(clipboard),
             folder_opener: Box::new(folder_opener),
@@ -116,7 +119,8 @@ impl AppHarness {
             archive_covers: REFUSING_URL.to_owned(),
         };
         AppHarness {
-            config_dir,
+            config_dir: temp_dir.path().to_path_buf(),
+            temp_dir,
             dialogs: dialogs_handle,
             clipboard: clipboard_handle,
             folder_opener: folder_opener_handle,
@@ -135,7 +139,16 @@ impl AppHarness {
     }
 
     pub fn config_dir(&self) -> &Path {
-        self.config_dir.path()
+        &self.config_dir
+    }
+
+    /// Starts the app as on a fresh install: its config folder does not exist until something writes to it.
+    pub fn with_config_dir_not_created(&mut self) {
+        self.config_dir = self.temp_dir.path().join(FRESH_CONFIG_FOLDER);
+        let config_dir = self.config_dir.clone();
+        let environment = &mut self.setup("with_config_dir_not_created").environment;
+        environment.error_log = ErrorLog::in_dir(&config_dir);
+        environment.config_dir = config_dir;
     }
 
     /// FTP settings for `console` on 127.0.0.1, with the fake console's default credentials.

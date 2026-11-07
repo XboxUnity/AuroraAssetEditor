@@ -1,3 +1,5 @@
+use std::fs;
+
 use crate::dialogs::Modal;
 use crate::status::StatusLine;
 
@@ -43,10 +45,13 @@ impl App {
         }
     }
 
-    /// The About dialog's "Open log folder": the folder that holds `error.log`.
+    /// The About dialog's "Open log folder": the folder that holds `error.log`. On a fresh install nothing has
+    /// written to it yet, so it is created first.
     pub fn open_log_folder(&mut self) {
         let folder = self.environment.config_dir.clone();
-        if let Err(error) = self.environment.folder_opener.open_folder(&folder) {
+        let opened = fs::create_dir_all(&folder)
+            .and_then(|()| self.environment.folder_opener.open_folder(&folder));
+        if let Err(error) = opened {
             let message = format!("{OPEN_LOG_FOLDER_FAILED}: {error}");
             self.fail_over_about(OPEN_LOG_FOLDER_FAILED, message, &error);
         }
