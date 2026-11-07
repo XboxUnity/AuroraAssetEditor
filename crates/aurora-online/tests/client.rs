@@ -425,6 +425,7 @@ fn body_over_the_size_limit_is_error() {
             timeout: TIMEOUT,
             use_proxy: false,
             max_response_bytes: 50,
+            loopback_only: false,
         },
     );
 
@@ -489,4 +490,60 @@ fn errors_can_cross_threads() {
     assert_send_sync::<OnlineError>();
     assert_send_sync::<aurora_online::QueryError>();
     assert_send_sync::<OnlineClient>();
+}
+
+#[test]
+fn loopback_only_client_refuses_other_hosts_before_connecting() {
+    let client = OnlineClient::with_options(
+        Endpoints::live(),
+        ClientOptions {
+            timeout: TIMEOUT,
+            loopback_only: true,
+            ..ClientOptions::default()
+        },
+    );
+
+    for url in [
+        "http://assets.xboxunity.net/api/boxartsm/225",
+        "http://192.0.2.1/x.png",
+    ] {
+        let started = Instant::now();
+        let error = client
+            .download_image(url)
+            .expect_err("a remote host is refused");
+
+        assert!(matches!(error, OnlineError::Request { .. }), "{error:?}");
+        let mut chain = String::new();
+        let mut next = std::error::Error::source(&error);
+        while let Some(source) = next {
+            chain.push_str(&source.to_string());
+            next = source.source();
+        }
+        assert!(chain.contains("not a loopback address"), "{chain}");
+        assert!(started.elapsed() < Duration::from_secs(1));
+    }
+    assert!(
+        client
+            .find_covers(CoverSource::XboxUnity, &title(HALO_3))
+            .is_err()
+    );
+}
+
+#[test]
+fn loopback_only_client_still_reaches_the_local_server() {
+    let server = server_with(Vec::new());
+    let client = OnlineClient::with_options(
+        endpoints_for(&server),
+        ClientOptions {
+            timeout: TIMEOUT,
+            loopback_only: true,
+            ..ClientOptions::default()
+        },
+    );
+
+    let covers = client
+        .find_covers(CoverSource::XboxUnity, &title(HALO_3))
+        .expect("the local server answers");
+
+    assert!(!covers.is_empty());
 }

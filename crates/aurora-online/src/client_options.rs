@@ -13,6 +13,9 @@ pub struct ClientOptions {
     pub use_proxy: bool,
     /// Longest response body accepted; a longer one is a `Request` error.
     pub max_response_bytes: u64,
+    /// Refuses every destination that is not loopback (IP literals and `localhost`) before any
+    /// connection or name lookup, and ignores proxies. For tests, which must never reach the internet.
+    pub loopback_only: bool,
 }
 
 impl Default for ClientOptions {
@@ -21,6 +24,7 @@ impl Default for ClientOptions {
             timeout: DEFAULT_TIMEOUT,
             use_proxy: true,
             max_response_bytes: DEFAULT_MAX_RESPONSE_BYTES,
+            loopback_only: false,
         }
     }
 }

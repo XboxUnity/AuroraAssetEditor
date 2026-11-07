@@ -1,12 +1,14 @@
 use std::time::Duration;
 
 use ureq::Agent;
+use ureq::unversioned::transport::DefaultConnector;
 
 use crate::OnlineError;
 use crate::archive::{archive_cover, archive_listing_url, parse_archive_variants};
 use crate::client_options::ClientOptions;
 use crate::cover_result::CoverResult;
 use crate::endpoints::Endpoints;
+use crate::loopback_resolver::LoopbackResolver;
 use crate::query::{CoverQuery, CoverSource, TitleId};
 use crate::xboxunity::{parse_xboxunity_covers, xboxunity_search_url};
 
@@ -50,14 +52,19 @@ impl OnlineClient {
 
     pub fn with_options(endpoints: Endpoints, options: ClientOptions) -> Self {
         let builder = Agent::config_builder().timeout_global(Some(options.timeout));
-        let config = if options.use_proxy {
+        let config = if options.use_proxy && !options.loopback_only {
             builder.build()
         } else {
             builder.proxy(None).build()
         };
+        let agent = if options.loopback_only {
+            Agent::with_parts(config, DefaultConnector::default(), LoopbackResolver)
+        } else {
+            config.into()
+        };
         OnlineClient {
             endpoints,
-            agent: config.into(),
+            agent,
             max_response_bytes: options.max_response_bytes,
         }
     }
