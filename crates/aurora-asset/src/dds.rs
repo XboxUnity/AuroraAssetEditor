@@ -7,7 +7,7 @@ use std::fmt;
 use image::RgbaImage;
 
 use crate::bytes::{BLOCK_SIDE, BYTES_PER_PIXEL, block_array, read_u32_le};
-use crate::texture::{decode_bc1_block, decode_bc3_block};
+use crate::texture::{MAX_DIMENSION, decode_bc1_block, decode_bc3_block};
 
 const MAGIC: &[u8; 4] = b"DDS ";
 const HEADER_SIZE: u32 = 124;
@@ -72,12 +72,19 @@ pub fn decode(bytes: &[u8]) -> Result<RgbaImage, DdsError> {
         return Err(DdsError::Truncated);
     }
     if read_u32_le(bytes, HEADER_SIZE_OFFSET) != HEADER_SIZE {
-        return Err(unsupported("the header size is not 124"));
+        return Err(DdsError::Unsupported(format!(
+            "the header size is not {HEADER_SIZE}"
+        )));
     }
     let width = read_u32_le(bytes, WIDTH_OFFSET);
     let height = read_u32_le(bytes, HEIGHT_OFFSET);
     if width == 0 || height == 0 {
         return Err(unsupported("the image has no pixels"));
+    }
+    if width > MAX_DIMENSION || height > MAX_DIMENSION {
+        return Err(DdsError::Unsupported(format!(
+            "the image is {width}x{height}, more than {MAX_DIMENSION} pixels per side"
+        )));
     }
     let pixels = &bytes[DATA_START..];
     let rgba = match format_of(bytes)? {
@@ -207,6 +214,19 @@ mod tests {
             bytes.extend([0; 4]);
         }
         bytes
+    }
+
+    #[test]
+    fn sides_above_the_maximum_dimension_are_refused() {
+        assert!(decode(&numbered_dxt1(MAX_DIMENSION, 4)).is_ok());
+        for (width, height) in [(MAX_DIMENSION + 1, 4), (4, MAX_DIMENSION + 1)] {
+            assert_eq!(
+                decode(&numbered_dxt1(width, height)),
+                Err(DdsError::Unsupported(format!(
+                    "the image is {width}x{height}, more than {MAX_DIMENSION} pixels per side"
+                )))
+            );
+        }
     }
 
     #[test]

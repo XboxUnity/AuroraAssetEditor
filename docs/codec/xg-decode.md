@@ -112,7 +112,9 @@ Theories ruled out on the way:
 
 `ConvertDDSToImage` decodes the DDS images found in FSD files (`[[dds]]` in the manifest, made by
 `xtask/src/dds_corpus.rs`). Found by decoding the samples and larger probe files with the DLL; not
-disassembled. `dds::decode` returns the top mip level, as the DLL does.
+disassembled. `dds::decode` returns the top mip level, as the DLL does. It refuses images wider or
+taller than `MAX_DIMENSION` (8192), the most an `.asset` texture can hold, which bounds the memory a
+decode allocates; the DLL's own limit was not probed.
 
 What the DLL does with each format:
 
