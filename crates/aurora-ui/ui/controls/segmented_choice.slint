@@ -1,0 +1,53 @@
+import { Theme } from "../theme/theme.slint";
+
+// A row of options of which one is chosen, drawn as one pill.
+export component SegmentedChoice inherits Rectangle {
+    in property <[string]> options;
+    in property <int> selected;
+    // An option that cannot be chosen at the moment; -1 for none.
+    in property <int> disabled-option: -1;
+    callback chosen(int);
+
+    horizontal-stretch: 0;
+    height: Theme.pill-height;
+    border-radius: Theme.pill-radius;
+    background: Theme.pill-background;
+
+    HorizontalLayout {
+        for option[index] in options: segment := Rectangle {
+            property <bool> is-selected: index == selected;
+            property <bool> is-enabled: index != disabled-option;
+
+            border-radius: Theme.pill-radius;
+            background: is-selected ? Theme.chip-background : transparent;
+            opacity: is-enabled ? 1 : Theme.disabled-opacity;
+            accessible-role: button;
+            accessible-label: option;
+            accessible-checkable: true;
+            accessible-checked: is-selected;
+            accessible-enabled: is-enabled;
+            accessible-action-default => {
+                if is-enabled {
+                    chosen(index);
+                }
+            }
+
+            HorizontalLayout {
+                padding-left: Theme.pill-padding-x;
+                padding-right: Theme.pill-padding-x;
+                Text {
+                    text: option;
+                    color: is-selected ? Theme.chip-text : Theme.pill-text;
+                    vertical-alignment: center;
+                }
+            }
+
+            TouchArea {
+                enabled: is-enabled;
+                clicked => {
+                    chosen(index);
+                }
+            }
+        }
+    }
+}

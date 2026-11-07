@@ -1,0 +1,12 @@
+import { KindMarks } from "kind_marks.slint";
+
+// One row of the console's game table, with the IDs as eight hex digits.
+export struct GameRowView {
+    title: string,
+    title-id: string,
+    database-id: string,
+    media-id: string,
+    disc: string,
+    marks: KindMarks,
+    selected: bool,
+}

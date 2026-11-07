@@ -3,6 +3,9 @@ import { Icon } from "icon.slint";
 
 export component Chip inherits Rectangle {
     in property <string> text;
+    // Drawn before the text, e.g. the connection chip's dot.
+    in property <image> icon;
+    in property <color> icon-color: Theme.chip-text;
     in property <bool> has-chevron;
     in property <bool> enabled: true;
     callback clicked();
@@ -23,6 +26,11 @@ export component Chip inherits Rectangle {
         padding-left: Theme.chip-padding-x;
         padding-right: Theme.chip-padding-x;
         spacing: Theme.icon-gap;
+        if icon.width > 0: Icon {
+            y: (parent.height - self.height) / 2;
+            source: icon;
+            colorize: icon-color;
+        }
         Text {
             text: text;
             color: Theme.chip-text;

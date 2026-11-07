@@ -1,7 +1,11 @@
+import { ConsoleModel } from "../model/console_model.slint";
+import { MenuAction } from "../model/menu_action.slint";
 import { MenuId } from "../model/menu_id.slint";
 import { ShellModel } from "../model/shell_model.slint";
+import { Theme } from "../theme/theme.slint";
 import { GameMenu } from "game_menu.slint";
 import { GearMenu } from "gear_menu.slint";
+import { KindMenu } from "kind_menu.slint";
 import { OpenMenu } from "open_menu.slint";
 import { SaveMenu } from "save_menu.slint";
 
@@ -46,5 +50,33 @@ export component MenuOverlay inherits Rectangle {
     if ShellModel.open-menu == MenuId.gear: GearMenu {
         x: gear-button-right - self.width;
         y: menu-top;
+    }
+    // The Console page's buttons sit at the bottom of the page, so their menus open upwards.
+    if ShellModel.open-menu == MenuId.download: download-menu := KindMenu {
+        x: ConsoleModel.menu-anchor-x;
+        y: ConsoleModel.menu-anchor-y - self.height - Theme.menu-offset;
+        all-action: MenuAction.download-all;
+        cover-action: MenuAction.download-cover;
+        background-action: MenuAction.download-background;
+        icon-banner-action: MenuAction.download-icon-banner;
+        screenshots-action: MenuAction.download-screenshots;
+    }
+    if ShellModel.open-menu == MenuId.upload: upload-menu := KindMenu {
+        x: ConsoleModel.menu-anchor-x;
+        y: ConsoleModel.menu-anchor-y - self.height - Theme.menu-offset;
+        all-action: MenuAction.upload-all;
+        cover-action: MenuAction.upload-cover;
+        background-action: MenuAction.upload-background;
+        icon-banner-action: MenuAction.upload-icon-banner;
+        screenshots-action: MenuAction.upload-screenshots;
+    }
+    if ShellModel.open-menu == MenuId.remove: remove-menu := KindMenu {
+        x: ConsoleModel.menu-anchor-x;
+        y: ConsoleModel.menu-anchor-y - self.height - Theme.menu-offset;
+        all-action: MenuAction.remove-all;
+        cover-action: MenuAction.remove-cover;
+        background-action: MenuAction.remove-background;
+        icon-banner-action: MenuAction.remove-icon-banner;
+        screenshots-action: MenuAction.remove-screenshots;
     }
 }

@@ -1,0 +1,66 @@
+import { Theme } from "../theme/theme.slint";
+
+// A one-line text box drawn from Theme on every OS. It shows `value`: after each edit the owner gets the
+// typed text and sets `value` to what it keeps of it, which the box then shows.
+export component TextField inherits Rectangle {
+    in property <string> value;
+    in property <string> placeholder;
+    in property <bool> enabled: true;
+    out property <bool> has-focus: input.has-focus;
+    callback edited(string);
+    callback accepted();
+
+    forward-focus: input;
+    height: Theme.pill-height;
+    border-radius: Theme.pill-radius;
+    border-width: Theme.border-width;
+    border-color: input.has-focus ? Theme.accent : Theme.field-border;
+    background: Theme.field-background;
+    opacity: enabled ? 1 : Theme.disabled-opacity;
+    accessible-role: text-input;
+    accessible-value: value;
+    accessible-placeholder-text: placeholder;
+    accessible-enabled: enabled;
+
+    changed value => {
+        if input.text != value {
+            input.text = value;
+        }
+    }
+
+    Rectangle {
+        x: Theme.field-padding-x;
+        width: parent.width - 2 * Theme.field-padding-x;
+        clip: true;
+
+        if input.text == "": placeholder-text := Text {
+            width: 100%;
+            height: 100%;
+            text: placeholder;
+            color: Theme.text-muted;
+            font-size: Theme.caption-font-size;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+
+        input := TextInput {
+            width: 100%;
+            height: 100%;
+            text: value;
+            enabled: enabled;
+            single-line: true;
+            color: Theme.text;
+            selection-background-color: Theme.chip-background;
+            selection-foreground-color: Theme.chip-text;
+            font-size: Theme.caption-font-size;
+            vertical-alignment: center;
+            edited => {
+                root.edited(self.text);
+                self.text = root.value;
+            }
+            accepted => {
+                root.accepted();
+            }
+        }
+    }
+}

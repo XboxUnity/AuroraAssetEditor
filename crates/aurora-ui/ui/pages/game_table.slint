@@ -1,0 +1,148 @@
+import { ListView } from "std-widgets.slint";
+import { ConsoleModel } from "../model/console_model.slint";
+import { Theme } from "../theme/theme.slint";
+import { GameHeaderCell } from "game_header_cell.slint";
+import { GameRow } from "game_row.slint";
+
+// The console's games: a header that sorts, the rows that select, and Up, Down, Home and End to move the
+// selection once the table has focus.
+export component GameTable inherits Rectangle {
+    property <int> selected-row: ConsoleModel.selected-row;
+    property <int> last-row: ConsoleModel.rows.length - 1;
+    property <length> list-content-y: list.content-y;
+    // ListView answers a far jump by putting a whole row at its top edge, which can leave the selected row
+    // cut off at the bottom; the scroll is done once more after that.
+    property <bool> reveal-pending;
+
+    changed selected-row => {
+        reveal-pending = reveal-selected-row();
+    }
+    changed list-content-y => {
+        if reveal-pending {
+            reveal-pending = false;
+            reveal-selected-row();
+        }
+    }
+
+    // Scrolls the least distance that shows the whole selected row; true when it scrolled.
+    function reveal-selected-row() -> bool {
+        if selected-row < 0 {
+            return false;
+        }
+        let top = selected-row * Theme.table-row-height;
+        let bottom = top + Theme.table-row-height;
+        if top < -list.content-y {
+            list.content-y = -top;
+            return true;
+        }
+        if bottom > -list.content-y + list.height {
+            list.content-y = list.height - bottom;
+            return true;
+        }
+        false
+    }
+
+    keys := FocusScope {
+        key-pressed(event) => {
+            if last-row < 0 {
+                return reject;
+            }
+            if event.text == Key.UpArrow {
+                if selected-row > 0 {
+                    ConsoleModel.select(selected-row - 1);
+                }
+                return accept;
+            }
+            if event.text == Key.DownArrow {
+                if selected-row < last-row {
+                    ConsoleModel.select(selected-row + 1);
+                }
+                return accept;
+            }
+            if event.text == Key.Home {
+                ConsoleModel.select(0);
+                return accept;
+            }
+            if event.text == Key.End {
+                ConsoleModel.select(last-row);
+                return accept;
+            }
+            reject
+        }
+
+        VerticalLayout {
+            HorizontalLayout {
+                height: Theme.table-row-height;
+                padding-left: Theme.table-cell-padding-x;
+                padding-right: Theme.table-cell-padding-x;
+                spacing: 2 * Theme.table-cell-padding-x;
+                title-header := GameHeaderCell {
+                    horizontal-stretch: 1;
+                    text: "Title";
+                    sorted: ConsoleModel.sort-column == 0;
+                    ascending: ConsoleModel.sort-ascending;
+                    clicked => {
+                        ConsoleModel.sort(0);
+                    }
+                }
+                title-id-header := GameHeaderCell {
+                    width: Theme.table-id-column-width - 2 * Theme.table-cell-padding-x;
+                    text: "TitleID";
+                    sorted: ConsoleModel.sort-column == 1;
+                    ascending: ConsoleModel.sort-ascending;
+                    clicked => {
+                        ConsoleModel.sort(1);
+                    }
+                }
+                database-id-header := GameHeaderCell {
+                    width: Theme.table-id-column-width - 2 * Theme.table-cell-padding-x;
+                    text: "DatabaseID";
+                    sorted: ConsoleModel.sort-column == 2;
+                    ascending: ConsoleModel.sort-ascending;
+                    clicked => {
+                        ConsoleModel.sort(2);
+                    }
+                }
+                media-id-header := GameHeaderCell {
+                    width: Theme.table-id-column-width - 2 * Theme.table-cell-padding-x;
+                    text: "MediaID";
+                    sorted: ConsoleModel.sort-column == 3;
+                    ascending: ConsoleModel.sort-ascending;
+                    clicked => {
+                        ConsoleModel.sort(3);
+                    }
+                }
+                disc-header := GameHeaderCell {
+                    width: Theme.table-disc-column-width - 2 * Theme.table-cell-padding-x;
+                    text: "Disc";
+                    sorted: ConsoleModel.sort-column == 4;
+                    ascending: ConsoleModel.sort-ascending;
+                    clicked => {
+                        ConsoleModel.sort(4);
+                    }
+                }
+                assets-header := GameHeaderCell {
+                    width: Theme.table-assets-column-width - 2 * Theme.table-cell-padding-x;
+                    text: "Assets";
+                    sortable: false;
+                }
+            }
+
+            Rectangle {
+                height: Theme.border-width;
+                background: Theme.border;
+            }
+
+            list := ListView {
+                vertical-stretch: 1;
+                for row[index] in ConsoleModel.rows: game-row := GameRow {
+                    view: row;
+                    clicked => {
+                        keys.focus();
+                        ConsoleModel.select(index);
+                    }
+                }
+            }
+        }
+    }
+}

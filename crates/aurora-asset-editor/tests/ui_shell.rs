@@ -167,14 +167,19 @@ fn load_three_screenshots(harness: &mut AppHarness) {
     harness.run_jobs();
 }
 
-/// The headers the body shows: the asset pages' panel titles, or the title Online and Console still show.
+/// What names the page in the body: the asset pages' panel titles, or the Online and Console pages' main
+/// buttons.
 fn body_titles(shell: &Shell) -> Vec<String> {
-    ["ImagePanel::title", "PageHost::page-title"]
-        .into_iter()
-        .flat_map(|id| ElementHandle::find_by_element_id(shell.view.window(), id))
-        .filter_map(|title| title.accessible_label())
-        .map(|title| title.to_string())
-        .collect()
+    [
+        "ImagePanel::title",
+        "OnlinePage::search-button",
+        "ConsolePage::refresh-button",
+    ]
+    .into_iter()
+    .flat_map(|id| ElementHandle::find_by_element_id(shell.view.window(), id))
+    .filter_map(|title| title.accessible_label())
+    .map(|title| title.to_string())
+    .collect()
 }
 
 fn page_titles(page: Page) -> Vec<&'static str> {
@@ -183,8 +188,8 @@ fn page_titles(page: Page) -> Vec<&'static str> {
         Page::Background => vec!["Background"],
         Page::IconBanner => vec!["Icon", "Banner"],
         Page::Screenshots => vec!["Screenshot 1"],
-        Page::Online => vec!["Online"],
-        Page::Console => vec!["Console"],
+        Page::Online => vec!["Search"],
+        Page::Console => vec!["Refresh"],
     }
 }
 

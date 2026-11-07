@@ -8,7 +8,9 @@ use crate::app::App;
 use crate::platform::SystemTheme;
 
 use super::ImageCache;
+use super::console_view::{connect_console, render_console};
 use super::editor_view::{connect_editor, render_editor};
+use super::online_view::{connect_online, render_online};
 use super::shell_view::{Refresh, connect_shell, render_shell};
 
 /// The window: it shows what `App` holds and turns the window's callbacks into `App` calls.
@@ -48,6 +50,8 @@ impl MainWindowView {
         });
         connect_shell(&self.window, &app, &refresh);
         connect_editor(&self.window, &app, &refresh);
+        connect_online(&self.window, &app, &refresh);
+        connect_console(&self.window, &app, &refresh);
     }
 
     pub fn render(&self, app: &App) {
@@ -68,4 +72,6 @@ fn render_window(
 ) {
     render_shell(window, app, system_theme);
     render_editor(window, app, images);
+    render_online(window, app);
+    render_console(window, app);
 }

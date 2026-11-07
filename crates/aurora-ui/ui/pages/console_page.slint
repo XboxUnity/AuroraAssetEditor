@@ -1,0 +1,126 @@
+import { Chip } from "../controls/chip.slint";
+import { PillButton } from "../controls/pill_button.slint";
+import { TextField } from "../controls/text_field.slint";
+import { ConsoleModel } from "../model/console_model.slint";
+import { MenuId } from "../model/menu_id.slint";
+import { ShellModel } from "../model/shell_model.slint";
+import { Theme } from "../theme/theme.slint";
+import { GameTable } from "game_table.slint";
+
+// The console's games over FTP, and what can be done with the selected one.
+export component ConsolePage inherits VerticalLayout {
+    property <bool> game-actions-enabled: ConsoleModel.actions-reason == "" && !ConsoleModel.console-busy;
+
+    padding: Theme.body-padding;
+    spacing: Theme.body-gap;
+
+    HorizontalLayout {
+        vertical-stretch: 0;
+        spacing: Theme.header-gap;
+        connection-chip := Chip {
+            text: ConsoleModel.chip-text;
+            icon: ConsoleModel.link-state == 0 ? @image-url("") : @image-url("../icons/dot.svg");
+            icon-color: ConsoleModel.link-state == 2 ? Theme.link-ok : ConsoleModel.link-state == 3 ? Theme.link-failed : Theme.text-muted;
+        }
+        edit-connection-button := PillButton {
+            text: "Edit connection…";
+            clicked => {
+                ConsoleModel.edit-connection();
+            }
+        }
+        Rectangle {
+            horizontal-stretch: 1;
+        }
+        refresh-button := PillButton {
+            text: "Refresh";
+            enabled: !ConsoleModel.console-busy;
+            clicked => {
+                ConsoleModel.refresh();
+            }
+        }
+        bulk-button := PillButton {
+            text: "Bulk actions…";
+            enabled: !ConsoleModel.console-busy;
+            clicked => {
+                ConsoleModel.bulk();
+            }
+        }
+    }
+
+    HorizontalLayout {
+        vertical-stretch: 0;
+        spacing: Theme.header-gap;
+        filter-title-field := TextField {
+            horizontal-stretch: 1;
+            value: ConsoleModel.filter-title;
+            placeholder: "Filter title";
+            edited(text) => {
+                ConsoleModel.edit-filters(text, ConsoleModel.filter-title-id);
+            }
+        }
+        filter-title-id-field := TextField {
+            horizontal-stretch: 1;
+            value: ConsoleModel.filter-title-id;
+            placeholder: "Filter TitleID";
+            edited(text) => {
+                ConsoleModel.edit-filters(ConsoleModel.filter-title, text);
+            }
+        }
+    }
+
+    game-table := GameTable {
+        vertical-stretch: 1;
+    }
+
+    HorizontalLayout {
+        vertical-stretch: 0;
+        spacing: Theme.header-gap;
+        open-in-editor-button := PillButton {
+            text: "Open in editor";
+            accent: true;
+            enabled: game-actions-enabled && !ShellModel.editor-locked;
+            clicked => {
+                ConsoleModel.open-in-editor();
+            }
+        }
+        download-button := PillButton {
+            text: "Download";
+            has-chevron: true;
+            enabled: game-actions-enabled && !ShellModel.editor-locked;
+            clicked => {
+                ConsoleModel.menu-anchor-x = self.absolute-position.x;
+                ConsoleModel.menu-anchor-y = self.absolute-position.y;
+                ShellModel.toggle-menu(MenuId.download);
+            }
+        }
+        upload-button := PillButton {
+            text: "Upload current";
+            has-chevron: true;
+            enabled: game-actions-enabled;
+            clicked => {
+                ConsoleModel.menu-anchor-x = self.absolute-position.x;
+                ConsoleModel.menu-anchor-y = self.absolute-position.y;
+                ShellModel.toggle-menu(MenuId.upload);
+            }
+        }
+        remove-button := PillButton {
+            text: "Remove";
+            has-chevron: true;
+            enabled: game-actions-enabled;
+            clicked => {
+                ConsoleModel.menu-anchor-x = self.absolute-position.x;
+                ConsoleModel.menu-anchor-y = self.absolute-position.y;
+                ShellModel.toggle-menu(MenuId.remove);
+            }
+        }
+        if ConsoleModel.actions-reason != "": actions-reason := Text {
+            text: ConsoleModel.actions-reason;
+            color: Theme.text-muted;
+            font-size: Theme.caption-font-size;
+            vertical-alignment: center;
+        }
+        Rectangle {
+            horizontal-stretch: 1;
+        }
+    }
+}

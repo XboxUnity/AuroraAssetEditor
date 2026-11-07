@@ -1,0 +1,32 @@
+import { ResultTileView } from "result_tile_view.slint";
+
+export global OnlineModel {
+    // 0 XboxUnity, 1 Internet Archive.
+    in property <int> source-index;
+    // 0 TitleID, 1 Keywords.
+    in property <int> mode-index;
+    in property <bool> keywords-enabled;
+    // The search box's text after the mode's input rule; the box shows it again after every edit.
+    in property <string> search-text;
+    in property <string> search-placeholder;
+    in property <[ResultTileView]> tiles;
+    // The selected tile, -1 for none.
+    in property <int> selected;
+    in property <string> selected-label;
+    in property <string> selected-size;
+    in property <image> selected-image;
+    in property <bool> selected-has-image;
+    in property <bool> selected-failed;
+    in property <bool> can-use;
+    in property <bool> can-save;
+    // Shown in place of the grid while it has no results; empty while a search runs.
+    in property <string> empty-text;
+
+    callback set-source(int);
+    callback set-mode(int);
+    callback edit-search(string);
+    callback search();
+    callback select(int);
+    callback use-as-cover();
+    callback save-image();
+}

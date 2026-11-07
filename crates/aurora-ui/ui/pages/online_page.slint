@@ -1,0 +1,115 @@
+import { PillButton } from "../controls/pill_button.slint";
+import { SegmentedChoice } from "../controls/segmented_choice.slint";
+import { TextField } from "../controls/text_field.slint";
+import { OnlineModel } from "../model/online_model.slint";
+import { Theme } from "../theme/theme.slint";
+import { ResultGrid } from "result_grid.slint";
+
+// Search XboxUnity or the Internet Archive; the panel on the right acts on the selected result.
+export component OnlinePage inherits VerticalLayout {
+    padding: Theme.body-padding;
+    spacing: Theme.body-gap;
+
+    HorizontalLayout {
+        vertical-stretch: 0;
+        spacing: Theme.header-gap;
+        source-choice := SegmentedChoice {
+            options: ["XboxUnity", "Internet Archive"];
+            selected: OnlineModel.source-index;
+            chosen(index) => {
+                OnlineModel.set-source(index);
+            }
+        }
+        mode-choice := SegmentedChoice {
+            options: ["TitleID", "Keywords"];
+            selected: OnlineModel.mode-index;
+            disabled-option: OnlineModel.keywords-enabled ? -1 : 1;
+            chosen(index) => {
+                OnlineModel.set-mode(index);
+            }
+        }
+        search-field := TextField {
+            horizontal-stretch: 1;
+            value: OnlineModel.search-text;
+            placeholder: OnlineModel.search-placeholder;
+            edited(text) => {
+                OnlineModel.edit-search(text);
+            }
+            accepted => {
+                OnlineModel.search();
+            }
+        }
+        search-button := PillButton {
+            text: "Search";
+            accent: true;
+            clicked => {
+                OnlineModel.search();
+            }
+        }
+    }
+
+    HorizontalLayout {
+        vertical-stretch: 1;
+        spacing: Theme.body-gap;
+        result-grid := ResultGrid {
+            horizontal-stretch: 1;
+        }
+        VerticalLayout {
+            width: Theme.result-panel-width;
+            spacing: Theme.header-gap;
+            alignment: start;
+            if OnlineModel.selected >= 0: preview := Rectangle {
+                height: self.width * Theme.result-aspect;
+                border-radius: Theme.slot-radius;
+                border-width: Theme.border-width;
+                border-color: Theme.slot-filled-border;
+                background: Theme.slot-filled-gradient;
+                clip: true;
+                if OnlineModel.selected-has-image: Image {
+                    width: 100%;
+                    height: 100%;
+                    source: OnlineModel.selected-image;
+                    image-fit: contain;
+                }
+                if OnlineModel.selected-failed: Text {
+                    width: 100%;
+                    height: 100%;
+                    text: "Failed to load image";
+                    color: Theme.error-text;
+                    font-size: Theme.caption-font-size;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                    wrap: word-wrap;
+                }
+            }
+            if OnlineModel.selected-label != "": selected-label := Text {
+                text: OnlineModel.selected-label;
+                color: Theme.text-muted;
+                font-size: Theme.caption-font-size;
+                wrap: word-wrap;
+            }
+            if OnlineModel.selected-size != "": selected-size := Text {
+                text: OnlineModel.selected-size;
+                color: Theme.text-muted;
+                font-size: Theme.caption-font-size;
+            }
+            use-button := PillButton {
+                horizontal-stretch: 1;
+                text: "Use as Cover";
+                accent: true;
+                enabled: OnlineModel.can-use;
+                clicked => {
+                    OnlineModel.use-as-cover();
+                }
+            }
+            save-button := PillButton {
+                horizontal-stretch: 1;
+                text: "Save image…";
+                enabled: OnlineModel.can-save;
+                clicked => {
+                    OnlineModel.save-image();
+                }
+            }
+        }
+    }
+}

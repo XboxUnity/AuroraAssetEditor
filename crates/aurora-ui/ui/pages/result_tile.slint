@@ -1,0 +1,75 @@
+import { DashedBorder } from "../controls/dashed_border.slint";
+import { Icon } from "../controls/icon.slint";
+import { ResultTileView } from "../model/result_tile_view.slint";
+import { Theme } from "../theme/theme.slint";
+
+// One result of the Online grid: the thumbnail, or the label until it has loaded.
+export component ResultTile inherits Rectangle {
+    in property <ResultTileView> view;
+    callback clicked();
+
+    border-radius: Theme.slot-radius;
+    clip: true;
+    background: view.selected ? Theme.slot-filled-gradient : Theme.slot-background;
+    accessible-role: button;
+    accessible-label: view.label;
+    accessible-checkable: true;
+    accessible-checked: view.selected;
+    accessible-action-default => {
+        clicked();
+    }
+
+    if view.has-image: thumbnail := Image {
+        width: 100%;
+        height: 100%;
+        source: view.image;
+        image-fit: contain;
+    }
+
+    if !view.has-image: VerticalLayout {
+        padding: Theme.result-label-padding;
+        alignment: center;
+        if !view.failed: label := Text {
+            text: view.label;
+            color: view.selected ? Theme.chip-text : Theme.text-muted;
+            font-size: Theme.caption-font-size;
+            horizontal-alignment: center;
+            wrap: word-wrap;
+            overflow: elide;
+        }
+        if view.failed: failed-text := Text {
+            text: "Failed to load image";
+            color: Theme.error-text;
+            font-size: Theme.caption-font-size;
+            horizontal-alignment: center;
+            wrap: word-wrap;
+        }
+    }
+
+    if !view.selected: DashedBorder {
+        width: 100%;
+        height: 100%;
+        dash-color: Theme.slot-border;
+    }
+
+    if view.selected: Rectangle {
+        width: 100%;
+        height: 100%;
+        border-radius: Theme.slot-radius;
+        border-width: Theme.border-width;
+        border-color: Theme.slot-filled-border;
+    }
+
+    if view.selected: check := Icon {
+        x: parent.width - self.width - Theme.result-check-inset;
+        y: Theme.result-check-inset;
+        source: @image-url("../icons/check.svg");
+        colorize: Theme.chip-text;
+    }
+
+    TouchArea {
+        clicked => {
+            clicked();
+        }
+    }
+}

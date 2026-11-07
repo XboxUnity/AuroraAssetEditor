@@ -2,11 +2,12 @@ import { EditorModel } from "../model/editor_model.slint";
 import { PageId } from "../model/page_id.slint";
 import { ShellModel } from "../model/shell_model.slint";
 import { AssetPage } from "../pages/asset_page.slint";
+import { ConsolePage } from "../pages/console_page.slint";
 import { IconBannerPage } from "../pages/icon_banner_page.slint";
+import { OnlinePage } from "../pages/online_page.slint";
 import { ScreenshotsPage } from "../pages/screenshots_page.slint";
-import { Theme } from "../theme/theme.slint";
 
-// The page area. Until the Online and Console pages exist, they show their title where the header goes.
+// The page area: the page the sidebar has selected.
 export component PageHost inherits Rectangle {
     if ShellModel.page == PageId.cover: cover-page := AssetPage {
         width: 100%;
@@ -28,16 +29,12 @@ export component PageHost inherits Rectangle {
         width: 100%;
         height: 100%;
     }
-    if ShellModel.page == PageId.online || ShellModel.page == PageId.console: VerticalLayout {
+    if ShellModel.page == PageId.online: online-page := OnlinePage {
         width: 100%;
         height: 100%;
-        padding: Theme.body-padding;
-        alignment: start;
-        page-title := Text {
-            text: ShellModel.page == PageId.online ? "Online" : "Console";
-            color: Theme.text-strong;
-            font-size: Theme.page-title-font-size;
-            font-weight: Theme.semibold-font-weight;
-        }
+    }
+    if ShellModel.page == PageId.console: console-page := ConsolePage {
+        width: 100%;
+        height: 100%;
     }
 }

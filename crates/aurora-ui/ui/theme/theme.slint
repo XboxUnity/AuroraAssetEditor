@@ -97,4 +97,25 @@ export global Theme {
     out property <length> thumb-selected-outline-width: 2px;
     out property <length> drag-threshold: 4px;
     out property <length> insertion-bar-width: 2px;
+
+    // Text fields sit on the slot colour with the separator line as their edge.
+    out property <color> field-background: slot-background;
+    out property <color> field-border: border;
+    out property <length> field-padding-x: 6px;
+
+    out property <int> result-columns: 3;
+    out property <length> result-gap: 6px;
+    out property <length> result-panel-width: 110px;
+    out property <float> result-aspect: 600 / 900;
+    out property <length> result-label-padding: 6px;
+    out property <length> result-check-inset: 4px;
+
+    // The mockup's 11 px table text at line height 1.35 with 3 px cell padding, plus the 1 px row line.
+    out property <length> table-row-height: 22px;
+    out property <length> table-cell-padding-x: 6px;
+    out property <length> table-id-column-width: 80px;
+    out property <length> table-disc-column-width: 40px;
+    out property <length> table-assets-column-width: 76px;
+    out property <length> table-mark-gap: 2px;
+    out property <length> table-chevron-gap: 2px;
 }

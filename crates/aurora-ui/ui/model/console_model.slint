@@ -1,0 +1,31 @@
+import { GameRowView } from "game_row_view.slint";
+
+export global ConsoleModel {
+    in property <string> chip-text;
+    // 0 not set up, 1 not tried yet, 2 connected, 3 failed.
+    in property <int> link-state;
+    in property <string> filter-title;
+    in property <string> filter-title-id;
+    in property <[GameRowView]> rows;
+    // The selected row, -1 for none.
+    in property <int> selected-row;
+    // 0 Title, 1 TitleID, 2 DatabaseID, 3 MediaID, 4 Disc; -1 while unsorted.
+    in property <int> sort-column;
+    in property <bool> sort-ascending;
+    in property <bool> has-selection;
+    // Why the per-game actions are disabled; empty while they are enabled.
+    in property <string> actions-reason;
+    in property <bool> console-busy;
+    // Where the open Download, Upload or Remove menu hangs from: the top left of its button, in window
+    // coordinates. The button sets it when it opens its menu.
+    in-out property <length> menu-anchor-x;
+    in-out property <length> menu-anchor-y;
+
+    callback edit-connection();
+    callback refresh();
+    callback bulk();
+    callback edit-filters(string, string);
+    callback sort(int);
+    callback select(int);
+    callback open-in-editor();
+}

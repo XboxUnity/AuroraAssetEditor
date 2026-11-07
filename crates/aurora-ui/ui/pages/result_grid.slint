@@ -1,0 +1,40 @@
+import { ScrollView } from "std-widgets.slint";
+import { OnlineModel } from "../model/online_model.slint";
+import { Theme } from "../theme/theme.slint";
+import { ResultTile } from "result_tile.slint";
+
+// The Online results, three to a row at the cover's 900:600, scrolling when they do not fit.
+export component ResultGrid inherits Rectangle {
+    property <length> tile-width: (scroll.visible-width - (Theme.result-columns - 1) * Theme.result-gap) / Theme.result-columns;
+    property <length> tile-height: tile-width * Theme.result-aspect;
+    property <int> row-count: ceil(OnlineModel.tiles.length / Theme.result-columns);
+
+    if OnlineModel.empty-text != "": empty-text := Text {
+        width: 100%;
+        height: 100%;
+        text: OnlineModel.empty-text;
+        color: Theme.text-muted;
+        font-size: Theme.caption-font-size;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        wrap: word-wrap;
+    }
+
+    scroll := ScrollView {
+        width: 100%;
+        height: 100%;
+        content-width: self.visible-width;
+        content-height: max(0, row-count * (tile-height + Theme.result-gap) - Theme.result-gap);
+
+        for tile[index] in OnlineModel.tiles: ResultTile {
+            x: mod(index, Theme.result-columns) * (tile-width + Theme.result-gap);
+            y: floor(index / Theme.result-columns) * (tile-height + Theme.result-gap);
+            width: tile-width;
+            height: tile-height;
+            view: tile;
+            clicked => {
+                OnlineModel.select(index);
+            }
+        }
+    }
+}

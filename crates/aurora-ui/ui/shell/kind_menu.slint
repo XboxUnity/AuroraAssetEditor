@@ -1,0 +1,44 @@
+import { MenuList } from "../controls/menu_list.slint";
+import { MenuRow } from "../controls/menu_row.slint";
+import { MenuAction } from "../model/menu_action.slint";
+import { ShellModel } from "../model/shell_model.slint";
+
+// The Console page's Download, Upload current and Remove menus: every kind, or one of them.
+export component KindMenu inherits MenuList {
+    in property <MenuAction> all-action;
+    in property <MenuAction> cover-action;
+    in property <MenuAction> background-action;
+    in property <MenuAction> icon-banner-action;
+    in property <MenuAction> screenshots-action;
+
+    MenuRow {
+        text: "All";
+        activated => {
+            ShellModel.menu-action(all-action);
+        }
+    }
+    MenuRow {
+        text: "Cover";
+        activated => {
+            ShellModel.menu-action(cover-action);
+        }
+    }
+    MenuRow {
+        text: "Background";
+        activated => {
+            ShellModel.menu-action(background-action);
+        }
+    }
+    MenuRow {
+        text: "Icon & Banner";
+        activated => {
+            ShellModel.menu-action(icon-banner-action);
+        }
+    }
+    MenuRow {
+        text: "Screenshots";
+        activated => {
+            ShellModel.menu-action(screenshots-action);
+        }
+    }
+}

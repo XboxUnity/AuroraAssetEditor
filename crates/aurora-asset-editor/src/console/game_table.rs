@@ -61,6 +61,10 @@ impl GameTable {
         }
     }
 
+    pub fn filter(&self) -> &GameFilter {
+        &self.filter
+    }
+
     /// The first click on a column sorts it ascending, the next ones toggle the direction.
     pub fn sort_by(&mut self, column: GameColumn) {
         let ascending = match self.sort {

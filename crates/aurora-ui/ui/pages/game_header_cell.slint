@@ -1,0 +1,45 @@
+import { Icon } from "../controls/icon.slint";
+import { Theme } from "../theme/theme.slint";
+
+// A column label of the game table; a click on a sortable one sorts by it, and the sorted one shows its
+// direction.
+export component GameHeaderCell inherits Rectangle {
+    in property <string> text;
+    in property <bool> sortable: true;
+    in property <bool> sorted;
+    in property <bool> ascending;
+    callback clicked();
+
+    accessible-role: button;
+    accessible-label: text;
+    accessible-enabled: sortable;
+    accessible-action-default => {
+        if sortable {
+            clicked();
+        }
+    }
+
+    HorizontalLayout {
+        spacing: Theme.table-chevron-gap;
+        alignment: start;
+        Text {
+            text: text;
+            color: Theme.text-muted;
+            font-size: Theme.caption-font-size;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+        if sorted: Icon {
+            y: (parent.height - self.height) / 2;
+            source: ascending ? @image-url("../icons/chevron_up.svg") : @image-url("../icons/chevron_down.svg");
+            colorize: Theme.text-muted;
+        }
+    }
+
+    TouchArea {
+        enabled: sortable;
+        clicked => {
+            clicked();
+        }
+    }
+}

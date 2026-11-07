@@ -1,0 +1,77 @@
+import { GameRowView } from "../model/game_row_view.slint";
+import { Theme } from "../theme/theme.slint";
+import { AssetMarks } from "asset_marks.slint";
+
+// One game of the console's table, with the row line under it.
+export component GameRow inherits Rectangle {
+    in property <GameRowView> view;
+    callback clicked();
+
+    property <color> foreground: view.selected ? Theme.text-strong : Theme.text;
+
+    height: Theme.table-row-height;
+    background: view.selected ? Theme.chip-background : transparent;
+    accessible-role: list-item;
+    accessible-label: view.title;
+    accessible-item-selected: view.selected;
+
+    VerticalLayout {
+        HorizontalLayout {
+            padding-left: Theme.table-cell-padding-x;
+            padding-right: Theme.table-cell-padding-x;
+            spacing: 2 * Theme.table-cell-padding-x;
+            Text {
+                horizontal-stretch: 1;
+                text: view.title;
+                color: foreground;
+                font-size: Theme.caption-font-size;
+                vertical-alignment: center;
+                overflow: elide;
+            }
+            Text {
+                width: Theme.table-id-column-width - 2 * Theme.table-cell-padding-x;
+                text: view.title-id;
+                color: foreground;
+                font-size: Theme.caption-font-size;
+                vertical-alignment: center;
+            }
+            Text {
+                width: Theme.table-id-column-width - 2 * Theme.table-cell-padding-x;
+                text: view.database-id;
+                color: foreground;
+                font-size: Theme.caption-font-size;
+                vertical-alignment: center;
+            }
+            Text {
+                width: Theme.table-id-column-width - 2 * Theme.table-cell-padding-x;
+                text: view.media-id;
+                color: foreground;
+                font-size: Theme.caption-font-size;
+                vertical-alignment: center;
+            }
+            Text {
+                width: Theme.table-disc-column-width - 2 * Theme.table-cell-padding-x;
+                text: view.disc;
+                color: foreground;
+                font-size: Theme.caption-font-size;
+                vertical-alignment: center;
+            }
+            AssetMarks {
+                width: Theme.table-assets-column-width - 2 * Theme.table-cell-padding-x;
+                marks: view.marks;
+                present-color: foreground;
+            }
+        }
+
+        Rectangle {
+            height: Theme.border-width;
+            background: Theme.border;
+        }
+    }
+
+    TouchArea {
+        clicked => {
+            clicked();
+        }
+    }
+}
