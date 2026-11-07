@@ -2,8 +2,9 @@ use std::io::Cursor;
 
 use aurora_asset::RgbaImage;
 use aurora_asset::dds;
-use image::{DynamicImage, ImageError, ImageFormat, ImageReader, Limits, Rgba};
+use image::{DynamicImage, ImageBuffer, ImageError, ImageFormat, ImageReader, Limits, Luma, Rgba};
 
+use crate::gdiplus_gray16_table::GDIPLUS_GRAY16_THRESHOLDS;
 use crate::import_error::ImportError;
 
 pub const IMPORT_EXTENSIONS: [&str; 12] = [
@@ -19,8 +20,8 @@ const TGA_EXTENSION: &str = "tga";
 const RGBA_BYTES_PER_PIXEL: u64 = 4;
 const BYTE_BITS: u16 = 8;
 
-/// Decodes any import format to straight-alpha RGBA8. `file_name` only matters for TGA,
-/// which has no magic number.
+/// Decodes any import format to straight-alpha RGBA8, reducing 16-bit PNG samples to 8 bits as
+/// GDI+ does. `file_name` only matters for TGA, which has no magic number.
 pub fn decode_image(bytes: &[u8], file_name: Option<&str>) -> Result<RgbaImage, ImportError> {
     if bytes.starts_with(DDS_MAGIC) {
         return dds::decode(bytes).map_err(ImportError::Dds);
@@ -39,24 +40,23 @@ pub fn decode_image(bytes: &[u8], file_name: Option<&str>) -> Result<RgbaImage, 
     }
 }
 
+/// 16-bit PNG samples are reduced the way GDI+ reduces them; everything else converts as `image`
+/// does, which matches GDI+ for 8-bit data.
 fn to_rgba8(image: DynamicImage, format: ImageFormat) -> RgbaImage {
-    if format == ImageFormat::Png && is_sixteen_bit(&image) {
-        return high_bytes(&image);
+    if format != ImageFormat::Png {
+        return image.into_rgba8();
     }
-    image.into_rgba8()
+    match image {
+        DynamicImage::ImageLuma16(grey) => gdiplus_grey(&grey),
+        DynamicImage::ImageLumaA16(_)
+        | DynamicImage::ImageRgb16(_)
+        | DynamicImage::ImageRgba16(_) => high_bytes(&image),
+        _ => image.into_rgba8(),
+    }
 }
 
-fn is_sixteen_bit(image: &DynamicImage) -> bool {
-    matches!(
-        image,
-        DynamicImage::ImageLuma16(_)
-            | DynamicImage::ImageLumaA16(_)
-            | DynamicImage::ImageRgb16(_)
-            | DynamicImage::ImageRgba16(_)
-    )
-}
-
-/// GDI+ keeps the high byte of each 16-bit PNG sample, where `image` rounds to the nearest value.
+/// GDI+ keeps the high byte of each 16-bit sample of colour and grey-with-alpha PNGs, where
+/// `image` rounds to the nearest value.
 fn high_bytes(image: &DynamicImage) -> RgbaImage {
     let wide = image.to_rgba16();
     RgbaImage::from_fn(wide.width(), wide.height(), |x, y| {
@@ -65,6 +65,16 @@ fn high_bytes(image: &DynamicImage) -> RgbaImage {
                 .0
                 .map(|sample| (sample >> BYTE_BITS) as u8),
         )
+    })
+}
+
+/// GDI+ maps 16-bit grey without alpha through its own curve, neither high byte nor rounding;
+/// the measured table holds where each 8-bit value starts.
+fn gdiplus_grey(grey: &ImageBuffer<Luma<u16>, Vec<u16>>) -> RgbaImage {
+    RgbaImage::from_fn(grey.width(), grey.height(), |x, y| {
+        let sample = grey.get_pixel(x, y)[0];
+        let value = GDIPLUS_GRAY16_THRESHOLDS.partition_point(|&start| start <= sample) as u8;
+        Rgba([value, value, value, u8::MAX])
     })
 }
 

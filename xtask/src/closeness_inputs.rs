@@ -17,6 +17,8 @@ use crate::srgb_profile::srgb_profile;
 use crate::synthetic;
 
 const ICON_SIDE: u32 = 64;
+/// A 256x256 image holds every 16-bit value once.
+pub const RAMP_SIDE: u32 = 256;
 const BANNER_PLACEHOLDER: &str = "ph_banner";
 const PLACEHOLDERS: [&str; 5] = [
     "ph_cover",
@@ -43,7 +45,7 @@ pub fn gate_directory(paths: &Paths) -> PathBuf {
     paths.closeness().join("inputs")
 }
 
-/// `cargo xtask closeness-inputs`: writes the 13 gate inputs under `fixtures/`.
+/// `cargo xtask closeness-inputs`: writes the gate inputs under `fixtures/`.
 pub fn write_gate_inputs() -> Result<()> {
     let paths = Paths::new()?;
     let directory = gate_directory(&paths);
@@ -181,6 +183,31 @@ fn sixteen_bit_input(prng: &mut Prng) -> PngInput {
     input
 }
 
+fn gray16_input(prng: &mut Prng) -> PngInput {
+    let samples = (ICON_SIDE * ICON_SIDE * 2) as usize;
+    let mut input = PngInput::new(
+        ICON_SIDE,
+        ICON_SIDE,
+        ColorType::Grayscale,
+        random_bytes(prng, samples),
+    );
+    input.bit_depth = BitDepth::Sixteen;
+    input
+}
+
+/// Every 16-bit grey value once, row by row: sample `y * 256 + x`.
+fn gray16_ramp() -> PngInput {
+    let data = (0..=u16::MAX).flat_map(u16::to_be_bytes).collect();
+    let mut input = PngInput::new(RAMP_SIDE, RAMP_SIDE, ColorType::Grayscale, data);
+    input.bit_depth = BitDepth::Sixteen;
+    input
+}
+
+/// Writes the 16-bit grey ramp as `gray16_ramp.png` into `directory`.
+pub fn write_gray16_ramp(directory: &Path) -> Result<()> {
+    gray16_ramp().write(&directory.join("gray16_ramp.png"))
+}
+
 fn write_bmp(image: &RgbaImage, with_alpha: bool, path: &Path) -> Result<()> {
     let written = if with_alpha {
         image.save_with_format(path, ImageFormat::Bmp)
@@ -244,6 +271,7 @@ pub fn write_gate_set(paths: &Paths, directory: &Path) -> Result<Vec<String>> {
             "png_banner",
             PngInput::rgba(&placeholder(paths, BANNER_PLACEHOLDER)?),
         ),
+        ("png_gray16", gray16_input(&mut prng)),
     ];
     let mut names = Vec::new();
     for (name, input) in pngs {

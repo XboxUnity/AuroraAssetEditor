@@ -4,13 +4,13 @@
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
-use anyhow::{Context, Result, bail, ensure};
+use anyhow::{Context, Result, ensure};
 use aurora_image::{RESIZE_FILTER, Resampler, decode_image, encoder_pixels};
 use image::RgbaImage;
 
 use crate::closeness_inputs::{self, gate_directory};
+use crate::gdiplus_tool::{PowerShellHost, run_reference_tool};
 use crate::golden::{Paths, absolute};
 
 const REPORT_PATH: [&str; 3] = ["docs", "image", "gdiplus-closeness.md"];
@@ -21,10 +21,6 @@ const ALPHA: usize = 0;
 const MAX_CHANNEL: f64 = 255.0;
 /// An exact match has infinite PSNR; the mean counts it as this value.
 const EXACT_PSNR_DB: f64 = 100.0;
-const WINDOWS_ROOT_VARIABLE: &str = "SystemRoot";
-/// The old app ran as a 32-bit process, so the reference runs in 32-bit Windows PowerShell.
-const POWERSHELL_32_BIT: [&str; 4] = ["SysWOW64", "WindowsPowerShell", "v1.0", "powershell.exe"];
-const REFERENCE_SCRIPT: [&str; 3] = ["tools", "gdiplus", "gdiplus-reference.ps1"];
 
 /// How far one image is from its GDI+ reference.
 #[derive(Clone, Copy)]
@@ -102,37 +98,6 @@ fn to_argb(image: &RgbaImage) -> Vec<u8> {
             [alpha, red, green, blue]
         })
         .collect()
-}
-
-fn powershell_32_bit() -> Result<PathBuf> {
-    let windows = std::env::var_os(WINDOWS_ROOT_VARIABLE)
-        .with_context(|| format!("{WINDOWS_ROOT_VARIABLE} is not set"))?;
-    Ok(POWERSHELL_32_BIT
-        .iter()
-        .fold(PathBuf::from(windows), |path, part| path.join(part)))
-}
-
-fn run_reference_tool(paths: &Paths, input_dir: &Path, output_dir: &Path) -> Result<()> {
-    let script = REFERENCE_SCRIPT
-        .iter()
-        .fold(paths.root().to_path_buf(), |path, part| path.join(part));
-    let output = Command::new(powershell_32_bit()?)
-        .args(["-NoProfile", "-ExecutionPolicy", "Bypass", "-File"])
-        .arg(&script)
-        .arg("-InputDir")
-        .arg(input_dir)
-        .arg("-OutputDir")
-        .arg(output_dir)
-        .output()
-        .context("cannot start 32-bit Windows PowerShell")?;
-    if !output.status.success() {
-        bail!(
-            "the GDI+ reference tool failed ({}): {}",
-            output.status,
-            String::from_utf8_lossy(&output.stderr).trim()
-        );
-    }
-    Ok(())
 }
 
 fn sorted_files(directory: &Path) -> Result<Vec<PathBuf>> {
@@ -513,7 +478,7 @@ fn generate_set(
     let output_dir = work.join(format!("{name}-gdiplus"));
     std::fs::create_dir_all(&input_dir)?;
     write_inputs(&input_dir)?;
-    run_reference_tool(paths, &input_dir, &output_dir)?;
+    run_reference_tool(paths, PowerShellHost::Bit32, &input_dir, &output_dir, None)?;
     Ok((decode_inputs(&input_dir)?, read_references(&output_dir)?))
 }
 
@@ -530,7 +495,13 @@ pub fn write_report() -> Result<()> {
     closeness_inputs::write_gate_set(&paths, &fresh_gate_inputs)?;
     ensure_gate_inputs_current(&gate_inputs, &fresh_gate_inputs)?;
     let fresh_gate_dir = work.join("gate-gdiplus");
-    run_reference_tool(&paths, &fresh_gate_inputs, &fresh_gate_dir)?;
+    run_reference_tool(
+        &paths,
+        PowerShellHost::Bit32,
+        &fresh_gate_inputs,
+        &fresh_gate_dir,
+        None,
+    )?;
     ensure_references_current(&gate_references, &read_references(&fresh_gate_dir)?)?;
     let gate_rows = measure_gate(&decode_inputs(&gate_inputs)?, &gate_references)?;
 

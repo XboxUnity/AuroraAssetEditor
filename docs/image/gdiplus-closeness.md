@@ -6,7 +6,7 @@ Chosen filter: GDI+ bilinear
 
 ## Gate: PNG and BMP at target size
 
-Gate result: 13 of 13 inputs match GDI+ byte for byte (`png_and_bmp_at_target_size_match_gdiplus`).
+Gate result: 14 of 14 inputs match GDI+ byte for byte (`png_and_bmp_at_target_size_match_gdiplus`).
 
 "Straight decode" compares the decoded pixels without the premultiplied copy that `ImageToRawArgb` makes with `new Bitmap(img)`; the difference is what that copy changes.
 
@@ -18,6 +18,7 @@ Gate result: 13 of 13 inputs match GDI+ byte for byte (`png_and_bmp_at_target_si
 | png_banner to 420x96 | exact | 2477 | 238 | 1204 |
 | png_gamma_1_0 to 64x64 | exact | 0 | 0 | 0 |
 | png_gray to 64x64 | exact | 0 | 0 | 0 |
+| png_gray16 to 64x64 | exact | 0 | 0 | 0 |
 | png_gray_alpha to 64x64 | exact | 2568 | 236 | 4067 |
 | png_iccp to 64x64 | exact | 0 | 0 | 0 |
 | png_palette to 64x64 | exact | 0 | 0 | 0 |

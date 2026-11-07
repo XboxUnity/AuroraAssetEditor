@@ -6,13 +6,14 @@ const BYTES_PER_PIXEL: usize = 4;
 const CHOSEN_FILTER_PREFIX: &str = "Chosen filter: ";
 
 /// The target-size gate set of spec 6.2, written by `cargo xtask closeness-inputs`.
-const GATE_INPUTS: [(&str, ImageTarget); 13] = [
+const GATE_INPUTS: [(&str, ImageTarget); 14] = [
     ("bmp_24.bmp", ImageTarget::Icon),
     ("bmp_32.bmp", ImageTarget::Icon),
     ("png_16bit.png", ImageTarget::Icon),
     ("png_banner.png", ImageTarget::Banner),
     ("png_gamma_1_0.png", ImageTarget::Icon),
     ("png_gray.png", ImageTarget::Icon),
+    ("png_gray16.png", ImageTarget::Icon),
     ("png_gray_alpha.png", ImageTarget::Icon),
     ("png_iccp.png", ImageTarget::Icon),
     ("png_palette.png", ImageTarget::Icon),

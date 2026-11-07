@@ -8,6 +8,7 @@ mod export_error;
 mod export_format;
 mod fit_to_target;
 mod gdiplus_alpha;
+mod gdiplus_gray16_table;
 mod gdiplus_resize;
 mod image_target;
 mod import_error;

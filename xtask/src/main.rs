@@ -6,7 +6,9 @@ mod crafted;
 mod cross_decode;
 mod dds_sample;
 mod gdiplus_report;
+mod gdiplus_tool;
 mod golden;
+mod gray16_table;
 mod minimum_read;
 mod prng;
 mod record_online;
@@ -30,6 +32,7 @@ fn main() -> ExitCode {
         ["content-db-samples"] => content_db::write_samples(),
         ["closeness-inputs"] => closeness_inputs::write_gate_inputs(),
         ["gdiplus-report"] => gdiplus_report::write_report(),
+        ["gray16-table"] => gray16_table::write_table(),
         ["record-online"] => record_online::record(),
         ["cross-decode", files @ ..] => {
             let files: Vec<PathBuf> = files.iter().map(PathBuf::from).collect();
