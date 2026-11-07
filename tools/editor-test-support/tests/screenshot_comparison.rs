@@ -246,22 +246,50 @@ fn image_with_changed_pixels(base: &RgbaImage, changed: &[(u32, u32)]) -> RgbaIm
     image
 }
 
+/// The left edge of panel `index` in a diff whose panels are `panel_width` wide.
+fn panel_left(index: u32, panel_width: u32) -> u32 {
+    index * (panel_width + DIFF_PANEL_GAP)
+}
+
+/// True for the one pixel ring just outside `bounds`.
+fn on_outline_ring(x: u32, y: u32, bounds: &PixelBounds) -> bool {
+    let (x, y) = (i64::from(x), i64::from(y));
+    let left = i64::from(bounds.left) - 1;
+    let top = i64::from(bounds.top) - 1;
+    let right = i64::from(bounds.right) + 1;
+    let bottom = i64::from(bounds.bottom) + 1;
+    let inside_ring_box = (left..=right).contains(&x) && (top..=bottom).contains(&y);
+    inside_ring_box && (x == left || x == right || y == top || y == bottom)
+}
+
 #[test]
 fn diff_image_shows_reference_actual_and_changes_side_by_side() {
     let reference = plain_image(10, 6);
     let actual = image_with_changed_pixels(&reference, &[(3, 2)]);
+    let bounds = bounds(3, 2, 3, 2);
 
     let diff = diff_image(&reference, &actual);
 
     assert_eq!(diff.dimensions(), (3 * 10 + 2 * DIFF_PANEL_GAP, 6));
-    let panel_step = 10 + DIFF_PANEL_GAP;
-    assert_eq!(*diff.get_pixel(0, 0), *reference.get_pixel(0, 0));
-    assert_eq!(*diff.get_pixel(3, 2), *reference.get_pixel(3, 2));
-    assert_eq!(*diff.get_pixel(panel_step + 3, 2), *actual.get_pixel(3, 2));
-    assert_eq!(*diff.get_pixel(panel_step + 9, 5), *actual.get_pixel(9, 5));
-    for gap_start in [10, 2 * 10 + DIFF_PANEL_GAP] {
-        for x in gap_start..gap_start + DIFF_PANEL_GAP {
-            assert_eq!(*diff.get_pixel(x, 3), DIFF_GAP_COLOUR);
+    for y in 0..6 {
+        for x in 0..10 {
+            if on_outline_ring(x, y, &bounds) {
+                continue;
+            }
+            assert_eq!(
+                *diff.get_pixel(panel_left(0, 10) + x, y),
+                *reference.get_pixel(x, y)
+            );
+            assert_eq!(
+                *diff.get_pixel(panel_left(1, 10) + x, y),
+                *actual.get_pixel(x, y)
+            );
+        }
+        for panel in 0..2 {
+            let gap_start = panel_left(panel, 10) + 10;
+            for x in gap_start..gap_start + DIFF_PANEL_GAP {
+                assert_eq!(*diff.get_pixel(x, y), DIFF_GAP_COLOUR);
+            }
         }
     }
 }
@@ -273,7 +301,7 @@ fn changed_pixels_are_magenta_on_a_dimmed_copy() {
 
     let diff = diff_image(&reference, &actual);
 
-    let changes_left = 2 * (10 + DIFF_PANEL_GAP);
+    let changes_left = panel_left(2, 10);
     assert_eq!(*diff.get_pixel(changes_left + 3, 2), DIFF_CHANGED_COLOUR);
     assert_eq!(
         *diff.get_pixel(changes_left + 9, 5),
@@ -285,22 +313,23 @@ fn changed_pixels_are_magenta_on_a_dimmed_copy() {
 fn difference_bounds_are_outlined_on_every_panel() {
     let reference = plain_image(10, 8);
     let actual = image_with_changed_pixels(&reference, &[(3, 2), (6, 4)]);
+    let bounds = bounds(3, 2, 6, 4);
 
     let diff = diff_image(&reference, &actual);
 
-    let panel_step = 10 + DIFF_PANEL_GAP;
     for panel in 0..3 {
-        let left = panel * panel_step;
-        for x in 2..=7 {
-            assert_eq!(*diff.get_pixel(left + x, 1), DIFF_BOUNDS_COLOUR);
-            assert_eq!(*diff.get_pixel(left + x, 5), DIFF_BOUNDS_COLOUR);
-        }
-        for y in 1..=5 {
-            assert_eq!(*diff.get_pixel(left + 2, y), DIFF_BOUNDS_COLOUR);
-            assert_eq!(*diff.get_pixel(left + 7, y), DIFF_BOUNDS_COLOUR);
+        for y in 0..8 {
+            for x in 0..10 {
+                let is_yellow = *diff.get_pixel(panel_left(panel, 10) + x, y) == DIFF_BOUNDS_COLOUR;
+                assert_eq!(
+                    is_yellow,
+                    on_outline_ring(x, y, &bounds),
+                    "panel {panel}, pixel ({x}, {y})"
+                );
+            }
         }
     }
-    let changes_left = 2 * panel_step;
+    let changes_left = panel_left(2, 10);
     assert_eq!(*diff.get_pixel(changes_left + 3, 2), DIFF_CHANGED_COLOUR);
     assert_eq!(*diff.get_pixel(changes_left + 6, 4), DIFF_CHANGED_COLOUR);
 }
@@ -312,11 +341,10 @@ fn an_outline_at_the_image_edge_is_clipped_to_its_panel() {
 
     let diff = diff_image(&reference, &actual);
 
-    let panel_step = 4 + DIFF_PANEL_GAP;
     assert_eq!(*diff.get_pixel(1, 1), DIFF_BOUNDS_COLOUR);
     assert_eq!(*diff.get_pixel(0, 1), DIFF_BOUNDS_COLOUR);
     assert_eq!(*diff.get_pixel(1, 0), DIFF_BOUNDS_COLOUR);
-    assert_eq!(*diff.get_pixel(panel_step + 1, 1), DIFF_BOUNDS_COLOUR);
+    assert_eq!(*diff.get_pixel(panel_left(1, 4) + 1, 1), DIFF_BOUNDS_COLOUR);
     assert_eq!(*diff.get_pixel(4, 0), DIFF_GAP_COLOUR);
 }
 
@@ -324,16 +352,37 @@ fn an_outline_at_the_image_edge_is_clipped_to_its_panel() {
 fn diff_of_different_sizes_keeps_both_whole() {
     let reference = plain_image(4, 4);
     let actual = plain_image(6, 3);
+    // Changed: x 4..=5 in rows 0..=2 (actual only) and x 0..=3 in row 3 (reference only). The
+    // outline would lie outside the panel on every side, so nothing is outlined.
+    let (panel_width, panel_height) = (6, 4);
 
     let diff = diff_image(&reference, &actual);
 
-    assert_eq!(diff.dimensions(), (3 * 6 + 2 * DIFF_PANEL_GAP, 4));
-    let panel_step = 6 + DIFF_PANEL_GAP;
-    assert_eq!(*diff.get_pixel(5, 0), DIFF_GAP_COLOUR);
-    assert_eq!(*diff.get_pixel(0, 3), *reference.get_pixel(0, 3));
-    assert_eq!(*diff.get_pixel(panel_step, 3), DIFF_GAP_COLOUR);
-    assert_eq!(*diff.get_pixel(panel_step + 5, 2), *actual.get_pixel(5, 2));
-    let changes_left = 2 * panel_step;
-    assert_eq!(*diff.get_pixel(changes_left + 5, 1), DIFF_CHANGED_COLOUR);
-    assert_eq!(*diff.get_pixel(changes_left, 3), DIFF_CHANGED_COLOUR);
+    assert_eq!(
+        diff.dimensions(),
+        (3 * panel_width + 2 * DIFF_PANEL_GAP, panel_height)
+    );
+    for y in 0..panel_height {
+        for x in 0..panel_width {
+            let in_reference = reference.get_pixel_checked(x, y);
+            let in_actual = actual.get_pixel_checked(x, y);
+
+            let expected_reference_panel = in_reference.copied().unwrap_or(DIFF_GAP_COLOUR);
+            let expected_actual_panel = in_actual.copied().unwrap_or(DIFF_GAP_COLOUR);
+            let expected_changes_panel = match (in_reference, in_actual) {
+                (Some(_), Some(actual_pixel)) => dimmed_grey(*actual_pixel),
+                (Some(_), None) | (None, Some(_)) => DIFF_CHANGED_COLOUR,
+                (None, None) => DIFF_GAP_COLOUR,
+            };
+
+            let at = |panel| *diff.get_pixel(panel_left(panel, panel_width) + x, y);
+            assert_eq!(
+                at(0),
+                expected_reference_panel,
+                "reference panel ({x}, {y})"
+            );
+            assert_eq!(at(1), expected_actual_panel, "actual panel ({x}, {y})");
+            assert_eq!(at(2), expected_changes_panel, "changes panel ({x}, {y})");
+        }
+    }
 }

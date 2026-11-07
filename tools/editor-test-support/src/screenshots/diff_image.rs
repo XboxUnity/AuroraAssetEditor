@@ -16,17 +16,18 @@ const UNCHANGED_BRIGHTNESS_PERCENT: u32 = 30;
 pub fn diff_image(reference: &RgbaImage, actual: &RgbaImage) -> RgbaImage {
     let panel_width = reference.width().max(actual.width());
     let panel_height = reference.height().max(actual.height());
-    let panel_step = panel_width + DIFF_PANEL_GAP;
     let width = PANEL_COUNT * panel_width + (PANEL_COUNT - 1) * DIFF_PANEL_GAP;
     let mut diff = RgbaImage::from_pixel(width, panel_height, DIFF_GAP_COLOUR);
 
-    draw_panel(&mut diff, 0, reference, |pixel| pixel);
-    draw_panel(&mut diff, panel_step, actual, |pixel| pixel);
-    draw_panel(&mut diff, 2 * panel_step, actual, dimmed);
+    draw_panel(&mut diff, panel_left(0, panel_width), reference, |pixel| {
+        pixel
+    });
+    draw_panel(&mut diff, panel_left(1, panel_width), actual, |pixel| pixel);
+    draw_panel(&mut diff, panel_left(2, panel_width), actual, dimmed);
 
     let mut bounds: Option<PixelBounds> = None;
     for (x, y) in changed_pixels(reference, actual) {
-        diff.put_pixel(2 * panel_step + x, y, DIFF_CHANGED_COLOUR);
+        diff.put_pixel(panel_left(2, panel_width) + x, y, DIFF_CHANGED_COLOUR);
         match bounds.as_mut() {
             Some(known) => known.include(x, y),
             None => bounds = Some(PixelBounds::around(x, y)),
@@ -35,7 +36,12 @@ pub fn diff_image(reference: &RgbaImage, actual: &RgbaImage) -> RgbaImage {
 
     if let Some(bounds) = bounds {
         for panel in 0..PANEL_COUNT {
-            outline_bounds(&mut diff, panel * panel_step, panel_width, &bounds);
+            outline_bounds(
+                &mut diff,
+                panel_left(panel, panel_width),
+                panel_width,
+                &bounds,
+            );
         }
     }
     diff
@@ -85,4 +91,9 @@ fn outline_bounds(diff: &mut RgbaImage, left: u32, panel_width: u32, bounds: &Pi
         }
         put(last_x, y);
     }
+}
+
+/// The left edge of panel `index` when every panel is `panel_width` wide.
+fn panel_left(index: u32, panel_width: u32) -> u32 {
+    index * (panel_width + DIFF_PANEL_GAP)
 }
