@@ -167,7 +167,9 @@ impl App {
             JobOutcome::Loaded(loaded) => self.apply_loaded(loaded),
             JobOutcome::Imported(results) => self.apply_imported(results),
             JobOutcome::Console(outcome) => self.apply_console_outcome(outcome),
-            JobOutcome::Progress(Progress::Console(status)) => self.apply_console_status(&status),
+            JobOutcome::Progress(Progress::Console { kind, status }) => {
+                self.apply_console_status(kind, &status);
+            }
         }
     }
 

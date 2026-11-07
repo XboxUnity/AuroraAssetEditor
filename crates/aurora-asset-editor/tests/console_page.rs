@@ -4,11 +4,11 @@ use std::path::PathBuf;
 
 use aurora_asset::{AssetKind, AssetSlot, Compression, RgbaImage};
 use aurora_asset_editor::app::{
-    CONNECTION_FAILED_TITLE, NO_CONSOLE_TEXT, REFRESHING_TEXT, TEMP_FILE_NOTE,
+    BUSY_TEXT, CONNECTION_FAILED_TITLE, NO_CONSOLE_TEXT, REFRESHING_TEXT, TEMP_FILE_NOTE,
 };
 use aurora_asset_editor::console::{ConsoleLink, GameColumn, PresenceCell, port_text_for_save};
 use aurora_asset_editor::dialogs::{ConnectionForm, Modal, ModalAnswer, ModalField};
-use aurora_asset_editor::jobs::{ConsoleOutcome, JobOutcome, Progress};
+use aurora_asset_editor::jobs::{ConsoleJobKind, ConsoleOutcome, JobOutcome, Progress};
 use aurora_asset_editor::status::Severity;
 use aurora_console::{
     AssetPresence, ConsoleError, ConsoleStatus, FTP_SETTINGS_FILE, FtpSettings, Game, GameIds,
@@ -702,7 +702,10 @@ fn console_status_reaches_status_line() {
     assert_eq!(
         first_progress,
         Some((
-            Progress::Console(connecting),
+            Progress::Console {
+                kind: ConsoleJobKind::Refresh,
+                status: connecting
+            },
             Some("Connecting to 127.0.0.1...".to_owned())
         ))
     );
@@ -732,4 +735,132 @@ fn test_connection_shows_each_status_in_the_form() {
             info("Connected to Aurora revision 1655"),
         ]
     );
+}
+
+#[test]
+fn stale_presence_jobs_do_not_contact_the_console() {
+    let (mut harness, console) = harness_with_console();
+    harness.app().refresh_games();
+    harness.run_jobs_with(|app, stage| {
+        if stage == OutcomeStage::Final && app.console().refresh_generation() == 1 {
+            app.refresh_games();
+        }
+    });
+
+    let checks_of_first_game = console
+        .commands()
+        .iter()
+        .filter(|command| command.contains("GameData/4D5307E6_00000001"))
+        .count();
+    assert_eq!(harness.app().console().refresh_generation(), 2);
+    assert_eq!(checks_of_first_game, 1, "{:?}", console.commands());
+    let presence: Vec<PresenceCell> = typical_games()
+        .iter()
+        .map(|game| harness.app().console().table.presence(&game.ids))
+        .collect();
+    assert_eq!(presence, [PresenceCell::Known(AssetPresence::NONE); 3]);
+}
+
+#[test]
+fn unreachable_console_ends_the_presence_checks() {
+    let (mut harness, console) = harness_with_console();
+    harness.app().refresh_games();
+
+    let mut console_gone = false;
+    harness.run_jobs_with(|_, stage| {
+        if stage == OutcomeStage::Final && !console_gone {
+            console_gone = true;
+            console.drop_connections();
+            console.refuse_new_connections();
+        }
+    });
+
+    assert_eq!(harness.app().console().link, ConsoleLink::Failed);
+    let presence: Vec<PresenceCell> = typical_games()
+        .iter()
+        .map(|game| harness.app().console().table.presence(&game.ids))
+        .collect();
+    assert_eq!(presence, [PresenceCell::Failed; 3]);
+    let log = harness.error_log_text();
+    assert_eq!(
+        log.matches("The console could not be reached to check the assets")
+            .count(),
+        1,
+        "{log}"
+    );
+    assert_eq!(harness.queued_jobs(), 0);
+}
+
+#[test]
+fn presence_progress_does_not_reach_the_status_line() {
+    let (mut harness, _console) = harness_with_console();
+    harness.app().refresh_games();
+    let mut leaked = Vec::new();
+
+    harness.run_jobs_with(|app, stage| {
+        let presence_progress = matches!(
+            stage,
+            OutcomeStage::Progress(Progress::Console {
+                kind: ConsoleJobKind::Presence,
+                ..
+            })
+        );
+        if presence_progress && app.status().progress.is_some() {
+            leaked.push(app.status().progress.clone());
+        }
+    });
+
+    assert!(leaked.is_empty(), "{leaked:?}");
+}
+
+#[test]
+fn console_that_is_not_aurora_keeps_the_old_test_text() {
+    let config = FakeConsoleConfig {
+        site_revision_reply: None,
+        ..FakeConsoleConfig::default()
+    };
+    let console = FakeConsole::start(config);
+    let mut harness = AppHarness::new();
+    harness.with_console(&console);
+    harness.app().edit_connection();
+
+    harness.app().test_connection();
+    harness.run_jobs();
+
+    let (severity, text) = form(&mut harness).test_status.expect("the test ended");
+    assert_eq!(severity, Severity::Error);
+    assert!(
+        text.starts_with(
+            "Connection test Failed...: the console does not look like it runs Aurora"
+        ),
+        "{text}"
+    );
+}
+
+#[test]
+fn test_refused_while_busy_says_so_in_the_form() {
+    let (mut harness, _console) = harness_with_console();
+    harness.app().edit_connection();
+    harness.app().test_connection();
+
+    harness.app().test_connection();
+
+    assert_eq!(
+        form(&mut harness).test_status,
+        Some((Severity::Info, BUSY_TEXT.to_owned()))
+    );
+    assert_eq!(harness.queued_jobs(), 1);
+}
+
+#[test]
+fn test_connection_applies_the_port_rewrite_to_the_session() {
+    let mut harness = AppHarness::new();
+    harness.app().edit_connection();
+    type_into_form(&mut harness, "10.0.0.7", "abc");
+
+    harness.app().test_connection();
+
+    let settings = harness.app().console().settings.clone().expect("applied");
+    assert_eq!(settings.host, "10.0.0.7");
+    assert_eq!(settings.port, "21");
 }

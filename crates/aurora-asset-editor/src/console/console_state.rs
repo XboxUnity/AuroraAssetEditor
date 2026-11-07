@@ -1,7 +1,7 @@
 use aurora_console::FtpSettings;
 use chrono::{DateTime, Local};
 
-use super::{ConsoleLink, GameTable};
+use super::{ConsoleLink, GameTable, PresenceGate};
 
 /// The console page's state: the connection settings of this session, what is known about the link, and
 /// the game table.
@@ -11,7 +11,7 @@ pub struct ConsoleState {
     pub link: ConsoleLink,
     pub table: GameTable,
     pub last_refresh: Option<DateTime<Local>>,
-    refresh_generation: u64,
+    presence_gate: PresenceGate,
 }
 
 impl ConsoleState {
@@ -26,18 +26,21 @@ impl ConsoleState {
             link,
             table: GameTable::default(),
             last_refresh: None,
-            refresh_generation: 0,
+            presence_gate: PresenceGate::default(),
         }
     }
 
     /// The refresh whose results are current; results of an earlier one are stale.
     pub fn refresh_generation(&self) -> u64 {
-        self.refresh_generation
+        self.presence_gate.current()
+    }
+
+    pub(crate) fn presence_gate(&self) -> &PresenceGate {
+        &self.presence_gate
     }
 
     pub(crate) fn start_refresh(&mut self) -> u64 {
-        self.refresh_generation += 1;
-        self.refresh_generation
+        self.presence_gate.start_refresh()
     }
 
     /// Different settings say nothing about the link until they are tried.

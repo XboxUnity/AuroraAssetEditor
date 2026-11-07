@@ -10,7 +10,7 @@ mod load_job;
 mod progress_sink;
 mod progress_slot;
 
-pub use console_job::{ConsoleJob, ConsoleOutcome, ConsoleRequest};
+pub use console_job::{ConsoleJob, ConsoleJobKind, ConsoleOutcome, ConsoleRequest};
 pub use console_worker::ConsoleWorker;
 pub use import_failure::ImportFailure;
 pub use import_job::{ImageSource, ImportJob, ImportRequest, ImportResult};

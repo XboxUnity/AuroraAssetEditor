@@ -7,7 +7,7 @@ use aurora_console::{
 
 use crate::console::{ConsoleLink, ConsoleState, GameColumn, PresenceCell, is_connection_failure};
 use crate::dialogs::{ConnectionForm, Modal};
-use crate::jobs::{ConsoleJob, ConsoleOutcome, ConsoleRequest, Job, JobPriority};
+use crate::jobs::{ConsoleJob, ConsoleJobKind, ConsoleOutcome, ConsoleRequest, Job, JobPriority};
 use crate::logging::error_chain;
 use crate::status::{ConsoleActivity, Severity, StatusLine};
 
@@ -20,10 +20,12 @@ pub const CONNECTION_FAILED_TITLE: &str = "Connection failed";
 pub const TEMP_FILE_NOTE: &str = "temp file left behind (see error.log)";
 const CONNECTION_FAILED_PREFIX: &str = "FTP Connection could not be established";
 const CONNECTION_TEST_FAILED: &str = "The connection test failed";
+const NOT_AURORA_TEST_TEXT: &str = "Connection test Failed...";
 const CONNECTION_SAVE_FAILED: &str = "Could not save the connection settings";
 const REFRESH_FAILED: &str = "Could not refresh the game list";
 const TEMP_CLEANUP_FAILED: &str = "Could not remove the temporary copy of Content.db";
 const SUPERSEDED_REFRESH_FAILED: &str = "A refresh that was replaced failed";
+const PRESENCE_UNREACHABLE: &str = "The console could not be reached to check the assets";
 const PRESENCE_FAILED: &str = "Could not check the assets on the console";
 const STATUS_SEPARATOR: &str = " · ";
 const LAST_REFRESH_FORMAT: &str = "%H:%M";
@@ -48,6 +50,7 @@ impl App {
     /// The dialog's Test Connection: the typed settings become the session's settings, saved or not.
     pub fn test_connection(&mut self) {
         if self.refuse_while_console_busy() {
+            self.set_test_result(Severity::Info, BUSY_TEXT);
             return;
         }
         let Some(form) = self.modals.connection_form_mut() else {
@@ -136,20 +139,23 @@ impl App {
                 ids,
                 result,
             } => self.apply_presence(generation, &ids, result),
+            ConsoleOutcome::PresenceSkipped { generation, ids } => {
+                self.apply_presence_skipped(generation, &ids);
+            }
         }
     }
 
     /// Shows what the client reports while a job the user started runs. Presence checks report the same
     /// statuses in the background; they are not progress of anything the user is waiting for.
-    pub(super) fn apply_console_status(&mut self, status: &ConsoleStatus) {
-        if self.active_work.console.is_none() {
+    pub(super) fn apply_console_status(&mut self, kind: ConsoleJobKind, status: &ConsoleStatus) {
+        if kind == ConsoleJobKind::Presence {
             return;
         }
         let text = status.to_string();
         if let ConsoleStatus::AuroraFound { revision } = status {
             self.console.link = connected_link(revision);
         }
-        if self.active_work.console == Some(ConsoleActivity::Testing)
+        if kind == ConsoleJobKind::Test
             && let Some(form) = self.modals.connection_form_mut()
         {
             form.test_status = Some((Severity::Info, text.clone()));
@@ -170,7 +176,7 @@ impl App {
                 self.status = StatusLine::info(text);
             }
             Err(error) => {
-                let text = format!("Error: {}", error_sentence(&error));
+                let text = test_failure_text(&error);
                 let log_failure = self.record_error(CONNECTION_TEST_FAILED, &error);
                 self.console.link = ConsoleLink::Failed;
                 self.set_test_result(Severity::Error, &text);
@@ -238,7 +244,11 @@ impl App {
         };
         let generation = self.console.refresh_generation();
         for ids in self.console.table.ids_in_presence_order() {
-            let job = ConsoleJob::Presence { generation, ids };
+            let job = ConsoleJob::Presence {
+                generation,
+                ids,
+                gate: self.console.presence_gate().clone(),
+            };
             self.submit_console_job(settings.clone(), job, JobPriority::Background);
         }
     }
@@ -257,6 +267,11 @@ impl App {
         }
         let cell = match result {
             Ok(presence) => PresenceCell::Known(presence),
+            Err(error) if is_connection_failure(&error) => {
+                self.console.link = ConsoleLink::Failed;
+                self.report_console_error(PRESENCE_UNREACHABLE, &error);
+                PresenceCell::Failed
+            }
             Err(error) => {
                 let context = format!("{PRESENCE_FAILED} for {}", ids.folder_name());
                 if let Some(log_failure) = self.record_error(&context, &error) {
@@ -266,6 +281,13 @@ impl App {
             }
         };
         self.console.table.set_presence(ids, cell);
+    }
+
+    /// The worker skips the rest of a refresh's checks once one has found the console unreachable.
+    fn apply_presence_skipped(&mut self, generation: u64, ids: &GameIds) {
+        if generation == self.console.refresh_generation() {
+            self.console.table.set_presence(ids, PresenceCell::Failed);
+        }
     }
 
     /// A result of a replaced job is not shown, but its failure is still written to `error.log`.
@@ -299,6 +321,17 @@ impl App {
         self.environment
             .jobs
             .submit(Job::Console(request), priority);
+    }
+}
+
+/// The old test said "Connection test Failed..." when the console did not answer like Aurora, and
+/// "Error: {message}" for everything else.
+fn test_failure_text(error: &ConsoleError) -> String {
+    match error {
+        ConsoleError::NotAurora { .. } => {
+            format!("{NOT_AURORA_TEST_TEXT}: {}", error_sentence(error))
+        }
+        _ => format!("Error: {}", error_sentence(error)),
     }
 }
 
