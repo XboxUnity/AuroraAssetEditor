@@ -13,8 +13,10 @@ use crate::files::{
 };
 use crate::logging::error_chain;
 use crate::platform::SaveRequest;
+use crate::status::StatusLine;
 
 use super::App;
+use super::file_actions::BUSY_TEXT;
 
 pub const SAVE_ERROR_TITLE: &str = "Could not save";
 pub const SAVE_ALL_TITLE: &str = "Save all assets";
@@ -24,9 +26,10 @@ const ALREADY_SAVED_LABEL: &str = "Already saved:";
 const DEFAULT_FILTER: usize = 0;
 
 impl App {
-    /// The Save menu's "Save cover…" and its three siblings: one page into one file.
+    /// The Save menu's "Save cover…" and its three siblings: one page into one file. A write that fails after
+    /// the screenshots were compacted leaves the page compacted: only stored bytes moved.
     pub fn save_kind(&mut self, kind: AssetKind) {
-        if self.refuse_while_busy() {
+        if self.refuse_save_while_busy() {
             return;
         }
         let request = SaveRequest {
@@ -38,14 +41,15 @@ impl App {
         let Some(path) = self.ask_save_file(&request) else {
             return;
         };
-        if let Err(error) = save_page(self.pages.get_mut(kind), &path) {
-            self.show_save_failure(&error.path, &error, &error.source, &[]);
+        match save_page(self.pages.get_mut(kind), &path) {
+            Ok(()) => self.status = StatusLine::info(format!("Saved {}", file_display_name(&path))),
+            Err(error) => self.show_save_failure(&error.path, &error, &error.source, &[]),
         }
     }
 
     /// The Save menu's "Save all locally…": asks for the TitleID, then the folder.
     pub fn save_all_locally(&mut self) {
-        if self.refuse_while_busy() {
+        if self.refuse_save_while_busy() {
             return;
         }
         let prefill = self
@@ -69,12 +73,33 @@ impl App {
                 return;
             }
         };
+        if self.refuse_save_while_busy() {
+            return;
+        }
         let Some(folder) = self.ask_folder(SAVE_ALL_FOLDER_TITLE) else {
             return;
         };
-        if let Err(error) = save_all_to_folder(&mut self.pages, &folder, &title_id) {
-            self.show_save_failure(&error.path, &error, &error.source, &error.written);
+        match save_all_to_folder(&mut self.pages, &folder, &title_id) {
+            Ok(written) => {
+                self.status = StatusLine::info(format!(
+                    "Saved {} asset files to {}",
+                    written.len(),
+                    folder.display()
+                ));
+            }
+            Err(error) => {
+                self.show_save_failure(&error.path, &error, &error.source, &error.written);
+            }
         }
+    }
+
+    /// Saving reads the pages, so it waits for whatever is writing them.
+    fn refuse_save_while_busy(&mut self) -> bool {
+        if !self.locks().save_local {
+            return false;
+        }
+        self.status = StatusLine::info(BUSY_TEXT);
+        true
     }
 
     /// The page's Export button: the slot's pixels into one image file, in the format its extension names.
@@ -99,11 +124,13 @@ impl App {
             return;
         };
         match ExportFormat::from_path(&path).encode(&pixels) {
-            Ok(bytes) => {
-                if let Err(error) = fs::write(&path, bytes) {
-                    self.show_save_failure(&path, &error, &error, &[]);
+            Ok(bytes) => match fs::write(&path, bytes) {
+                Ok(()) => {
+                    self.status =
+                        StatusLine::info(format!("Exported {}", file_display_name(&path)));
                 }
-            }
+                Err(error) => self.show_save_failure(&path, &error, &error, &[]),
+            },
             Err(error) => self.show_save_failure(&path, &error, &error, &[]),
         }
     }

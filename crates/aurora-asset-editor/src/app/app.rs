@@ -131,6 +131,7 @@ impl App {
 
     pub fn edit_modal_field(&mut self, field: ModalField, text: &str) {
         let Some(Modal::TitleId { form, .. }) = self.modals.current_mut() else {
+            log::warn!("{field:?} was edited while its dialog is not on screen");
             return;
         };
         match field {

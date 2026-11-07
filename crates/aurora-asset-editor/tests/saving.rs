@@ -191,7 +191,13 @@ fn icon_and_banner_save_into_one_gl_file() {
     harness.app().save_kind(AssetKind::IconBanner);
 
     let original = placeholder_file(&[AssetSlot::Icon, AssetSlot::Banner]);
-    let saved = AssetFile::parse(&fs::read(target).unwrap()).unwrap();
+    let saved_bytes = fs::read(target).unwrap();
+    let expected = AssetFile::parse(&fs::read(&source).unwrap())
+        .unwrap()
+        .only(AssetKind::IconBanner)
+        .to_bytes();
+    assert_eq!(saved_bytes, expected);
+    let saved = AssetFile::parse(&saved_bytes).unwrap();
     for slot in [AssetSlot::Icon, AssetSlot::Banner] {
         assert_eq!(
             saved.get(slot).unwrap().data,
@@ -212,7 +218,17 @@ fn saving_screenshots_compacts_without_reencoding() {
     harness.app().save_kind(AssetKind::Screenshots);
 
     let original = placeholder_file(&[shot(2), shot(5)]);
-    let saved = AssetFile::parse(&fs::read(target).unwrap()).unwrap();
+    let saved_bytes = fs::read(target).unwrap();
+    // The page file is a fresh file the loaded kind was copied into (`replace_kind` keeps its offsets),
+    // so emptied slots keep offset 0, not the source file's offsets.
+    let mut expected = AssetFile::new();
+    expected.replace_kind(
+        AssetKind::Screenshots,
+        &AssetFile::parse(&fs::read(&source).unwrap()).unwrap(),
+    );
+    expected.compact_screenshots();
+    assert_eq!(saved_bytes, expected.to_bytes());
+    let saved = AssetFile::parse(&saved_bytes).unwrap();
     assert_eq!(
         saved.get(shot(1)).unwrap().data,
         original.get(shot(2)).unwrap().data
@@ -595,4 +611,75 @@ fn non_ascii_paths_save() {
     assert_eq!(harness.app().modal(), None);
     assert!(folder.join("カバー.asset").is_file());
     assert!(folder.join("GC4D5307E6.asset").is_file());
+}
+
+#[test]
+fn save_all_writes_empty_file_for_missing_kind_byte_for_byte() {
+    let source_folder = TempDir::new().unwrap();
+    let target = TempDir::new().unwrap();
+    let mut harness = AppHarness::new();
+    let cover = write_file(source_folder.path(), "c.asset", &[AssetSlot::Cover]);
+    load(&mut harness, &[&cover]);
+    harness.app().set_current_game(Some(halo_3()));
+
+    save_all(&mut harness, target.path());
+
+    let empty = AssetFile::new().to_bytes();
+    for name in ["BK4D5307E6.asset", "GL4D5307E6.asset", "SS4D5307E6.asset"] {
+        assert_eq!(fs::read(target.path().join(name)).unwrap(), empty, "{name}");
+    }
+}
+
+#[test]
+fn successful_saves_set_a_status() {
+    let folder = TempDir::new().unwrap();
+    let target = TempDir::new().unwrap();
+    let mut harness = harness_with_cover_and_screenshot(folder.path());
+    harness.app().set_current_game(Some(halo_3()));
+
+    harness
+        .dialogs()
+        .push_save(target.path().join("mine.asset"));
+    harness.app().save_kind(AssetKind::Cover);
+    assert_eq!(harness.app().status().text, "Saved mine.asset");
+
+    save_all(&mut harness, target.path());
+    assert_eq!(
+        harness.app().status().text,
+        format!("Saved 4 asset files to {}", target.path().display())
+    );
+
+    harness.dialogs().push_save(target.path().join("pic.png"));
+    harness.app().export_image(AssetSlot::Cover);
+    assert_eq!(harness.app().status().text, "Exported pic.png");
+}
+
+#[test]
+fn saving_waits_for_a_running_load() {
+    let folder = TempDir::new().unwrap();
+    let mut harness = AppHarness::new();
+    let source = write_file(folder.path(), "c.asset", &[AssetSlot::Cover]);
+    harness.app().open_paths(vec![source.clone()]);
+
+    harness.app().save_kind(AssetKind::Cover);
+    harness.app().save_all_locally();
+
+    assert_eq!(
+        harness.app().status().text,
+        "Busy, try again when the current work finishes"
+    );
+    assert!(harness.dialogs().requests().is_empty());
+    assert_eq!(harness.app().modal(), None);
+    harness.run_jobs();
+
+    harness.app().set_current_game(Some(halo_3()));
+    harness.app().save_all_locally();
+    harness.app().open_paths(vec![source]);
+    harness.app().answer_modal(ModalAnswer::Accept);
+
+    assert!(harness.dialogs().requests().is_empty());
+    assert_eq!(
+        harness.app().status().text,
+        "Busy, try again when the current work finishes"
+    );
 }
