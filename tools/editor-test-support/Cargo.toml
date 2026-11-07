@@ -29,3 +29,4 @@ slint = { version = "=1.18.1", default-features = false, features = [
 ] }
 tempfile = "3.27.0"
 test-servers = { path = "../test-servers" }
+ttf-parser = "0.25.1"

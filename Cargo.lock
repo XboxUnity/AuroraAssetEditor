@@ -1240,6 +1240,7 @@ dependencies = [
  "slint",
  "tempfile",
  "test-servers",
+ "ttf-parser",
 ]
 
 [[package]]

@@ -236,6 +236,11 @@ impl AppHarness {
         true
     }
 
+    /// The job a worker would take next, removed from the queue and not run, so a test can answer it by hand.
+    pub fn take_next_job(&mut self) -> Option<Job> {
+        self.jobs.next_job()
+    }
+
     /// Like `run_jobs`, calling `hook` right after each outcome, progress included, has been applied.
     pub fn run_jobs_with(&mut self, mut hook: impl FnMut(&mut App, OutcomeStage)) {
         self.running();

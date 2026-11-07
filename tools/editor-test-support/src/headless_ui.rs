@@ -16,6 +16,7 @@ pub struct HeadlessUi;
 
 impl HeadlessUi {
     pub const WINDOW_SIZE: (u32, u32) = (1024, 680);
+    pub const MINIMUM_WINDOW_SIZE: (u32, u32) = (760, 500);
 
     pub fn new() -> HeadlessUi {
         if !BACKEND_INSTALLED.get() {
@@ -32,7 +33,10 @@ impl HeadlessUi {
     }
 
     pub fn show(&self, window: &Window) {
-        let (width, height) = Self::WINDOW_SIZE;
+        self.show_at_size(window, Self::WINDOW_SIZE);
+    }
+
+    pub fn show_at_size(&self, window: &Window, (width, height): (u32, u32)) {
         window.set_size(LogicalSize::new(width as f32, height as f32));
         window
             .show()
