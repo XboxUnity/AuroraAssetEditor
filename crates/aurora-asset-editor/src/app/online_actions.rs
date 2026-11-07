@@ -13,7 +13,7 @@ use crate::platform::SaveRequest;
 use crate::status::StatusLine;
 use crate::text::filter_hex_input;
 
-use super::App;
+use super::{App, PendingImportStatus};
 
 pub const ENTER_TITLE_ID_TEXT: &str = "Enter a TitleID to search.";
 pub const ENTER_KEYWORDS_TEXT: &str = "Enter keywords to search.";
@@ -21,6 +21,7 @@ pub const IMAGE_FAILED_TEXT: &str = "Failed to load image";
 pub const SEARCH_FAILED: &str = "Search failed";
 pub const SAVE_RESULT_TITLE: &str = "Select where to save the cover";
 pub const SAVE_RESULT_DEFAULT_NAME: &str = "cover.png";
+pub const IMPORTING_COVER_TEXT: &str = "Importing cover…";
 const DOWNLOADING_COVER_TEXT: &str = "Downloading cover…";
 const SEARCH_TEXT_INVALID: &str = "The search text is not valid";
 const SUPERSEDED_SEARCH_FAILED: &str = "A search that was replaced failed";
@@ -138,7 +139,11 @@ impl App {
         self.environment
             .jobs
             .submit(Job::Import(job), JobPriority::User);
-        self.status = StatusLine::info(format!("Cover set from {source} result"));
+        self.pending_import_status = Some(PendingImportStatus {
+            done: format!("Cover set from {source} result"),
+            failed: format!("Could not set the cover from {source} result"),
+        });
+        self.status = StatusLine::info(IMPORTING_COVER_TEXT);
     }
 
     /// The panel's "Save image…": the decoded image into a file in the format the extension names.

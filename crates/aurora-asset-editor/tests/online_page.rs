@@ -5,9 +5,10 @@ use std::time::Duration;
 
 use aurora_asset::{AssetSlot, RgbaImage, TextureFormat};
 use aurora_asset_editor::app::{
-    ENTER_KEYWORDS_TEXT, ENTER_TITLE_ID_TEXT, IMAGE_FAILED_TEXT, Page, SAVE_RESULT_DEFAULT_NAME,
-    SAVE_RESULT_TITLE, SEARCH_FAILED,
+    ENTER_KEYWORDS_TEXT, ENTER_TITLE_ID_TEXT, IMAGE_FAILED_TEXT, IMPORTING_COVER_TEXT, Page,
+    SAVE_RESULT_DEFAULT_NAME, SAVE_RESULT_TITLE, SEARCH_FAILED,
 };
+use aurora_asset_editor::dialogs::Modal;
 use aurora_asset_editor::online::{SearchMode, TileImage};
 use aurora_asset_editor::status::Severity;
 use aurora_console::{GameIds, HexId};
@@ -31,7 +32,7 @@ fn fixtures() -> PathBuf {
 }
 
 fn server_with(extra: Vec<Route>) -> RecordedHttp {
-    RecordedHttp::from_recordings(&fixtures().join("recordings.toml"), extra)
+    RecordedHttp::from_recordings_with_local_images(&fixtures().join("recordings.toml"), extra)
 }
 
 fn endpoints(server: &RecordedHttp) -> Endpoints {
@@ -570,6 +571,7 @@ fn use_as_cover_does_not_resize() {
     harness.run_jobs();
 
     harness.app().use_result_as_cover();
+    assert_eq!(harness.app().status().text, IMPORTING_COVER_TEXT);
     harness.run_jobs();
 
     let header = harness
@@ -648,4 +650,155 @@ fn save_result_image_reencodes_by_extension() {
         );
         assert_eq!(request.default_name.as_deref(), Some("cover.png"));
     }
+}
+
+#[test]
+fn use_as_cover_names_the_source_that_was_searched() {
+    let server = server_with(two_cover_routes());
+    let mut harness = harness_for(&server);
+    search_for(&mut harness, FIRST_TITLE);
+    harness.run_jobs();
+    harness.app().select_result(0);
+    harness.run_jobs();
+
+    harness
+        .app()
+        .set_online_source(CoverSource::InternetArchive);
+    harness.app().use_result_as_cover();
+    harness.run_jobs();
+
+    assert_eq!(
+        harness.app().status().text,
+        "Cover set from XboxUnity result"
+    );
+}
+
+#[test]
+fn use_as_cover_that_fails_to_encode_does_not_claim_success() {
+    let wide = 9000;
+    let server = server_with(vec![
+        listing_route(FIRST_TITLE, &[cover("Wide", "/image/wide.png", None)]),
+        image_route("/image/wide.png", wide, 1, 10),
+    ]);
+    let mut harness = harness_for(&server);
+    search_for(&mut harness, FIRST_TITLE);
+    harness.run_jobs();
+    harness.app().select_result(0);
+    harness.run_jobs();
+
+    harness.app().use_result_as_cover();
+    assert_eq!(harness.app().status().text, IMPORTING_COVER_TEXT);
+    harness.run_jobs();
+
+    let status = harness.app().status();
+    assert_eq!(status.severity, Severity::Error);
+    assert_eq!(status.text, "Could not set the cover from XboxUnity result");
+    match harness.app().modal() {
+        Some(Modal::Message { title, text }) => {
+            assert_eq!(title, "Could not use image");
+            assert!(text.contains(&label("Wide")), "{text}");
+        }
+        other => panic!("expected the image error dialog, got {other:?}"),
+    }
+    assert!(
+        harness
+            .app()
+            .pages()
+            .cover
+            .texture_header(AssetSlot::Cover)
+            .is_none()
+    );
+    assert!(harness.error_log_text().contains("Wide"));
+}
+
+#[test]
+fn selecting_zero_one_zero_applies_only_the_selected_tile() {
+    let server = server_with(two_cover_routes());
+    let mut harness = harness_for(&server);
+    search_for(&mut harness, FIRST_TITLE);
+    harness.run_jobs();
+
+    harness.app().select_result(0);
+    harness.app().select_result(1);
+    harness.app().select_result(0);
+    harness.run_jobs();
+
+    let online = harness.app().online();
+    assert_eq!(online.selected, Some(0));
+    assert!(tile_is_loaded(&online.results[0].full));
+    assert!(matches!(online.results[1].full, TileImage::Pending));
+    assert_eq!(
+        harness.app().status().text,
+        format!("2 results for {FIRST_TITLE}")
+    );
+    assert_eq!(harness.error_log_text(), "");
+}
+
+#[test]
+fn undecodable_image_body_fails_the_tile_and_is_logged() {
+    let server = server_with(vec![
+        listing_route(FIRST_TITLE, &[cover("Junk", "/image/junk.png", None)]),
+        route(
+            "/image/junk.png",
+            200,
+            "image/png",
+            b"not an image".to_vec(),
+        ),
+    ]);
+    let mut harness = harness_for(&server);
+    search_for(&mut harness, FIRST_TITLE);
+    harness.run_jobs();
+
+    assert!(matches!(
+        harness.app().online().results[0].thumbnail,
+        TileImage::Failed
+    ));
+    harness.app().select_result(0);
+    harness.run_jobs();
+
+    assert!(matches!(
+        harness.app().online().results[0].full,
+        TileImage::Failed
+    ));
+    assert_eq!(harness.app().status().text, IMAGE_FAILED_TEXT);
+    let log = harness.error_log_text();
+    assert!(log.contains(&label("Junk")), "{log}");
+    assert!(
+        log.contains("not an image format the editor reads"),
+        "{log}"
+    );
+}
+
+#[test]
+fn recorded_results_load_their_thumbnails_from_the_local_server() {
+    let server = server_with(Vec::new());
+    let mut harness = harness_for(&server);
+    search_for(&mut harness, HALO_3);
+
+    harness.run_jobs();
+
+    let tiles = &harness.app().online().results;
+    assert!(tile_is_loaded(&tiles[0].thumbnail));
+    assert_eq!(requests_to(&server, "/api/boxartsm/225"), 1);
+}
+
+#[test]
+fn calls_the_view_disables_do_nothing() {
+    let server = server_with(Vec::new());
+    let mut harness = harness_for(&server);
+
+    harness.app().use_result_as_cover();
+    harness.app().save_result_image();
+    harness.app().select_result(3);
+    harness
+        .app()
+        .set_online_source(CoverSource::InternetArchive);
+    harness.app().set_search_mode(SearchMode::Keywords);
+
+    assert_eq!(harness.queued_jobs(), 0);
+    assert!(harness.app().modal().is_none());
+    assert!(harness.dialogs().requests().is_empty());
+    assert_eq!(harness.app().online().mode, SearchMode::TitleId);
+    assert!(harness.app().online().selected.is_none());
+    assert!(server.requests().is_empty());
 }

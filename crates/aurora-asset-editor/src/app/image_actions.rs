@@ -246,6 +246,7 @@ impl App {
 
     pub(super) fn apply_imported(&mut self, results: Vec<ImportResult>) {
         self.active_work.importing = self.active_work.importing.saturating_sub(1);
+        let pending_status = self.pending_import_status.take();
         let mut failures = Vec::new();
         for ImportResult {
             slot,
@@ -257,6 +258,13 @@ impl App {
                 Ok(image) => self.put_image(slot, image),
                 Err(failure) => failures.push((label, failure)),
             }
+        }
+        if let Some(pending) = pending_status {
+            self.status = if failures.is_empty() {
+                StatusLine::info(pending.done)
+            } else {
+                StatusLine::error(pending.failed)
+            };
         }
         self.report_image_failures(failures);
     }

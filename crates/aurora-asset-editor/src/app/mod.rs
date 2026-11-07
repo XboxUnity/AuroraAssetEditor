@@ -14,6 +14,7 @@ mod image_actions;
 mod kind_choice;
 mod online_actions;
 mod page;
+mod pending_import_status;
 mod save_actions;
 mod settings_actions;
 mod startup_settings;
@@ -32,9 +33,10 @@ pub use current_game::CurrentGame;
 pub use file_actions::BUSY_TEXT;
 pub use kind_choice::KindChoice;
 pub use online_actions::{
-    ENTER_KEYWORDS_TEXT, ENTER_TITLE_ID_TEXT, IMAGE_FAILED_TEXT, SAVE_RESULT_DEFAULT_NAME,
-    SAVE_RESULT_TITLE, SEARCH_FAILED,
+    ENTER_KEYWORDS_TEXT, ENTER_TITLE_ID_TEXT, IMAGE_FAILED_TEXT, IMPORTING_COVER_TEXT,
+    SAVE_RESULT_DEFAULT_NAME, SAVE_RESULT_TITLE, SEARCH_FAILED,
 };
 pub use page::Page;
+pub use pending_import_status::PendingImportStatus;
 pub use settings_actions::SETTINGS_SAVE_FAILED;
 pub use startup_settings::{SETTINGS_LOAD_FAILED, StartupSettings};

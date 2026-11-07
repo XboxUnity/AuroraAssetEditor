@@ -13,7 +13,7 @@ use crate::platform::{DialogError, OpenRequest, SaveRequest};
 use crate::settings::AppSettings;
 use crate::status::{ActiveWork, Locks, StatusLine};
 
-use super::{AppEnvironment, CurrentGame, Page, StartupProblem};
+use super::{AppEnvironment, CurrentGame, Page, PendingImportStatus, StartupProblem};
 
 pub const LOG_WRITE_FAILED: &str = "Could not write error.log";
 pub const DIALOG_FAILED_TITLE: &str = "Could not open the file dialog";
@@ -36,6 +36,9 @@ pub struct App {
     pub(super) modals: ModalQueue,
     pub(super) selected_screenshot: ScreenshotNumber,
     pub(super) drop_hover: bool,
+    /// Set while an import with its own status text is queued; the editor is locked meanwhile, so no
+    /// other import can end first.
+    pub(super) pending_import_status: Option<PendingImportStatus>,
 }
 
 impl App {
@@ -58,6 +61,7 @@ impl App {
             modals: ModalQueue::new(),
             selected_screenshot: ScreenshotNumber::ALL[0],
             drop_hover: false,
+            pending_import_status: None,
         };
         app.report_startup_problems(&startup_problems);
         app
