@@ -3,54 +3,154 @@ import { Theme } from "../theme/theme.slint";
 import { ScreenshotThumb } from "screenshot_thumb.slint";
 
 // Positions 1 to the last filled one, the "+" tile, and drag to reorder: a dragged thumbnail lands on the
-// position under the pointer, which the insertion bar marks.
+// position under the pointer, which the insertion bar marks. The row scrolls sideways when it is wider than
+// the page (the wheel, a sideways swipe, or Left, Right, Home and End once the strip has focus), and the
+// selected thumbnail is always scrolled into view.
 export component ScreenshotStrip inherits Rectangle {
     property <length> inset: Theme.thumb-selected-outline-width;
     property <length> pitch: Theme.thumb-width + Theme.thumb-gap;
     property <int> numbered-count: EditorModel.screenshot-position-count;
+    property <int> selected: EditorModel.selected-screenshot;
+    property <int> tile-count: EditorModel.screenshot-tiles.length;
+    property <bool> overflows: scroller.content-width > scroller.width;
     // 0 while nothing is dragged.
     property <int> drag-from;
     property <int> drag-to;
 
     height: Theme.thumb-height + 2 * inset;
 
-    function position-under(strip-x: length) -> int {
-        return clamp(floor((strip-x - inset) / pitch), 0, numbered-count - 1) + 1;
+    changed selected => {
+        reveal-selected();
+    }
+    changed tile-count => {
+        reveal-selected();
+    }
+    changed width => {
+        reveal-selected();
     }
 
-    HorizontalLayout {
-        padding: inset;
-        spacing: Theme.thumb-gap;
-        alignment: start;
-        for tile in EditorModel.screenshot-tiles: thumb := ScreenshotThumb {
-            tile: tile;
-            drag-moved(pointer-x) => {
-                drag-from = tile.number;
-                drag-to = position-under(self.x + pointer-x);
+    function position-under(content-x: length) -> int {
+        return clamp(floor((content-x - inset) / pitch), 0, numbered-count - 1) + 1;
+    }
+
+    // Scrolls the least distance that shows the selected thumbnail with its outline.
+    function reveal-selected() {
+        if selected < 1 || selected > tile-count {
+            return;
+        }
+        let left = (selected - 1) * pitch;
+        let right = left + Theme.thumb-width + 2 * inset;
+        if left < -scroller.content-x {
+            scroll-to(-left);
+        } else if right > -scroller.content-x + scroller.width {
+            scroll-to(scroller.width - right);
+        }
+    }
+
+    function scroll-to(content-x: length) {
+        scroller.content-x = clamp(content-x, min(0px, scroller.width - scroller.content-width), 0px);
+    }
+
+    function select(number: int) {
+        if number >= 1 && number <= numbered-count && number != selected {
+            EditorModel.select-screenshot(number);
+        }
+    }
+
+    // A plain wheel scrolls the row sideways; a sideways wheel or swipe reaches the Flickable itself.
+    wheel := TouchArea {
+        scroll-event(event) => {
+            if overflows && event.delta-x == 0 && event.delta-y != 0 {
+                scroll-to(scroller.content-x + event.delta-y);
+                return accept;
             }
-            drag-ended(pointer-x) => {
-                let to = position-under(self.x + pointer-x);
-                drag-from = 0;
-                if to != tile.number {
-                    EditorModel.move-screenshot(tile.number, to);
+            reject
+        }
+
+        keys := FocusScope {
+            accessible-role: AccessibleRole.list;
+            accessible-label: "Screenshots";
+            key-pressed(event) => {
+                if event.text == Key.LeftArrow {
+                    select(min(selected, numbered-count + 1) - 1);
+                    return accept;
+                }
+                if event.text == Key.RightArrow {
+                    select(selected + 1);
+                    return accept;
+                }
+                if event.text == Key.Home {
+                    select(1);
+                    return accept;
+                }
+                if event.text == Key.End {
+                    select(numbered-count);
+                    return accept;
+                }
+                reject
+            }
+
+            scroller := Flickable {
+                // A mouse drag reorders thumbnails, so only the wheel and touch pan the row.
+                mouse-drag-pan-enabled: false;
+                content-width: row.preferred-width;
+                content-height: self.height;
+
+                row := HorizontalLayout {
+                    height: scroller.height;
+                    padding: inset;
+                    spacing: Theme.thumb-gap;
+                    alignment: start;
+                    for tile in EditorModel.screenshot-tiles: thumb := ScreenshotThumb {
+                        tile: tile;
+                        pointer-pressed => {
+                            keys.focus();
+                        }
+                        drag-moved(pointer-x) => {
+                            drag-from = tile.number;
+                            drag-to = position-under(self.x + pointer-x);
+                        }
+                        drag-ended(pointer-x) => {
+                            let to = position-under(self.x + pointer-x);
+                            drag-from = 0;
+                            if to != tile.number {
+                                EditorModel.move-screenshot(tile.number, to);
+                            }
+                        }
+                    }
+                    if numbered-count > 0: hint := Text {
+                        text: "drag to reorder";
+                        color: Theme.text-muted;
+                        font-size: Theme.caption-font-size;
+                        vertical-alignment: center;
+                    }
+                }
+
+                if drag-from != 0 && drag-to != drag-from: insertion-bar := Rectangle {
+                    // After the target when moving right, before it when moving left: where the dragged one lands.
+                    x: max(0px, inset + (drag-to > drag-from ? drag-to : drag-to - 1) * pitch
+                        - Theme.thumb-gap / 2 - Theme.insertion-bar-width / 2);
+                    y: inset;
+                    width: Theme.insertion-bar-width;
+                    height: Theme.thumb-height;
+                    background: Theme.accent;
                 }
             }
         }
-        if numbered-count > 0: hint := Text {
-            text: "drag to reorder";
-            color: Theme.text-muted;
-            font-size: Theme.caption-font-size;
-            vertical-alignment: center;
-        }
     }
 
-    if drag-from != 0 && drag-to != drag-from: insertion-bar := Rectangle {
-        // After the target when moving right, before it when moving left: where the dragged one lands.
-        x: max(0px, inset + (drag-to > drag-from ? drag-to : drag-to - 1) * pitch
-            - Theme.thumb-gap / 2 - Theme.insertion-bar-width / 2);
-        y: inset;
-        width: Theme.insertion-bar-width;
-        height: Theme.thumb-height;
-        background: Theme.accent;
+    if keys.has-focus: focus-outline := Rectangle {
+        border-width: Theme.focus-outline-width;
+        border-color: Theme.focus-outline;
+    }
+
+    // In the page padding below the row, like the dialog text's scroll thumb in the card padding.
+    if overflows: scroll-thumb := Rectangle {
+        x: -scroller.content-x * root.width / scroller.content-width;
+        y: root.height + Theme.scroll-indicator-gap;
+        width: root.width * root.width / scroller.content-width;
+        height: Theme.scroll-indicator-width;
+        border-radius: self.height / 2;
+        background: Theme.text-muted;
     }
 }

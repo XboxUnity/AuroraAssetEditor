@@ -6,8 +6,9 @@ export global EditorModel {
     in property <SlotView> background;
     in property <SlotView> icon;
     in property <SlotView> banner;
-    // The selected screenshot position.
+    // The selected screenshot position, and its number from 1 to 20.
     in property <SlotView> screenshot;
+    in property <int> selected-screenshot;
     in property <[ScreenshotTile]> screenshot-tiles;
     // Positions 1 to the last filled one: the tiles before the "+" tile.
     in property <int> screenshot-position-count;

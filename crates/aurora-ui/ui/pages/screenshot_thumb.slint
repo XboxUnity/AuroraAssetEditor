@@ -7,6 +7,7 @@ import { Theme } from "../theme/theme.slint";
 
 export component ScreenshotThumb inherits Rectangle {
     in property <ScreenshotTile> tile;
+    callback pointer-pressed();
     // The pointer's x relative to this thumbnail, while a filled thumbnail is dragged.
     callback drag-moved(length);
     callback drag-ended(length);
@@ -87,6 +88,9 @@ export component ScreenshotThumb inherits Rectangle {
             }
         }
         pointer-event(event) => {
+            if event.kind == PointerEventKind.down && event.button == PointerEventButton.left {
+                root.pointer-pressed();
+            }
             if event.kind == PointerEventKind.up && event.button == PointerEventButton.left {
                 if dragging {
                     dragging = false;

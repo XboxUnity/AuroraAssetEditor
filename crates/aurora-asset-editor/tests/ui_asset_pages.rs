@@ -11,8 +11,8 @@ use aurora_ui::{EditorModel, MainWindow, ScreenshotTile};
 use editor_test_support::{AppHarness, HeadlessUi, asset_file_with};
 use i_slint_backend_testing::ElementHandle;
 use image::{Rgba, RgbaImage};
-use slint::platform::{PointerEventButton, WindowEvent};
-use slint::{ComponentHandle, LogicalPosition, Model};
+use slint::platform::{Key, PointerEventButton, WindowEvent};
+use slint::{ComponentHandle, LogicalPosition, LogicalSize, Model, SharedString};
 use tempfile::TempDir;
 
 const DARK_SLOT_BACKGROUND: Rgba<u8> = Rgba([0x26, 0x2a, 0x31, 0xff]);
@@ -38,6 +38,11 @@ const ASSET_PAGES: [Page; 4] = [
     Page::IconBanner,
     Page::Screenshots,
 ];
+const MINIMUM_WINDOW: (f32, f32) = (760.0, 500.0);
+/// Longer than the wheel's smooth-scroll animation.
+const WHEEL_SETTLE: std::time::Duration = std::time::Duration::from_millis(400);
+const WHEEL_STEP: f32 = -60.0;
+const MAX_WHEEL_STEPS: usize = 40;
 /// Set to a folder to keep the rendered pages as PNG files for a look.
 const SNAPSHOT_DIR_VARIABLE: &str = "AURORA_UI_SNAPSHOT_DIR";
 
@@ -101,6 +106,39 @@ impl Ui {
     fn dispatch(&self, event: WindowEvent) {
         self.view.window().window().dispatch_event(event);
     }
+
+    fn press_key(&self, key: Key) {
+        let text = SharedString::from(key);
+        self.dispatch(WindowEvent::KeyPressed { text: text.clone() });
+        self.dispatch(WindowEvent::KeyReleased { text });
+        settle();
+    }
+
+    /// The thumbnail with this accessible label, while any part of it is in view.
+    fn thumb(&self, label: &str) -> Option<ElementHandle> {
+        self.elements("ScreenshotStrip::thumb")
+            .into_iter()
+            .find(|thumb| thumb.accessible_label().as_deref() == Some(label))
+    }
+
+    /// Whether the whole thumbnail lies inside the strip's visible part and the window.
+    fn thumb_in_view(&self, label: &str) -> bool {
+        let Some(thumb) = self.thumb(label) else {
+            return false;
+        };
+        let scroller = self.element("ScreenshotStrip::scroller");
+        let left = scroller.absolute_position().x;
+        // Scale factor 1: physical and logical pixels are the same.
+        let window_width = self.view.window().window().size().width as f32;
+        let right = (left + scroller.size().width).min(window_width);
+        let thumb_left = thumb.absolute_position().x;
+        thumb_left >= left && thumb_left + thumb.size().width <= right
+    }
+}
+
+/// Runs the strip's scroll animation and change handlers to their end.
+fn settle() {
+    i_slint_backend_testing::mock_elapsed_time(WHEEL_SETTLE);
 }
 
 fn harness_with_theme(theme: ThemeChoice) -> AppHarness {
@@ -718,5 +756,113 @@ fn new_asset_set_then_load_shows_the_new_image() {
     assert!(
         near(pixel_at(&ui.snapshot(), slot_centre), BLUE),
         "the new cover is shown"
+    );
+}
+
+#[test]
+fn screenshot_strip_scrolls_to_every_thumbnail() {
+    let mut harness = harness_with_theme(ThemeChoice::Dark);
+    let all: Vec<_> = (1..=20).map(|number| (number, GREEN)).collect();
+    load_screenshots(&mut harness, &all);
+    harness.app().show_page(Page::Screenshots);
+    let ui = Ui::start(&mut harness);
+
+    for (width, height) in [
+        (
+            HeadlessUi::WINDOW_SIZE.0 as f32,
+            HeadlessUi::WINDOW_SIZE.1 as f32,
+        ),
+        MINIMUM_WINDOW,
+    ] {
+        ui.view
+            .window()
+            .window()
+            .set_size(LogicalSize::new(width, height));
+        ui.act(|app| app.select_screenshot(ScreenshotNumber::new(1).expect("position 1")));
+        settle();
+        assert!(
+            ui.thumb_in_view("Screenshot 1"),
+            "{width}: the first thumbnail is in view"
+        );
+        assert!(
+            !ui.thumb_in_view("Screenshot 20"),
+            "{width}: twenty do not fit at once"
+        );
+        assert!(
+            !ui.elements("ScreenshotStrip::scroll-thumb").is_empty(),
+            "{width}: the strip shows that it scrolls"
+        );
+
+        let strip = centre(&ui.element("ScreenshotStrip::scroller"));
+        for _ in 0..MAX_WHEEL_STEPS {
+            if ui.thumb_in_view("Screenshot 20") {
+                break;
+            }
+            ui.dispatch(WindowEvent::PointerScrolled {
+                position: strip,
+                delta_x: 0.0,
+                delta_y: WHEEL_STEP,
+            });
+            settle();
+        }
+        assert!(
+            ui.thumb_in_view("Screenshot 20"),
+            "{width}: the wheel reaches thumbnail 20"
+        );
+        keep_snapshot(
+            &ui.snapshot(),
+            &format!("pages-dark-twenty-screenshots-{width}"),
+        );
+
+        ui.act(|app| app.select_screenshot(ScreenshotNumber::new(2).expect("position 2")));
+        settle();
+        assert!(
+            ui.thumb_in_view("Screenshot 2"),
+            "{width}: selecting position 2 scrolls back"
+        );
+        ui.act(|app| app.select_screenshot(ScreenshotNumber::new(1).expect("position 1")));
+        settle();
+        assert!(ui.thumb_in_view("Screenshot 1"), "{width}: and position 1");
+        // A click gives the strip the keyboard.
+        ui.thumb("Screenshot 1")
+            .expect("position 1 is in view")
+            .mock_single_click(PointerEventButton::Left);
+        ui.press_key(Key::End);
+        ui.render();
+        settle();
+        assert_eq!(ui.app.borrow().selected_screenshot().get(), 20);
+        assert!(
+            ui.thumb_in_view("Screenshot 20"),
+            "{width}: End selects and shows position 20"
+        );
+        ui.press_key(Key::LeftArrow);
+        ui.render();
+        assert_eq!(ui.app.borrow().selected_screenshot().get(), 19);
+    }
+}
+
+#[test]
+fn adding_a_screenshot_scrolls_it_into_view() {
+    let mut harness = harness_with_theme(ThemeChoice::Dark);
+    let shots: Vec<_> = (1..=15).map(|number| (number, GREEN)).collect();
+    load_screenshots(&mut harness, &shots);
+    harness.app().show_page(Page::Screenshots);
+    let folder = TempDir::new().expect("tests need a temp folder");
+    harness
+        .dialogs()
+        .push_files(vec![write_png(&folder, "more.png", BLUE)]);
+    let ui = Ui::start(&mut harness);
+    ui.act(|app| app.select_screenshot(ScreenshotNumber::new(1).expect("position 1")));
+    settle();
+    assert!(ui.thumb("Add…").is_none(), "the + tile is out of view");
+
+    ui.act(|app| app.add_screenshots());
+    harness.run_jobs();
+    ui.render();
+    settle();
+    assert_eq!(ui.app.borrow().selected_screenshot().get(), 16);
+    assert!(
+        ui.thumb_in_view("Screenshot 16"),
+        "the added screenshot is in view"
     );
 }

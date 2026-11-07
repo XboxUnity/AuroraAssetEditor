@@ -73,6 +73,7 @@ pub(super) fn render_editor(window: &MainWindow, app: &App, images: &mut ImageCa
     )
     .into();
     editor.set_screenshot(screenshot);
+    editor.set_selected_screenshot(i32::from(selected.get()));
     let position_count = shown_position_count(screenshots);
     editor.set_screenshot_position_count(i32::try_from(position_count).unwrap_or(i32::MAX));
     editor.set_screenshot_tiles(screenshot_tiles(
