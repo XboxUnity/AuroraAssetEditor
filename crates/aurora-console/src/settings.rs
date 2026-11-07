@@ -10,6 +10,7 @@ pub const FTP_SETTINGS_FILE: &str = "ftp.json";
 const APP_FOLDER_NAME: &str = "AuroraAssetEditor";
 const DEFAULT_PORT: u16 = 21;
 const DEFAULT_CREDENTIAL: &str = "xboxftp";
+const UTF8_BOM: char = '\u{feff}';
 // TEST-NET-1: never routed, and connecting a UDP socket sends nothing.
 const ROUTE_PROBE_ADDRESS: &str = "192.0.2.1:9";
 
@@ -97,8 +98,9 @@ impl FtpSettings {
                 });
             }
         };
+        let json = text.strip_prefix(UTF8_BOM).unwrap_or(&text);
         let file: FtpSettingsFile =
-            serde_json::from_str(&text).map_err(|source| SettingsError::Malformed {
+            serde_json::from_str(json).map_err(|source| SettingsError::Malformed {
                 path: path.to_path_buf(),
                 source,
             })?;
@@ -129,9 +131,13 @@ impl FtpSettings {
         std::fs::write(path, json).map_err(write_error)
     }
 
-    /// Follows the old `int.TryParse`: text that is not an `i32` falls back to 21.
+    /// Follows the old `int.TryParse` (NumberStyles.Integer): text that is not an `i32` falls back to 21.
     pub fn port_number(&self) -> Result<u16, SettingsError> {
-        let Ok(port) = self.port.trim().parse::<i32>() else {
+        let number = self
+            .port
+            .trim_end_matches('\0')
+            .trim_matches(is_dotnet_whitespace);
+        let Ok(port) = number.parse::<i32>() else {
             return Ok(DEFAULT_PORT);
         };
         match u16::try_from(port) {
@@ -139,6 +145,11 @@ impl FtpSettings {
             _ => Err(SettingsError::PortOutOfRange { port }),
         }
     }
+}
+
+/// .NET's `NumberStyles.Integer` white space: U+0009 to U+000D and U+0020 only.
+fn is_dotnet_whitespace(c: char) -> bool {
+    matches!(c, '\u{9}'..='\u{d}' | ' ')
 }
 
 pub fn app_config_dir() -> Option<PathBuf> {

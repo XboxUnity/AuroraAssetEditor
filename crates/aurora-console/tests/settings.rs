@@ -68,21 +68,10 @@ fn save_writes_old_app_compatible_json() {
 
     let bytes = fs::read(&path).unwrap();
     assert!(!bytes.starts_with(&[0xEF, 0xBB, 0xBF]), "no BOM");
-    let text = String::from_utf8(bytes).unwrap();
-    let positions: Vec<usize> = ["\"ip\"", "\"pass\"", "\"port\"", "\"user\""]
-        .iter()
-        .map(|key| text.find(key).unwrap())
-        .collect();
-    assert!(positions.is_sorted(), "keys out of order in {text}");
-    let value: serde_json::Value = serde_json::from_str(&text).unwrap();
-    assert!(
-        value
-            .as_object()
-            .unwrap()
-            .values()
-            .all(serde_json::Value::is_string)
+    assert_eq!(
+        String::from_utf8(bytes).unwrap(),
+        r#"{"ip":"192.168.1.50","pass":"p/a\"ss\\é","port":"21","user":"xboxftp"}"#
     );
-    assert!(text.contains("p/a"), "'/' is written unescaped");
     assert_eq!(FtpSettings::load(&path).unwrap(), Some(saved));
 }
 
@@ -93,18 +82,38 @@ fn port_number_rules() {
     assert_eq!(port("21").unwrap(), 21);
     assert_eq!(port(" 2121 ").unwrap(), 2121);
     assert_eq!(port("+21").unwrap(), 21);
-    assert_eq!(port("").unwrap(), 21);
-    assert_eq!(port("abc").unwrap(), 21);
-    assert_eq!(port("3000000000").unwrap(), 21);
-    for out_of_range in ["70000", "0", "-1"] {
+    assert_eq!(port("\t21\r\n").unwrap(), 21);
+    assert_eq!(port("2121\0").unwrap(), 2121);
+    for fallback in [
+        "",
+        "abc",
+        "3000000000",
+        "2147483648",
+        "+",
+        "- 5",
+        "--5",
+        "\u{a0}2121",
+    ] {
+        assert_eq!(port(fallback).unwrap(), 21, "{fallback:?}");
+    }
+    for (text, value) in [
+        ("70000", 70000),
+        ("0", 0),
+        ("-1", -1),
+        ("2147483647", i32::MAX),
+        ("-2147483648", i32::MIN),
+    ] {
         assert!(
-            matches!(
-                port(out_of_range),
-                Err(SettingsError::PortOutOfRange { .. })
-            ),
-            "{out_of_range}"
+            matches!(port(text), Err(SettingsError::PortOutOfRange { port }) if port == value),
+            "{text}"
         );
     }
+}
+
+#[test]
+fn load_accepts_utf8_bom() {
+    let loaded = load_text("\u{feff}{\"ip\":\"10.0.0.1\"}").unwrap();
+    assert_eq!(loaded, Some(settings("10.0.0.1", "", "", "")));
 }
 
 #[test]
