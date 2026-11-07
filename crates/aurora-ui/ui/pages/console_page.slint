@@ -96,7 +96,7 @@ export component ConsolePage inherits VerticalLayout {
         upload-button := PillButton {
             text: "Upload current";
             has-chevron: true;
-            enabled: game-actions-enabled;
+            enabled: game-actions-enabled && !ShellModel.editor-locked;
             clicked => {
                 ConsoleModel.menu-anchor-x = self.absolute-position.x;
                 ConsoleModel.menu-anchor-y = self.absolute-position.y;

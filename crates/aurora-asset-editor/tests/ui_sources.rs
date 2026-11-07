@@ -617,6 +617,38 @@ fn console_page_renders_states() {
 }
 
 #[test]
+fn transfers_that_touch_the_editor_wait_while_it_is_busy() {
+    let folder = tempfile::TempDir::new().expect("tests need a temp folder");
+    let image = folder.path().join("cover.png");
+    RgbaImage::from_pixel(8, 8, image::Rgba([10, 40, 90, 255]))
+        .save(&image)
+        .expect("the PNG can be written");
+    let mut harness = console_harness(ThemeChoice::Dark);
+    harness.dialogs().push_files(vec![image]);
+    let ui = Ui::start(&mut harness);
+    ui.act(|app| show_games(app, mixed_games()));
+    ui.click_label_in("banana", "ConsolePage::game-table");
+    let editor_buttons = [
+        "ConsolePage::open-in-editor-button",
+        "ConsolePage::download-button",
+        "ConsolePage::upload-button",
+    ];
+    for button in editor_buttons {
+        assert!(ui.enabled(button), "{button} is enabled");
+    }
+
+    ui.act(|app| app.replace_image(AssetSlot::Cover));
+    assert!(harness.app().locks().editor, "the import is queued");
+    for button in editor_buttons {
+        assert!(!ui.enabled(button), "{button} waits for the import");
+    }
+    assert!(
+        ui.enabled("ConsolePage::remove-button"),
+        "Remove leaves the editor alone"
+    );
+}
+
+#[test]
 fn presence_marks_follow_the_presence_cells() {
     let mut harness = console_harness(ThemeChoice::Dark);
     let ui = Ui::start(&mut harness);
