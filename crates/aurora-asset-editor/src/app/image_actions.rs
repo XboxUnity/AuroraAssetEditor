@@ -237,7 +237,7 @@ impl App {
             .collect();
         let job = Job::Import(ImportJob {
             requests,
-            auto_resize: self.environment.settings.auto_resize,
+            auto_resize: self.settings.auto_resize,
             compression: self.compression(),
         });
         self.active_work.importing += 1;

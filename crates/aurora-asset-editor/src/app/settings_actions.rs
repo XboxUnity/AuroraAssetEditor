@@ -8,7 +8,7 @@ pub const SETTINGS_SAVE_FAILED: &str = "Could not save the settings";
 
 impl App {
     pub fn settings(&self) -> &AppSettings {
-        &self.environment.settings
+        &self.settings
     }
 
     pub fn set_auto_resize(&mut self, on: bool) {
@@ -25,7 +25,7 @@ impl App {
 
     /// "Use Compression" as the encoder takes it; read when an image is loaded.
     pub(super) fn compression(&self) -> Compression {
-        if self.environment.settings.use_compression {
+        if self.settings.use_compression {
             Compression::Dxt
         } else {
             Compression::None
@@ -35,21 +35,21 @@ impl App {
     /// Stores where the window was when it closed. Moving the window is not a change of a setting, so an
     /// unreadable settings file stays as it is.
     pub fn save_window_geometry(&mut self, geometry: WindowGeometry) {
-        self.environment.settings.window = Some(geometry);
-        if !self.environment.keep_settings_file {
+        self.settings.window = Some(geometry);
+        if !self.keep_settings_file {
             self.save_settings();
         }
     }
 
     fn change_settings(&mut self, change: impl FnOnce(&mut AppSettings)) {
-        change(&mut self.environment.settings);
-        self.environment.keep_settings_file = false;
+        change(&mut self.settings);
+        self.keep_settings_file = false;
         self.save_settings();
     }
 
     fn save_settings(&mut self) {
         let path = self.environment.config_dir.join(APP_SETTINGS_FILE);
-        if let Err(error) = self.environment.settings.save(&path) {
+        if let Err(error) = self.settings.save(&path) {
             self.report_error(SETTINGS_SAVE_FAILED, &error);
         }
     }

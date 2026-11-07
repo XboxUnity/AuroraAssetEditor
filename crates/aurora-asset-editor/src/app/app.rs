@@ -8,6 +8,7 @@ use crate::editor::EditorPages;
 use crate::jobs::JobOutcome;
 use crate::logging::error_chain;
 use crate::platform::{DialogError, OpenRequest, SaveRequest};
+use crate::settings::AppSettings;
 use crate::status::{ActiveWork, Locks, StatusLine};
 
 use super::{AppEnvironment, CurrentGame, Page, StartupProblem};
@@ -20,6 +21,9 @@ const STATUS_SEPARATOR: &str = " · ";
 /// methods, and work that may take a while goes to the job runner.
 pub struct App {
     pub(super) environment: AppEnvironment,
+    pub(super) settings: AppSettings,
+    /// `settings.json` could not be read at start and is left as it is until the user changes a setting.
+    pub(super) keep_settings_file: bool,
     pub(super) page: Page,
     pub(super) pages: EditorPages,
     pub(super) current_game: Option<CurrentGame>,
@@ -33,8 +37,12 @@ pub struct App {
 impl App {
     pub fn new(mut environment: AppEnvironment) -> App {
         let startup_problems = std::mem::take(&mut environment.startup_problems);
+        let settings = std::mem::take(&mut environment.settings);
+        let keep_settings_file = environment.keep_settings_file;
         let mut app = App {
             environment,
+            settings,
+            keep_settings_file,
             page: Page::Cover,
             pages: EditorPages::new(),
             current_game: None,

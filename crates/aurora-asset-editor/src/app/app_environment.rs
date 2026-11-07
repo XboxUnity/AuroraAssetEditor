@@ -16,7 +16,8 @@ pub struct StartupProblem {
     pub error: Box<dyn Error + Send + Sync>,
 }
 
-/// Everything the app is given at start: loaded values and the platform services.
+/// Everything the app is started with: the values loaded at start and the platform services. `App::new`
+/// moves the loaded values into the `App`, which changes them from then on.
 pub struct AppEnvironment {
     pub config_dir: PathBuf,
     pub settings: AppSettings,
