@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -6,12 +7,12 @@ use super::pixel_comparison::PixelComparison;
 use super::reference_store::{
     ACTUAL_FOLDER, DIFF_FOLDER, ImageStatus, PNG_EXTENSION, REFERENCE_COPY_FOLDER,
 };
-use super::suite_report::{AreaReport, ImageReport, SuiteReport};
+use super::suite_report::{ImageReport, SuiteReport};
 
 pub const CONTACT_SHEET_FILE: &str = "index.html";
 
 const PAGE_TITLE: &str = "UI screenshots";
-/// Mid grey, so the dark and the light theme both stand out from the page.
+/// The page's CSS. The page is mid grey, so the dark and the light theme both stand out from it.
 const STYLE: &str = r#"
 *{box-sizing:border-box}
 body{margin:0;background:#808080;color:#101215;font:15px/1.5 "Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif}
@@ -73,15 +74,41 @@ fn contact_sheet_html(report: &SuiteReport) -> String {
          <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\
          <title>{PAGE_TITLE}</title>\n<style>{STYLE}</style>\n</head>\n<body>\n<main>\n"
     );
-    push_summary(&mut html, report);
-    for area in &report.areas {
+    let areas = areas_without_repeats(report);
+    push_summary(&mut html, report, &areas);
+    for area in &areas {
         push_area(&mut html, area);
     }
     html.push_str(PAGE_END);
     html
 }
 
-fn push_summary(html: &mut String, report: &SuiteReport) {
+/// An area as the sheet shows it.
+struct ShownArea<'a> {
+    title: &'static str,
+    images: Vec<&'a ImageReport>,
+}
+
+/// Every area with each image once. An image name the catalogue repeats already fails the run
+/// with a problem; showing the image again would repeat its id on the page.
+fn areas_without_repeats(report: &SuiteReport) -> Vec<ShownArea<'_>> {
+    let mut shown = BTreeSet::new();
+    report
+        .areas
+        .iter()
+        .map(|area| ShownArea {
+            title: area.title,
+            images: area
+                .images
+                .iter()
+                .filter(|image| shown.insert(image.image.as_str()))
+                .collect(),
+        })
+        .filter(|area| !area.images.is_empty())
+        .collect()
+}
+
+fn push_summary(html: &mut String, report: &SuiteReport, areas: &[ShownArea<'_>]) {
     let (verdict_class, verdict) = if report.passed() {
         ("verdict-passed", "Passed")
     } else {
@@ -109,7 +136,7 @@ fn push_summary(html: &mut String, report: &SuiteReport) {
         "Removed references without a screen",
         &report.removed_orphans,
     );
-    push_needs_a_look(html, report);
+    push_needs_a_look(html, areas);
     html.push_str("</header>\n");
 }
 
@@ -147,13 +174,14 @@ fn push_list(html: &mut String, heading: &str, items: &[String]) {
 }
 
 /// Links to every image that is not plain matching, so a long sheet never hides one.
-fn push_needs_a_look(html: &mut String, report: &SuiteReport) {
-    let flagged: Vec<&ImageReport> = report
-        .images()
+fn push_needs_a_look(html: &mut String, areas: &[ShownArea<'_>]) {
+    let flagged: Vec<&ImageReport> = areas
+        .iter()
+        .flat_map(|area| area.images.iter().copied())
         .filter(|image| image.status != ImageStatus::Matches)
         .collect();
     if flagged.is_empty() {
-        if report.images().next().is_some() {
+        if !areas.is_empty() {
             html.push_str("<p class=\"all-clear\">Every image matches its reference.</p>\n");
         }
         return;
@@ -169,7 +197,7 @@ fn push_needs_a_look(html: &mut String, report: &SuiteReport) {
     html.push_str("</ul>\n");
 }
 
-fn push_area(html: &mut String, area: &AreaReport) {
+fn push_area(html: &mut String, area: &ShownArea<'_>) {
     html.push_str(&format!(
         "<section class=\"area\">\n<h2>{}</h2>\n",
         escape(area.title)
@@ -184,7 +212,7 @@ fn push_area(html: &mut String, area: &AreaReport) {
 }
 
 /// One screen: its name and description, then its images (one per theme) side by side.
-fn push_screen(html: &mut String, images: &[ImageReport]) {
+fn push_screen(html: &mut String, images: &[&ImageReport]) {
     let Some(first) = images.first() else {
         return;
     };
@@ -226,8 +254,8 @@ fn push_image(html: &mut String, image: &ImageReport) {
             push_outcome(html, "New reference, written by this update run.");
             push_panel(html, None, ACTUAL_FOLDER, name);
         }
-        // The outputs were cleared before staging, and what is on disk now may not belong to
-        // this run's result, so an error shows its message only.
+        // An error can come from clearing the earlier outputs, and then an old screenshot may
+        // still be on disk, so an error shows its message only, never an image.
         ImageStatus::Error(message) => {
             html.push_str(&format!("<pre class=\"error\">{}</pre>\n", escape(message)));
         }

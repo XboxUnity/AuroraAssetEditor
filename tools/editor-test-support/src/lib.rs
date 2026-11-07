@@ -26,7 +26,7 @@ pub use screenshots::{
     DIFF_GAP_COLOUR, DIFF_PANEL_GAP, FORBIDDEN_SCREEN_TEXT, ImageCounts, ImageReport, ImageStatus,
     PixelBounds, PixelComparison, PixelDifference, PngFileError, REFERENCES_VARIABLE, REPORT_FILE,
     ReferenceMode, ReferenceModeError, ReferenceStore, SCREEN_THEMES, SCREENS_VARIABLE,
-    SETTLE_TIME, Scene, Screen, ScreenArea, ScreenTextProblem, ScreenshotSuite, SuiteReport,
-    changed_pixels, check_screen_text, compare_pixels, diff_image, image_name, read_png,
-    write_contact_sheet, write_opaque_png,
+    SETTLE_TIME, Scene, Screen, ScreenArea, ScreenFilterOnCi, ScreenTextProblem, ScreenshotSuite,
+    SuiteReport, changed_pixels, check_screen_text, compare_pixels, diff_image, image_name,
+    read_png, write_contact_sheet, write_opaque_png,
 };

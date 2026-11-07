@@ -23,5 +23,5 @@ pub use reference_store::{ImageStatus, ReferenceStore};
 pub use scene::{SETTLE_TIME, Scene};
 pub use screen::{SCREEN_THEMES, Screen, ScreenArea, image_name};
 pub use screen_text_check::{FORBIDDEN_SCREEN_TEXT, ScreenTextProblem, check_screen_text};
-pub use screenshot_suite::{REPORT_FILE, SCREENS_VARIABLE, ScreenshotSuite};
+pub use screenshot_suite::{REPORT_FILE, SCREENS_VARIABLE, ScreenFilterOnCi, ScreenshotSuite};
 pub use suite_report::{AreaReport, ImageCounts, ImageReport, SuiteReport};

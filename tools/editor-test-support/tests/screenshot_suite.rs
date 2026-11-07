@@ -8,7 +8,7 @@ use aurora_asset_editor::app::Menu;
 use aurora_asset_editor::settings::ThemeChoice;
 use editor_test_support::{
     AppHarness, ImageReport, ImageStatus, ReferenceMode, ReferenceStore, Scene, Screen, ScreenArea,
-    ScreenshotSuite, SuiteReport, read_png, write_opaque_png,
+    ScreenFilterOnCi, ScreenshotSuite, SuiteReport, read_png, write_opaque_png,
 };
 use image::{Rgba, RgbaImage};
 use tempfile::TempDir;
@@ -88,12 +88,13 @@ const RECORDING_SCREENS: &[ScreenArea] = &[ScreenArea {
 const ONE_BROKEN_SCREEN: &[ScreenArea] = &[ScreenArea {
     title: AREA_TITLE,
     screens: &[
-        SCREEN_A,
         Screen {
             name: "broken",
             description: "Staging panics",
             stage: stage_panicking,
         },
+        SCREEN_A,
+        SCREEN_B,
     ],
 }];
 const SCREEN_WITH_MARKUP: &[ScreenArea] = &[ScreenArea {
@@ -215,8 +216,9 @@ fn staging_panic_fails_the_run_and_names_the_image() {
             other => panic!("{name} is an error, not {other:?}"),
         }
     }
-    assert_eq!(image(&report, "a-dark").status, ImageStatus::Created);
-    assert_eq!(image(&report, "a-light").status, ImageStatus::Created);
+    for name in ["a-dark", "a-light", "b-dark", "b-light"] {
+        assert_eq!(image(&report, name).status, ImageStatus::Created, "{name}");
+    }
     assert!(!report.passed());
     assert!(!stale_actual.exists(), "the stale screenshot is removed");
     let text = report.to_string();
@@ -257,13 +259,21 @@ fn update_mode_removes_orphans() {
 #[test]
 fn filtered_run_is_reported_as_filtered() {
     let folders = SuiteFolders::new();
-    folders.write_png(&folders.store().reference_path("extra"));
+    let orphan = folders.store().reference_path("extra");
+    let other_screen_actual = folders.store().actual_path("a-dark");
+    folders.write_png(&orphan);
+    folders.write_png(&other_screen_actual);
 
     let report = folders.run(ReferenceMode::Update, Some("b"), TWO_SCREENS);
 
     assert_eq!(image_names(&report), ["b-dark", "b-light"]);
     assert!(report.orphans.is_empty());
     assert!(report.removed_orphans.is_empty());
+    assert!(orphan.exists(), "a filtered run leaves orphans alone");
+    assert!(
+        other_screen_actual.exists(),
+        "a filtered run leaves the outputs of other screens alone"
+    );
     assert_eq!(report.filter.as_deref(), Some("b"));
     let text = report.to_string();
     assert!(
@@ -413,5 +423,61 @@ fn screen_name_used_twice_fails_the_run() {
             .iter()
             .any(|problem| problem.contains("a-dark") && problem.contains("more than one screen")),
         "{report}"
+    );
+    let sheet = folders.sheet(&report);
+    assert_eq!(sheet.matches("id=\"a-dark\"").count(), 1, "{sheet}");
+}
+
+#[test]
+fn report_text_that_cannot_be_written_fails_the_sheet_too() {
+    let folders = SuiteFolders::new();
+    fs::create_dir_all(folders.output.join("report.txt"))
+        .expect("a folder in place of report.txt is created");
+
+    let report = folders.run(ReferenceMode::Update, None, TWO_SCREENS);
+
+    assert!(!report.passed());
+    assert!(
+        report
+            .problems
+            .iter()
+            .any(|problem| problem.contains("Could not write") && problem.contains("report.txt")),
+        "{report}"
+    );
+    let sheet = folders.sheet(&report);
+    assert!(!sheet.contains(">Passed<"), "{sheet}");
+    assert!(sheet.contains(">Failed<"), "{sheet}");
+    assert!(sheet.contains("report.txt"), "{sheet}");
+}
+
+#[test]
+fn screen_filter_comes_from_its_value() {
+    assert_eq!(ScreenshotSuite::filter_from_values(None, None), Ok(None));
+    assert_eq!(
+        ScreenshotSuite::filter_from_values(Some(""), None),
+        Ok(None)
+    );
+    assert_eq!(
+        ScreenshotSuite::filter_from_values(Some("cover"), None),
+        Ok(Some("cover".to_owned()))
+    );
+    assert_eq!(
+        ScreenshotSuite::filter_from_values(Some("cover"), Some("")),
+        Ok(Some("cover".to_owned()))
+    );
+    assert_eq!(
+        ScreenshotSuite::filter_from_values(Some(""), Some("true")),
+        Ok(None)
+    );
+}
+
+#[test]
+fn screen_filter_is_refused_on_ci() {
+    let refused = ScreenshotSuite::filter_from_values(Some("cover"), Some("true"));
+
+    assert_eq!(refused, Err(ScreenFilterOnCi));
+    assert_eq!(
+        ScreenFilterOnCi.to_string(),
+        "A screen filter is not allowed on CI; unset AURORA_UI_SCREENS"
     );
 }

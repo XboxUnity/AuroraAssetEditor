@@ -1,6 +1,7 @@
 use std::any::Any;
 use std::collections::BTreeSet;
-use std::env;
+use std::error::Error;
+use std::fmt;
 use std::fs;
 use std::io;
 use std::path::Path;
@@ -10,7 +11,7 @@ use aurora_asset_editor::settings::ThemeChoice;
 use image::RgbaImage;
 
 use super::contact_sheet::write_contact_sheet;
-use super::reference_mode::ReferenceMode;
+use super::reference_mode::{CI_VARIABLE, ReferenceMode, read_variable};
 use super::reference_store::{ImageStatus, ReferenceStore};
 use super::scene::Scene;
 use super::screen::{SCREEN_THEMES, Screen, ScreenArea, image_name};
@@ -43,18 +44,35 @@ impl ScreenshotSuite {
     }
 
     /// The workspace's references and output folder, the mode from `AURORA_UI_REFERENCES` and
-    /// `CI`, and the filter from `AURORA_UI_SCREENS`. Panics on a mode the run must refuse.
+    /// `CI`, and the filter from `AURORA_UI_SCREENS`. Panics on a mode or a filter the run must
+    /// refuse, naming why.
     pub fn from_environment() -> ScreenshotSuite {
         let mode = ReferenceMode::from_environment().unwrap_or_else(|error| panic!("{error}"));
-        let only = env::var_os(SCREENS_VARIABLE)
-            .map(|value| value.to_string_lossy().into_owned())
-            .filter(|text| !text.is_empty());
+        let only = ScreenshotSuite::filter_from_values(
+            read_variable(SCREENS_VARIABLE).as_deref(),
+            read_variable(CI_VARIABLE).as_deref(),
+        )
+        .unwrap_or_else(|error| panic!("{error}"));
         ScreenshotSuite::new(ReferenceStore::for_workspace(), mode, only)
+    }
+
+    /// An unset or empty `screens` means every screen. A filter is refused when `ci` is set to
+    /// anything non-empty: CI must always check the whole catalogue.
+    pub fn filter_from_values(
+        screens: Option<&str>,
+        ci: Option<&str>,
+    ) -> Result<Option<String>, ScreenFilterOnCi> {
+        let filter = screens.filter(|text| !text.is_empty());
+        if filter.is_some() && ci.is_some_and(|value| !value.is_empty()) {
+            return Err(ScreenFilterOnCi);
+        }
+        Ok(filter.map(str::to_owned))
     }
 
     pub fn run(&self, areas: &[ScreenArea]) -> SuiteReport {
         let mut report = SuiteReport {
             store: self.store.clone(),
+            mode: self.mode,
             areas: Vec::new(),
             orphans: Vec::new(),
             removed_orphans: Vec::new(),
@@ -211,24 +229,51 @@ impl ScreenshotSuite {
     }
 
     /// The contact sheet first, so the text report can name it.
+    /// A text report that cannot be written is a problem the sheet must show as well, so the
+    /// sheet is then written again.
     fn write_results(&self, report: &mut SuiteReport) {
-        let output = self.store.output();
-        match write_contact_sheet(report, output) {
-            Ok(path) => report.sheet = Some(path),
-            Err(error) => report.problems.push(format!(
-                "Could not write the contact sheet in {}: {error}",
-                output.display()
-            )),
-        }
-        let report_path = output.join(REPORT_FILE);
+        self.write_sheet(report);
+        let report_path = self.store.output().join(REPORT_FILE);
         if let Err(error) = write_text(&report_path, &report.to_string()) {
             report.problems.push(format!(
                 "Could not write {}: {error}",
                 report_path.display()
             ));
+            if report.sheet.is_some() {
+                self.write_sheet(report);
+            }
+        }
+    }
+
+    fn write_sheet(&self, report: &mut SuiteReport) {
+        let output = self.store.output();
+        match write_contact_sheet(report, output) {
+            Ok(path) => report.sheet = Some(path),
+            Err(error) => {
+                report.sheet = None;
+                report.problems.push(format!(
+                    "Could not write the contact sheet in {}: {error}",
+                    output.display()
+                ));
+            }
         }
     }
 }
+
+/// A screen filter was set on CI, where every run checks the whole catalogue.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ScreenFilterOnCi;
+
+impl fmt::Display for ScreenFilterOnCi {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            formatter,
+            "A screen filter is not allowed on CI; unset {SCREENS_VARIABLE}"
+        )
+    }
+}
+
+impl Error for ScreenFilterOnCi {}
 
 /// Slint's platform, mock clock and focus are per thread, so a fresh thread makes the image
 /// independent of every other image and of the order of the catalogue. A panic on that thread

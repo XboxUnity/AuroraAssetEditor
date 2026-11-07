@@ -2,6 +2,7 @@ use std::collections::BTreeSet;
 use std::fmt;
 use std::path::{Path, PathBuf};
 
+use super::reference_mode::ReferenceMode;
 use super::reference_store::{ImageStatus, ReferenceStore};
 use super::screenshot_suite::SCREENS_VARIABLE;
 
@@ -16,6 +17,7 @@ const PATH_LABEL_WIDTH: usize = 10;
 pub struct SuiteReport {
     /// Where the references are and where this run wrote its outputs.
     pub store: ReferenceStore,
+    pub mode: ReferenceMode,
     pub areas: Vec<AreaReport>,
     /// References that have no screen in the catalogue and are still there.
     pub orphans: Vec<String>,
@@ -86,10 +88,11 @@ impl SuiteReport {
         }
     }
 
-    /// An update run would resolve what failed: changed or missing images, or orphans.
+    /// A check run found what an update run resolves: changed or missing images, or orphans.
     fn update_would_help(&self) -> bool {
         let counts = self.counts();
-        counts.differing > 0 || counts.missing > 0 || !self.orphans.is_empty()
+        self.mode == ReferenceMode::Check
+            && (counts.differing > 0 || counts.missing > 0 || !self.orphans.is_empty())
     }
 
     fn write_summary(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
