@@ -10,6 +10,8 @@ use crate::paths::{CONTENT_DB_FILE, DATABASES_DIR};
 
 const TEMP_FILE_PREFIX: &str = "AuroraAssetEditor-";
 const TEMP_FILE_SUFFIX: &str = ".db";
+/// The delete is retried while another process holds the file, blocking for at most
+/// `(CLEANUP_ATTEMPTS - 1) * CLEANUP_DELAY` (about 0.9 s).
 const CLEANUP_ATTEMPTS: u32 = 10;
 const CLEANUP_DELAY: Duration = Duration::from_millis(100);
 
