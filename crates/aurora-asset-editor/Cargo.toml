@@ -39,6 +39,9 @@ tempfile = "3.27.0"
 chrono = { version = "0.4.45", default-features = false, features = ["clock", "std"] }
 flate2 = { version = "1.1.11", default-features = false, features = ["rust_backend"] }
 
+[target.'cfg(windows)'.build-dependencies]
+winresource = { version = "=0.1.34", default-features = false }
+
 [dev-dependencies]
 editor-test-support = { path = "../../tools/editor-test-support" }
 i-slint-backend-testing = { version = "=1.18.1", features = ["renderer-software"] }

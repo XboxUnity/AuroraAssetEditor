@@ -22,10 +22,12 @@ const REF_PREFIX: &str = "ref: ";
 
 const NOTICE_FILES: [&str; 2] = ["notices/handwritten.txt", "notices/third-party.txt"];
 const COMPRESSED_NOTICES: &str = "notices.gz";
+const APP_ICON: &str = "../aurora-ui/ui/app_icon.ico";
 
 fn main() {
     watch_git_state();
     pack_notices();
+    embed_exe_icon();
     println!("cargo:rerun-if-env-changed=SOURCE_DATE_EPOCH");
     println!("cargo:rerun-if-env-changed=AURORA_BUILD_RUN_URL");
 
@@ -82,6 +84,34 @@ fn pack_notices() {
         .write_all(text.as_bytes())
         .and_then(|()| encoder.finish().map(|_| ()))
         .unwrap_or_else(|error| panic!("could not write {}: {error}", target.display()));
+}
+
+/// The exe's own icon, which Explorer and a pinned taskbar entry show, as the old app's `ApplicationIcon` did.
+#[cfg(windows)]
+fn embed_exe_icon() {
+    println!("cargo:rerun-if-changed={APP_ICON}");
+    if !targets_windows() {
+        return;
+    }
+    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR")
+        .expect("cargo sets CARGO_MANIFEST_DIR for build scripts");
+    let icon = Path::new(&manifest_dir).join(APP_ICON);
+    winresource::WindowsResource::new()
+        .set_icon(&icon.to_string_lossy())
+        .compile()
+        .unwrap_or_else(|error| panic!("could not embed {} in the exe: {error}", icon.display()));
+}
+
+/// `winresource` needs the Windows resource compiler, which only a Windows host has.
+#[cfg(not(windows))]
+fn embed_exe_icon() {
+    if targets_windows() {
+        println!("cargo:warning=the exe icon is embedded only when building on Windows");
+    }
+}
+
+fn targets_windows() -> bool {
+    std::env::var("CARGO_CFG_TARGET_OS").is_ok_and(|os| os == "windows")
 }
 
 /// The output of `git` run with `arguments`; `None` with a warning when it fails.

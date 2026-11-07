@@ -29,6 +29,8 @@ use aurora_console::{
 use aurora_online::{DEFAULT_TIMEOUT, Endpoints, OnlineClient};
 use aurora_ui::MainWindow;
 use slint::winit_030::winit::event::WindowEvent;
+#[cfg(windows)]
+use slint::winit_030::winit::platform::windows::WindowExtWindows;
 use slint::winit_030::winit::window::{Icon, Theme};
 use slint::winit_030::{EventResult, WinitWindowAccessor};
 use slint::{CloseRequestResponse, ComponentHandle, Timer};
@@ -278,7 +280,11 @@ fn finish_window_setup(
     let view = Rc::clone(view);
     slint::spawn_local(async move {
         match view.window().window().winit_window().await {
-            Ok(winit_window) => winit_window.set_window_icon(setup.icon),
+            Ok(winit_window) => {
+                #[cfg(windows)]
+                winit_window.set_taskbar_icon(setup.icon.clone());
+                winit_window.set_window_icon(setup.icon);
+            }
             Err(error) => log::error!("{WINDOW_SETUP_FAILED}: {error}"),
         }
         window_placement::restore_position(view.window().window(), setup.geometry.as_ref());
