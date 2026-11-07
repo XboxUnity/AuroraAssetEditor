@@ -37,6 +37,7 @@ fn dialog(request: &DialogRequest) -> FileDialog {
     let allows_all_files = filters
         .iter()
         .any(|(_, extensions)| extensions.iter().any(|extension| extension == ALL_FILES));
+    // Ruled: with "All files" offered, no type list at all, so any file can be picked as on Windows.
     if allows_all_files {
         return dialog;
     }

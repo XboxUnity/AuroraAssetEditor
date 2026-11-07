@@ -5,6 +5,9 @@ mod dialog_error;
 mod dialog_filter;
 mod dialog_request;
 mod extension_filters;
+// Only the Linux portal answers with file URIs; the module is pure so its tests run everywhere.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+mod file_uri;
 #[cfg(target_os = "macos")]
 mod macos_dialogs;
 #[cfg(target_os = "linux")]

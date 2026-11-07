@@ -6,11 +6,8 @@ use ashpd::WindowIdentifier;
 use ashpd::desktop::ResponseError;
 use ashpd::desktop::file_chooser::{FileFilter, SelectedFiles};
 
+use super::file_uri::file_uri_path_bytes;
 use super::{DialogError, DialogFilter, DialogParent, DialogRequest};
-
-const FILE_URI_PREFIX: &str = "file://";
-const PERCENT: u8 = b'%';
-const HEX_RADIX: u32 = 16;
 
 pub fn open_files(request: &DialogRequest) -> Result<Vec<PathBuf>, DialogError> {
     async_io::block_on(open(request, true)).map(|picked| picked.unwrap_or_default())
@@ -115,28 +112,10 @@ async fn window_identifier(parent: Option<DialogParent<'_>>) -> Option<WindowIde
 
 /// The portal answers with `file://` URIs, percent-encoded.
 fn file_uri_path(uri: &str) -> Result<PathBuf, DialogError> {
-    let not_local = || {
+    let bytes = file_uri_path_bytes(uri).ok_or_else(|| {
         DialogError::new(format!(
             "the file dialog returned {uri}, which is not a local file"
         ))
-    };
-    let after_scheme = uri.strip_prefix(FILE_URI_PREFIX).ok_or_else(not_local)?;
-    let path_start = after_scheme.find('/').ok_or_else(not_local)?;
-    let bytes = percent_decode(&after_scheme[path_start..]).ok_or_else(not_local)?;
+    })?;
     Ok(PathBuf::from(OsString::from_vec(bytes)))
-}
-
-fn percent_decode(text: &str) -> Option<Vec<u8>> {
-    let mut decoded = Vec::with_capacity(text.len());
-    let mut bytes = text.bytes();
-    while let Some(byte) = bytes.next() {
-        if byte == PERCENT {
-            let high = char::from(bytes.next()?).to_digit(HEX_RADIX)?;
-            let low = char::from(bytes.next()?).to_digit(HEX_RADIX)?;
-            decoded.push(u8::try_from(high * HEX_RADIX + low).ok()?);
-        } else {
-            decoded.push(byte);
-        }
-    }
-    Some(decoded)
 }

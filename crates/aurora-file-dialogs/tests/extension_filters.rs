@@ -22,21 +22,22 @@ fn entry(name: &str, extensions: &[&str]) -> (String, Vec<String>) {
 
 #[test]
 fn extension_filters_reduce_patterns_to_extensions() {
+    // The names of `asset_open_filters` in aurora-asset-editor's files/file_filters.rs.
     let old_open_filters = [
-        filter("Game cover asset files (GC*.asset)", &["GC*.asset"]),
-        filter("Background asset files (BK*.asset)", &["BK*.asset"]),
-        filter("Icon & banner asset files (GL*.asset)", &["GL*.asset"]),
-        filter("Screenshot asset files (SS*.asset)", &["SS*.asset"]),
-        filter("Aurora asset files (*.asset)", &["*.asset"]),
-        filter("FSD asset files (*.assets)", &["*.assets"]),
+        filter("Game Cover/Boxart Asset File (GC*.asset)", &["GC*.asset"]),
+        filter("Background Asset File (BK*.asset)", &["BK*.asset"]),
+        filter("Icon/Banner Asset File (GL*.asset)", &["GL*.asset"]),
+        filter("Screenshot Asset File (SS*.asset)", &["SS*.asset"]),
+        filter("Aurora Asset Files (*.asset)", &["*.asset"]),
+        filter("FSD Assets Files (*.assets)", &["*.assets"]),
         filter("All files", &["*"]),
     ];
 
     assert_eq!(
         extension_filters(&old_open_filters, 4),
         vec![
-            entry("Aurora asset files (*.asset)", &["asset"]),
-            entry("FSD asset files (*.assets)", &["assets"]),
+            entry("Aurora Asset Files (*.asset)", &["asset"]),
+            entry("FSD Assets Files (*.assets)", &["assets"]),
             entry("All files", &["*"]),
         ]
     );
