@@ -4,9 +4,9 @@ use std::rc::Rc;
 use aurora_asset::AssetKind;
 use aurora_console::{FtpSettings, Game};
 use aurora_ui::{ConsoleModel, GameRowView, KindMarks, MainWindow};
-use slint::{ComponentHandle, ModelRc, VecModel};
+use slint::{ComponentHandle, Model, ModelRc, VecModel};
 
-use crate::app::App;
+use crate::app::{App, Menu};
 use crate::console::{ConsoleLink, ConsoleState, GameColumn, PresenceCell};
 
 use super::shell_view::{Refresh, action_runner};
@@ -69,6 +69,18 @@ pub(super) fn connect_console(window: &MainWindow, app: &Rc<RefCell<App>>, refre
 
     let act = action_runner(app, refresh);
     console.on_open_in_editor(move || act(&mut |app| app.open_in_editor()));
+
+    let act = action_runner(app, refresh);
+    console.on_move_selection(move |step| {
+        let step = isize::try_from(step).unwrap_or_default();
+        act(&mut |app| app.move_game_selection(step));
+    });
+
+    let act = action_runner(app, refresh);
+    console.on_select_first(move || act(&mut |app| app.select_first_game()));
+
+    let act = action_runner(app, refresh);
+    console.on_select_last(move || act(&mut |app| app.select_last_game()));
 }
 
 pub(super) fn render_console(window: &MainWindow, app: &App) {
@@ -82,9 +94,8 @@ pub(super) fn render_console(window: &MainWindow, app: &App) {
     model.set_filter_title_id(filter.title_id.as_str().into());
 
     let visible = console.table.visible();
-    let selected = console.table.selected().map(|game| &game.ids);
-    let selected_row = visible.iter().position(|game| Some(&game.ids) == selected);
-    model.set_rows(game_rows(console, &visible, selected_row));
+    let selected_row = console.table.selected_visible_row();
+    update_rows(&model, game_rows(console, &visible, selected_row));
     model.set_selected_row(selected_row.map_or(NO_ROW, row_number));
     model.set_has_selection(selected_row.is_some());
 
@@ -96,6 +107,13 @@ pub(super) fn render_console(window: &MainWindow, app: &App) {
     let reason = app.console_actions_disabled_reason().unwrap_or_default();
     model.set_actions_reason(reason.into());
     model.set_console_busy(app.locks().console_actions);
+    if !matches!(
+        app.open_menu(),
+        Some(Menu::Download | Menu::Upload | Menu::Remove)
+    ) {
+        model.set_menu_anchor_x(0.0);
+        model.set_menu_anchor_y(0.0);
+    }
 }
 
 fn chip_text(settings: Option<&FtpSettings>) -> String {
@@ -121,8 +139,8 @@ fn game_rows(
     console: &ConsoleState,
     visible: &[&Game],
     selected_row: Option<usize>,
-) -> ModelRc<GameRowView> {
-    let rows: Vec<GameRowView> = visible
+) -> Vec<GameRowView> {
+    visible
         .iter()
         .enumerate()
         .map(|(row, game)| GameRowView {
@@ -134,8 +152,25 @@ fn game_rows(
             marks: kind_marks(console.table.presence(&game.ids)),
             selected: selected_row == Some(row),
         })
-        .collect();
-    ModelRc::new(VecModel::from(rows))
+        .collect()
+}
+
+/// Changes only the rows that differ. A new model would make the ListView rebuild its rows and lose the
+/// part of a row it was scrolled by.
+fn update_rows(model: &ConsoleModel, rows: Vec<GameRowView>) {
+    let current = model.get_rows();
+    let same_length = current.row_count() == rows.len();
+    match current.as_any().downcast_ref::<VecModel<GameRowView>>() {
+        Some(shown) if same_length => {
+            for (index, row) in rows.into_iter().enumerate() {
+                if shown.row_data(index).as_ref() != Some(&row) {
+                    shown.set_row_data(index, row);
+                }
+            }
+        }
+        Some(shown) => shown.set_vec(rows),
+        None => model.set_rows(ModelRc::new(VecModel::from(rows))),
+    }
 }
 
 fn kind_marks(cell: PresenceCell) -> KindMarks {

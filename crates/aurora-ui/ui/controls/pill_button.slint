@@ -11,12 +11,13 @@ export component PillButton inherits Rectangle {
     in property <bool> compact;
     callback clicked();
 
-    property <color> foreground: accent ? Theme.accent-text : Theme.pill-text;
+    property <bool> accent-look: accent && enabled;
+    property <color> foreground: accent-look ? Theme.accent-text : enabled ? Theme.pill-text : Theme.disabled-button-text;
 
     horizontal-stretch: 0;
     height: compact ? self.preferred-height : Theme.pill-height;
     border-radius: Theme.pill-radius;
-    background: accent ? Theme.accent : Theme.pill-background;
+    background: accent-look ? Theme.accent : enabled ? Theme.pill-background : Theme.disabled-button-background;
     opacity: enabled ? 1 : Theme.disabled-opacity;
     accessible-role: button;
     accessible-label: text;

@@ -5,10 +5,9 @@ import { GameHeaderCell } from "game_header_cell.slint";
 import { GameRow } from "game_row.slint";
 
 // The console's games: a header that sorts, the rows that select, and Up, Down, Home and End to move the
-// selection once the table has focus.
+// selection once the table has focus (a click on a row, or Tab).
 export component GameTable inherits Rectangle {
     property <int> selected-row: ConsoleModel.selected-row;
-    property <int> last-row: ConsoleModel.rows.length - 1;
     property <length> list-content-y: list.content-y;
     // ListView answers a far jump by putting a whole row at its top edge, which can leave the selected row
     // cut off at the bottom; the scroll is done once more after that.
@@ -43,28 +42,23 @@ export component GameTable inherits Rectangle {
     }
 
     keys := FocusScope {
+        accessible-role: AccessibleRole.list;
+        accessible-label: "Games";
         key-pressed(event) => {
-            if last-row < 0 {
-                return reject;
-            }
             if event.text == Key.UpArrow {
-                if selected-row > 0 {
-                    ConsoleModel.select(selected-row - 1);
-                }
+                ConsoleModel.move-selection(-1);
                 return accept;
             }
             if event.text == Key.DownArrow {
-                if selected-row < last-row {
-                    ConsoleModel.select(selected-row + 1);
-                }
+                ConsoleModel.move-selection(1);
                 return accept;
             }
             if event.text == Key.Home {
-                ConsoleModel.select(0);
+                ConsoleModel.select-first();
                 return accept;
             }
             if event.text == Key.End {
-                ConsoleModel.select(last-row);
+                ConsoleModel.select-last();
                 return accept;
             }
             reject
@@ -144,5 +138,10 @@ export component GameTable inherits Rectangle {
                 }
             }
         }
+    }
+
+    if keys.has-focus: focus-outline := Rectangle {
+        border-width: Theme.focus-outline-width;
+        border-color: Theme.focus-outline;
     }
 }

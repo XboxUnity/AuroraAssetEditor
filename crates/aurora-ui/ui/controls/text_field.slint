@@ -55,6 +55,8 @@ export component TextField inherits Rectangle {
             font-size: Theme.caption-font-size;
             vertical-alignment: center;
             edited => {
+                // The owner has set `value` to what it keeps of the typed text by now; typing replaced the
+                // `text: value` binding, so the kept text is copied back by hand.
                 root.edited(self.text);
                 self.text = root.value;
             }

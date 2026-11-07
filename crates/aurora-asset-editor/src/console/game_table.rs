@@ -89,6 +89,14 @@ impl GameTable {
         self.games.get(self.selected?)
     }
 
+    /// Where the selected game is among the visible rows; `None` when none is selected or the filter hides it.
+    pub fn selected_visible_row(&self) -> Option<usize> {
+        let selected = self.selected?;
+        self.visible_indices()
+            .iter()
+            .position(|index| *index == selected)
+    }
+
     pub fn clear_selection(&mut self) {
         self.selected = None;
     }

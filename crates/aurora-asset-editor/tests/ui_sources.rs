@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::io::Cursor;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -10,7 +10,7 @@ use aurora_asset_editor::dialogs::ModalAnswer;
 use aurora_asset_editor::jobs::{ConsoleOutcome, JobOutcome};
 use aurora_asset_editor::online::{SearchMode, TileImage};
 use aurora_asset_editor::settings::ThemeChoice;
-use aurora_asset_editor::view::MainWindowView;
+use aurora_asset_editor::view::{MainWindowView, OnlineImageCache, ResultImage, ResultImageKey};
 use aurora_console::{
     AssetPresence, ConsoleError, FtpSettings, Game, GameIds, GameListing, HexId, asset_file_name,
     asset_folder, read_content_db,
@@ -21,7 +21,7 @@ use editor_test_support::{AppHarness, HeadlessUi, asset_file_with};
 use i_slint_backend_testing::ElementHandle;
 use image::RgbaImage;
 use slint::platform::{Key, PointerEventButton, WindowEvent};
-use slint::{ComponentHandle, Model, SharedString};
+use slint::{ComponentHandle, Image, Model, Rgba8Pixel, SharedPixelBuffer, SharedString};
 use test_servers::{FakeConsole, FakeConsoleConfig, RecordedHttp, Route, RouteBehaviour};
 
 const ARCHIVE_PATH: &str = "/download/xboxunity-covers-fulldump_202311/xboxunity-covers-fulldump/";
@@ -33,6 +33,10 @@ const LONG_TITLE_LENGTH: usize = 200;
 const MANY_GAMES: usize = 60;
 /// Set to a folder to keep the rendered pages as PNG files for a look.
 const SNAPSHOT_DIR_VARIABLE: &str = "AURORA_UI_SNAPSHOT_DIR";
+/// Inside a button's left padding, clear of its rounded corners.
+const ACCENT_PROBE_INSET: f32 = 3.0;
+/// The accent #3b82f6 has blue far above red; the neutral pill colours do not.
+const MAX_NEUTRAL_BLUE_CAST: u8 = 20;
 const THEMES: [(ThemeChoice, &str); 2] =
     [(ThemeChoice::Dark, "dark"), (ThemeChoice::Light, "light")];
 
@@ -142,6 +146,23 @@ impl Ui {
     }
 }
 
+/// A disabled accent button is drawn like a disabled neutral one: no blue cast at its left padding.
+fn assert_not_accent_coloured(ui: &Ui, id: &str) {
+    let button = ui.element(id);
+    assert_eq!(button.accessible_enabled(), Some(false), "{id} is disabled");
+    let (position, size) = (button.absolute_position(), button.size());
+    let snapshot = ui.snapshot();
+    let pixel = snapshot.get_pixel(
+        (position.x + ACCENT_PROBE_INSET) as u32,
+        (position.y + size.height / 2.0) as u32,
+    );
+    let [red, _, blue, _] = pixel.0;
+    assert!(
+        blue.saturating_sub(red) < MAX_NEUTRAL_BLUE_CAST,
+        "{id} is drawn neutral, not in the accent colour: {pixel:?}"
+    );
+}
+
 fn keep_snapshot(image: &RgbaImage, name: &str) {
     if let Some(folder) = std::env::var_os(SNAPSHOT_DIR_VARIABLE) {
         let folder = PathBuf::from(folder);
@@ -248,6 +269,7 @@ fn online_page_renders_states() {
         let mut states = Vec::new();
 
         assert_eq!(ui.online().get_empty_text(), EMPTY_GRID_TEXT);
+        assert_not_accent_coloured(&ui, "OnlinePage::use-button");
         states.push(("empty", ui.snapshot()));
 
         ui.act(|app| {
@@ -487,7 +509,7 @@ fn console_page_renders_states() {
         assert_eq!(ui.console().get_chip_text(), "Not set up");
         assert_eq!(ui.console().get_link_state(), 0);
         assert_eq!(ui.console().get_actions_reason(), SELECT_A_GAME_REASON);
-        assert!(!ui.enabled("ConsolePage::open-in-editor-button"));
+        assert_not_accent_coloured(&ui, "ConsolePage::open-in-editor-button");
         assert!(!ui.enabled("ConsolePage::download-button"));
         states.push(("not-set-up", ui.snapshot()));
         ui.click("ConsolePage::refresh-button");
@@ -681,6 +703,107 @@ fn filters_from_the_two_boxes_are_anded() {
 }
 
 #[test]
+fn tab_reaches_the_table_and_arrows_select() {
+    let mut harness = console_harness(ThemeChoice::Dark);
+    let ui = Ui::start(&mut harness);
+    ui.act(|app| show_games(app, mixed_games()));
+    assert!(ui.labelled("Games").accessible_label().is_some());
+    assert!(
+        ElementHandle::find_by_element_id(ui.view.window(), "GameTable::focus-outline")
+            .next()
+            .is_none()
+    );
+
+    ui.click("ConsolePage::filter-title-id-field");
+    ui.press(Key::Tab);
+    ui.element("GameTable::focus-outline");
+    assert_eq!(ui.console().get_selected_row(), -1);
+
+    ui.press(Key::DownArrow);
+    assert_eq!(
+        ui.console().get_selected_row(),
+        0,
+        "the first arrow selects the first row"
+    );
+    assert_eq!(
+        harness
+            .app()
+            .current_game()
+            .map(|game| game.title.clone())
+            .as_deref(),
+        Some("banana")
+    );
+    ui.press(Key::DownArrow);
+    assert_eq!(ui.console().get_selected_row(), 1);
+}
+
+#[test]
+fn moving_the_selection_in_an_empty_table_does_nothing() {
+    let mut harness = console_harness(ThemeChoice::Dark);
+    let app = &mut *harness.app();
+    app.move_game_selection(1);
+    app.select_last_game();
+    app.select_first_game();
+    assert!(app.console().table.selected().is_none());
+    assert!(app.current_game().is_none());
+}
+
+#[test]
+fn online_images_are_converted_once_per_result() {
+    let mut cache = OnlineImageCache::default();
+    let key = |generation, index, image| ResultImageKey {
+        generation,
+        index,
+        image,
+    };
+    let converted = Cell::new(0);
+    let convert_once = || {
+        converted.set(converted.get() + 1);
+        Image::from_rgba8(SharedPixelBuffer::<Rgba8Pixel>::new(1, 1))
+    };
+    let panic_on_second = || -> Image { panic!("the image was converted again") };
+
+    let first = cache.image(key(1, 0, ResultImage::Thumbnail), convert_once);
+    let again = cache.image(key(1, 0, ResultImage::Thumbnail), panic_on_second);
+    assert_eq!(first, again);
+    cache.image(key(1, 0, ResultImage::Full), convert_once);
+    cache.image(key(1, 1, ResultImage::Thumbnail), convert_once);
+    cache.image(key(1, 0, ResultImage::Full), panic_on_second);
+    assert_eq!(converted.get(), 3);
+
+    cache.image(key(2, 0, ResultImage::Thumbnail), convert_once);
+    assert_eq!(converted.get(), 4, "a new search converts its own images");
+}
+
+#[test]
+fn typing_does_not_reconvert_result_images() {
+    let server = online_server();
+    let mut harness = online_harness(&server, ThemeChoice::Dark);
+    let ui = Ui::start(&mut harness);
+    ui.act(|app| {
+        app.edit_search_text(RESULTS_TITLE);
+        app.search_online();
+    });
+    harness.run_jobs();
+    ui.render();
+    let first = ui.online().get_tiles().row_data(0).expect("a result").label;
+    ui.click_label_in(&first, "OnlinePage::result-grid");
+    harness.run_jobs();
+    ui.render();
+    let thumbnail = ui.online().get_tiles().row_data(0).expect("a result").image;
+    let full = ui.online().get_selected_image();
+
+    ui.click("TextField::input");
+    ui.ui.type_text(ui.view.window().window(), "Z");
+
+    assert_eq!(
+        ui.online().get_tiles().row_data(0).expect("a result").image,
+        thumbnail
+    );
+    assert_eq!(ui.online().get_selected_image(), full);
+}
+
+#[test]
 fn table_keyboard_moves_selection() {
     let games: Vec<Game> = (0..MANY_GAMES)
         .map(|index| {
@@ -776,6 +899,14 @@ fn console_menus_open_above_their_buttons_and_act() {
         assert_eq!(list.absolute_position().x, button.absolute_position().x);
         assert!(list.absolute_position().y + list.size().height <= button.absolute_position().y);
         ui.act(|app| app.toggle_menu(None));
+        assert_eq!(
+            (
+                ui.console().get_menu_anchor_x(),
+                ui.console().get_menu_anchor_y()
+            ),
+            (0.0, 0.0),
+            "closing the menu resets its anchor"
+        );
     }
 
     ui.click("ConsolePage::download-button");

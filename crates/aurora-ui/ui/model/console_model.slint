@@ -17,7 +17,7 @@ export global ConsoleModel {
     in property <string> actions-reason;
     in property <bool> console-busy;
     // Where the open Download, Upload or Remove menu hangs from: the top left of its button, in window
-    // coordinates. The button sets it when it opens its menu.
+    // coordinates. The button sets it when it opens its menu; it is reset when the menu closes.
     in-out property <length> menu-anchor-x;
     in-out property <length> menu-anchor-y;
 
@@ -27,5 +27,9 @@ export global ConsoleModel {
     callback edit-filters(string, string);
     callback sort(int);
     callback select(int);
+    // Up and Down move the selection by a row; Rust stops it at the first and last row.
+    callback move-selection(int);
+    callback select-first();
+    callback select-last();
     callback open-in-editor();
 }

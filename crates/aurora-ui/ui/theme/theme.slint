@@ -41,6 +41,11 @@ export global Theme {
 
     out property <color> menu-shadow: #00000040;
     out property <float> disabled-opacity: 0.5;
+    // A disabled button looks like a disabled neutral one, accent or not.
+    out property <color> disabled-button-background: pill-background;
+    out property <color> disabled-button-text: pill-text;
+    out property <color> focus-outline: accent;
+    out property <length> focus-outline-width: 1px;
 
     // Sizes from the layout B mockup (CSS line height 1.35 at 12 px gives the 20 px pills and 26 px rows).
     out property <length> window-width: 1024px;

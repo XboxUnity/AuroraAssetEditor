@@ -10,6 +10,7 @@ use crate::app::App;
 use crate::online::{OnlineState, ResultTile, SearchMode, TileImage};
 
 use super::shell_view::{Refresh, action_runner};
+use super::{OnlineImageCache, ResultImage, ResultImageKey};
 
 const EMPTY_GRID_TEXT: &str = "Search XboxUnity or the Internet Archive for covers";
 const TITLE_ID_PLACEHOLDER: &str = "TitleID";
@@ -56,7 +57,7 @@ pub(super) fn connect_online(window: &MainWindow, app: &Rc<RefCell<App>>, refres
     online.on_save_image(move || act(&mut |app| app.save_result_image()));
 }
 
-pub(super) fn render_online(window: &MainWindow, app: &App) {
+pub(super) fn render_online(window: &MainWindow, app: &App, images: &mut OnlineImageCache) {
     let online = window.global::<OnlineModel>();
     let state = app.online();
     online.set_source_index(position_of(&SOURCES, state.source));
@@ -64,12 +65,17 @@ pub(super) fn render_online(window: &MainWindow, app: &App) {
     online.set_keywords_enabled(state.source != CoverSource::InternetArchive);
     online.set_search_text(state.search_text().into());
     online.set_search_placeholder(placeholder(state.mode).into());
-    online.set_tiles(result_tiles(state));
+    online.set_tiles(result_tiles(state, images));
     online.set_empty_text(empty_text(state, app.locks().online_search).into());
-    render_selection(&online, state, app.locks().use_result);
+    render_selection(&online, state, app.locks().use_result, images);
 }
 
-fn render_selection(online: &OnlineModel, state: &OnlineState, use_locked: bool) {
+fn render_selection(
+    online: &OnlineModel,
+    state: &OnlineState,
+    use_locked: bool,
+    images: &mut OnlineImageCache,
+) {
     let selected = state.selected_tile();
     let full = selected.map(|tile| &tile.full);
     let full_pixels = match full {
@@ -89,34 +95,54 @@ fn render_selection(online: &OnlineModel, state: &OnlineState, use_locked: bool)
             .unwrap_or_default()
             .into(),
     );
-    online.set_selected_image(full_pixels.map(slint_image).unwrap_or_default());
+    let full_image = match (state.selected, full_pixels) {
+        (Some(index), Some(pixels)) => {
+            let key = image_key(state, index, ResultImage::Full);
+            images.image(key, || slint_image(pixels))
+        }
+        _ => Image::default(),
+    };
+    online.set_selected_image(full_image);
     online.set_selected_has_image(full_pixels.is_some());
     online.set_selected_failed(matches!(full, Some(TileImage::Failed)));
     online.set_can_use(full_pixels.is_some() && !use_locked);
     online.set_can_save(full_pixels.is_some());
 }
 
-fn result_tiles(state: &OnlineState) -> ModelRc<ResultTileView> {
+fn result_tiles(state: &OnlineState, images: &mut OnlineImageCache) -> ModelRc<ResultTileView> {
     let tiles: Vec<ResultTileView> = state
         .results
         .iter()
         .enumerate()
-        .map(|(index, tile)| result_tile_view(tile, state.selected == Some(index)))
+        .map(|(index, tile)| {
+            let thumbnail = match &tile.thumbnail {
+                TileImage::Loaded { pixels, .. } => {
+                    let key = image_key(state, index, ResultImage::Thumbnail);
+                    Some(images.image(key, || slint_image(pixels)))
+                }
+                TileImage::Pending | TileImage::Failed => None,
+            };
+            result_tile_view(tile, thumbnail, state.selected == Some(index))
+        })
         .collect();
     ModelRc::new(VecModel::from(tiles))
 }
 
-fn result_tile_view(tile: &ResultTile, selected: bool) -> ResultTileView {
-    let thumbnail = match &tile.thumbnail {
-        TileImage::Loaded { pixels, .. } => Some(slint_image(pixels)),
-        TileImage::Pending | TileImage::Failed => None,
-    };
+fn result_tile_view(tile: &ResultTile, thumbnail: Option<Image>, selected: bool) -> ResultTileView {
     ResultTileView {
         label: tile.result.label.as_str().into(),
         has_image: thumbnail.is_some(),
         image: thumbnail.unwrap_or_default(),
         failed: matches!(tile.thumbnail, TileImage::Failed),
         selected,
+    }
+}
+
+fn image_key(state: &OnlineState, index: usize, image: ResultImage) -> ResultImageKey {
+    ResultImageKey {
+        generation: state.generation(),
+        index,
+        image,
     }
 }
 

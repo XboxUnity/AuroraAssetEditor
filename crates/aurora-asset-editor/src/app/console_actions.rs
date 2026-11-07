@@ -128,6 +128,30 @@ impl App {
         self.set_current_game(Some(game));
     }
 
+    /// Up and Down in the table: moves the selection by `step` rows, stopping at the first and last row.
+    /// Without a selection the first row is selected.
+    pub fn move_game_selection(&mut self, step: isize) {
+        let Some(last) = self.console.table.visible().len().checked_sub(1) else {
+            return;
+        };
+        let row = match self.console.table.selected_visible_row() {
+            Some(row) => row.saturating_add_signed(step).min(last),
+            None => 0,
+        };
+        self.select_game(row);
+    }
+
+    /// Home and End in the table.
+    pub fn select_first_game(&mut self) {
+        self.select_game(0);
+    }
+
+    pub fn select_last_game(&mut self) {
+        if let Some(last) = self.console.table.visible().len().checked_sub(1) {
+            self.select_game(last);
+        }
+    }
+
     pub(super) fn apply_console_outcome(&mut self, outcome: ConsoleOutcome) {
         match outcome {
             ConsoleOutcome::Tested(result) => self.apply_tested(result),
