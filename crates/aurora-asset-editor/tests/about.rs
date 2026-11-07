@@ -12,7 +12,8 @@ use aurora_ui::{DialogKind, DialogModel, MainWindow, ShellModel};
 use editor_test_support::{AppHarness, HeadlessUi};
 use i_slint_backend_testing::ElementHandle;
 use image::RgbaImage;
-use slint::ComponentHandle;
+use slint::platform::{Key, PointerEventButton, WindowEvent};
+use slint::{ComponentHandle, LogicalSize, SharedString};
 
 /// Set to a folder to keep the rendered dialog as PNG files for a look.
 const SNAPSHOT_DIR_VARIABLE: &str = "AURORA_UI_SNAPSHOT_DIR";
@@ -21,6 +22,9 @@ const ABOUT_SLINT_ID: &str = "AboutDialog::about-slint";
 const MIN_FOREGROUND_COLOURS: usize = 2;
 const CARD_PROBE_GAP: f32 = 4.0;
 const DATE_EXAMPLE: &str = "2026-11-07T10:00:00Z";
+const MINIMUM_WINDOW: (f32, f32) = (760.0, 500.0);
+/// Copy build info, Third-party notices, then the notices list.
+const NOTICES_TAB_STOPS: usize = 3;
 const THEMES: [(ThemeChoice, &str); 2] =
     [(ThemeChoice::Dark, "dark"), (ThemeChoice::Light, "light")];
 
@@ -90,6 +94,13 @@ fn notices_do_not_list_removed_code() {
     assert!(!notices.contains("netftp"));
 }
 
+#[test]
+fn notices_carry_the_slint_attribution_clause_and_the_inter_copyright() {
+    let notices = notices_text();
+    assert!(notices.contains("widget in an \"About\" screen or dialog"));
+    assert!(notices.contains("Copyright (c) 2016 The Inter Project Authors"));
+}
+
 struct Ui {
     ui: HeadlessUi,
     view: MainWindowView,
@@ -112,6 +123,19 @@ impl Ui {
 
     fn render(&self) {
         self.view.render(&self.app.borrow());
+    }
+
+    fn press(&self, key: Key) {
+        let text = SharedString::from(key);
+        let window = self.view.window().window();
+        window.dispatch_event(WindowEvent::KeyPressed { text: text.clone() });
+        window.dispatch_event(WindowEvent::KeyReleased { text });
+    }
+
+    fn element(&self, id: &str) -> ElementHandle {
+        ElementHandle::find_by_element_id(self.view.window(), id)
+            .next()
+            .unwrap_or_else(|| panic!("the window shows {id}"))
     }
 
     fn snapshot(&self) -> RgbaImage {
@@ -212,6 +236,86 @@ fn copy_build_info_failure_is_shown() {
         other => panic!("expected the error dialog, got {other:?}"),
     }
     assert!(harness.error_log_text().contains("clipboard busy"));
+}
+
+#[test]
+fn copy_build_info_says_copied_inside_the_dialog() {
+    let mut harness = AppHarness::new();
+    let ui = Ui::start(&mut harness, ThemeChoice::Dark);
+    ui.app.borrow_mut().show_about();
+    ui.render();
+    ui.element("AboutDialog::copy-button")
+        .mock_single_click(PointerEventButton::Left);
+    assert!(ui.app.borrow().about_copied());
+    assert!(ui.view.window().global::<DialogModel>().get_about_copied());
+    assert!(harness.clipboard_text().is_some());
+}
+
+#[test]
+fn escape_and_enter_close_about() {
+    for key in [Key::Escape, Key::Return] {
+        let mut harness = AppHarness::new();
+        let ui = Ui::start(&mut harness, ThemeChoice::Dark);
+        ui.app.borrow_mut().show_about();
+        ui.render();
+        ui.press(key);
+        assert!(ui.app.borrow().modal().is_none());
+    }
+}
+
+#[test]
+fn expanded_notices_fit_the_minimum_window_and_scroll_with_the_keys() {
+    let mut harness = AppHarness::new();
+    let ui = Ui::start(&mut harness, ThemeChoice::Dark);
+    let window = ui.view.window().window();
+    window.set_size(LogicalSize::new(MINIMUM_WINDOW.0, MINIMUM_WINDOW.1));
+    ui.app.borrow_mut().show_about();
+    ui.app.borrow_mut().toggle_about_notices();
+    ui.render();
+
+    let dialog = ui.view.window().global::<DialogModel>();
+    assert!(dialog.get_about_notices_expanded());
+    assert!(slint::Model::row_count(&dialog.get_about_notices()) > 1000);
+
+    let title = ElementHandle::find_by_accessible_label(ui.view.window(), ABOUT_TITLE)
+        .next()
+        .expect("the About card is labelled with its title");
+    assert!(title.absolute_position().y >= 0.0);
+    let ok = ui.element("AboutDialog::ok-button");
+    let bottom = ok.absolute_position().y + ok.size().height;
+    assert!(bottom <= MINIMUM_WINDOW.1, "the OK row ends at {bottom}");
+
+    let list = ui.element("AboutDialog::notices-keys");
+    let (position, size) = (list.absolute_position(), list.size());
+    let crop = |image: &RgbaImage| {
+        image::imageops::crop_imm(
+            image,
+            position.x as u32,
+            position.y as u32,
+            size.width as u32,
+            size.height as u32,
+        )
+        .to_image()
+    };
+    keep_snapshot(&ui.snapshot(), "about-notices-minimum");
+    for _ in 0..NOTICES_TAB_STOPS {
+        ui.press(Key::Tab);
+    }
+    let before = crop(&ui.snapshot());
+    ui.press(Key::PageDown);
+    let after_page = crop(&ui.snapshot());
+    assert!(before.as_raw() != after_page.as_raw(), "PageDown scrolls");
+    ui.press(Key::DownArrow);
+    let after_line = crop(&ui.snapshot());
+    assert!(after_page.as_raw() != after_line.as_raw(), "Down scrolls");
+    ui.press(Key::PageUp);
+    ui.press(Key::PageUp);
+    ui.press(Key::UpArrow);
+    assert!(
+        crop(&ui.snapshot()).as_raw() == before.as_raw(),
+        "Up and PageUp scroll back"
+    );
+    assert!(ui.app.borrow().modal().is_some());
 }
 
 fn keep_snapshot(image: &RgbaImage, name: &str) {

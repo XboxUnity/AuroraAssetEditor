@@ -3,7 +3,7 @@ use std::rc::Rc;
 
 use aurora_online::CoverSource;
 use aurora_ui::{ChoiceView, DialogKind, DialogModel, MainWindow};
-use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
+use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 
 use crate::about::{BuildInfo, notices_text};
 use crate::app::{ABOUT_TITLE, App};
@@ -78,6 +78,9 @@ pub(super) fn connect_dialogs(window: &MainWindow, app: &Rc<RefCell<App>>, refre
     dialog.on_set_bulk_replace(move |replace| act(&mut |app| app.set_bulk_replace(replace)));
 
     let act = action_runner(app, refresh);
+    dialog.on_toggle_notices(move || act(&mut |app| app.toggle_about_notices()));
+
+    let act = action_runner(app, refresh);
     dialog.on_copy_build_info(move || act(&mut |app| app.copy_build_info()));
 
     let act = action_runner(app, refresh);
@@ -104,7 +107,23 @@ pub(super) fn render_dialogs(window: &MainWindow, app: &App) {
     dialog.set_about_commit(content.about_commit.into());
     dialog.set_about_built(content.about_built.into());
     dialog.set_about_run(content.about_run.into());
-    dialog.set_about_notices(content.about_notices.into());
+    dialog.set_about_notices_expanded(app.about_notices_expanded());
+    dialog.set_about_copied(app.about_copied());
+    set_about_notices(&dialog, app.about_notices_expanded());
+}
+
+/// The notices are unpacked and handed to the window only while they are expanded.
+fn set_about_notices(dialog: &DialogModel<'_>, expanded: bool) {
+    let shown = dialog.get_about_notices().row_count() > 0;
+    if expanded == shown {
+        return;
+    }
+    let lines: Vec<SharedString> = if expanded {
+        notices_text().lines().map(SharedString::from).collect()
+    } else {
+        Vec::new()
+    };
+    dialog.set_about_notices(ModelRc::new(VecModel::from(lines)));
 }
 
 /// What the dialog model shows for one modal.
@@ -127,7 +146,6 @@ struct DialogContent {
     about_commit: String,
     about_built: String,
     about_run: String,
-    about_notices: String,
 }
 
 impl DialogContent {
@@ -239,7 +257,6 @@ impl DialogContent {
             about_commit: format!("Commit {}", build.full_hash),
             about_built: format!("Built {} for {}", build.build_date, build.target),
             about_run: run,
-            about_notices: notices_text(),
             ..shown
         }
     }

@@ -11,14 +11,31 @@ const BUILD_INFO_COPIED_TEXT: &str = "Copied the build info";
 impl App {
     pub fn show_about(&mut self) {
         self.open_menu = None;
+        self.about_copied = false;
+        self.about_notices_expanded = false;
         self.modals.push(Modal::About);
+    }
+
+    pub fn about_copied(&self) -> bool {
+        self.about_copied
+    }
+
+    pub fn about_notices_expanded(&self) -> bool {
+        self.about_notices_expanded
+    }
+
+    pub fn toggle_about_notices(&mut self) {
+        self.about_notices_expanded = !self.about_notices_expanded;
     }
 
     /// The About dialog's "Copy build info".
     pub fn copy_build_info(&mut self) {
         let text = self.environment.build.copy_text();
         match self.environment.clipboard.set_text(&text) {
-            Ok(()) => self.status = StatusLine::info(BUILD_INFO_COPIED_TEXT.to_owned()),
+            Ok(()) => {
+                self.about_copied = true;
+                self.status = StatusLine::info(BUILD_INFO_COPIED_TEXT.to_owned());
+            }
             Err(error) => {
                 let message = format!("{COPY_BUILD_INFO_FAILED}: {error}");
                 self.fail_over_about(COPY_BUILD_INFO_FAILED, message, &error);

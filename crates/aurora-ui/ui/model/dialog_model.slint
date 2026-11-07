@@ -22,7 +22,10 @@ export global DialogModel {
     in property <string> about-commit;
     in property <string> about-built;
     in property <string> about-run;
-    in property <string> about-notices;
+    in property <bool> about-copied;
+    in property <bool> about-notices-expanded;
+    // One entry per line of the notices; empty while they are collapsed.
+    in property <[string]> about-notices;
 
     callback accept();
     callback cancel();
@@ -33,5 +36,6 @@ export global DialogModel {
     callback set-bulk-source(int);
     callback set-bulk-replace(bool);
     callback copy-build-info();
+    callback toggle-notices();
     callback open-log-folder();
 }

@@ -41,6 +41,9 @@ pub struct App {
     /// Set while an import with its own status text is queued; the editor is locked meanwhile, so no
     /// other import can end first.
     pub(super) pending_import_status: Option<PendingImportStatus>,
+    /// The About dialog's "Copy build info" worked; it says so until the dialog closes.
+    pub(super) about_copied: bool,
+    pub(super) about_notices_expanded: bool,
 }
 
 impl App {
@@ -65,6 +68,8 @@ impl App {
             selected_screenshot: ScreenshotNumber::ALL[0],
             drop_hover: false,
             pending_import_status: None,
+            about_copied: false,
+            about_notices_expanded: false,
         };
         app.report_startup_problems(&startup_problems);
         app

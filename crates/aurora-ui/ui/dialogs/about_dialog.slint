@@ -1,16 +1,15 @@
-import { AboutSlint } from "std-widgets.slint";
+import { AboutSlint, ListView } from "std-widgets.slint";
 import { Theme } from "../theme/theme.slint";
 import { DialogModel } from "../model/dialog_model.slint";
 import { PillButton } from "../controls/pill_button.slint";
 import { DialogFrame } from "dialog_frame.slint";
 
 // Build information, licences, and the "Made with Slint" widget that the Slint royalty-free licence requires in an
-// About screen reachable from the top-level menu.
+// About screen reachable from the top-level menu. The body scrolls when the window is too short for the card, so
+// the title and the OK row always stay on screen.
 export component AboutDialog inherits DialogFrame {
     title: DialogModel.title;
     card-width: Theme.about-dialog-width;
-
-    property <bool> notices-shown;
 
     first-has-focus: copy-button.has-focus;
     last-has-focus: ok-button.has-focus;
@@ -25,88 +24,116 @@ export component AboutDialog inherits DialogFrame {
         self.take-focus();
     }
 
-    Text {
-        text: DialogModel.about-heading;
-        color: Theme.text-strong;
-        font-weight: Theme.semibold-font-weight;
-        wrap: word-wrap;
-    }
+    body := Flickable {
+        height: min(body-layout.preferred-height, root.height - Theme.about-frame-height);
+        content-height: body-layout.preferred-height;
 
-    Text {
-        text: DialogModel.about-credits;
-        color: Theme.text;
-        wrap: word-wrap;
-    }
+        body-layout := VerticalLayout {
+            width: body.width;
+            spacing: Theme.dialog-gap;
 
-    Text {
-        text: DialogModel.about-commit;
-        color: Theme.text-muted;
-        wrap: word-wrap;
-    }
-
-    Text {
-        text: DialogModel.about-built;
-        color: Theme.text-muted;
-        wrap: word-wrap;
-    }
-
-    if DialogModel.about-run != "": Text {
-        text: DialogModel.about-run;
-        color: Theme.text-muted;
-        wrap: word-wrap;
-    }
-
-    HorizontalLayout {
-        alignment: start;
-
-        copy-button := PillButton {
-            text: "Copy build info";
-            focusable: true;
-            clicked => {
-                DialogModel.copy-build-info();
+            Text {
+                text: DialogModel.about-heading;
+                color: Theme.text-strong;
+                font-weight: Theme.semibold-font-weight;
+                wrap: word-wrap;
             }
-        }
-    }
 
-    Text {
-        text: "Public domain (Unlicense)";
-        color: Theme.text;
-    }
-
-    HorizontalLayout {
-        alignment: start;
-
-        notices-button := PillButton {
-            text: "Third-party notices";
-            has-chevron: true;
-            focusable: true;
-            clicked => {
-                root.notices-shown = !root.notices-shown;
+            Text {
+                text: DialogModel.about-credits;
+                color: Theme.text;
+                wrap: word-wrap;
             }
-        }
-    }
 
-    if root.notices-shown: notices-box := Rectangle {
-        height: Theme.dialog-text-max-height;
-        border-width: Theme.border-width;
-        border-color: Theme.border;
-        border-radius: Theme.dialog-radius;
-        clip: true;
-
-        Flickable {
-            viewport-height: notices.preferred-height;
-
-            notices := Text {
-                x: Theme.dialog-gap;
-                width: parent.width - 2 * Theme.dialog-gap;
-                text: DialogModel.about-notices;
+            Text {
+                text: DialogModel.about-commit;
                 color: Theme.text-muted;
                 wrap: word-wrap;
             }
+
+            Text {
+                text: DialogModel.about-built;
+                color: Theme.text-muted;
+                wrap: word-wrap;
+            }
+
+            if DialogModel.about-run != "": Text {
+                text: DialogModel.about-run;
+                color: Theme.text-muted;
+                wrap: word-wrap;
+            }
+
+            HorizontalLayout {
+                alignment: start;
+
+                copy-button := PillButton {
+                    text: DialogModel.about-copied ? "Copied" : "Copy build info";
+                    focusable: true;
+                    clicked => {
+                        DialogModel.copy-build-info();
+                    }
+                }
+            }
+
+            Text {
+                text: "Public domain (Unlicense)";
+                color: Theme.text;
+            }
+
+            HorizontalLayout {
+                alignment: start;
+
+                notices-button := PillButton {
+                    text: "Third-party notices";
+                    has-chevron: true;
+                    focusable: true;
+                    clicked => {
+                        DialogModel.toggle-notices();
+                    }
+                }
+            }
+
+            // Up, Down, PageUp and PageDown scroll the list while it has the focus.
+            if DialogModel.about-notices-expanded: notices-keys := FocusScope {
+                height: Theme.notices-height;
+                key-pressed(event) => {
+                    if event.text == Key.UpArrow {
+                        notices-list.viewport-y = min(0px, notices-list.viewport-y + Theme.notices-line-step);
+                        return accept;
+                    }
+                    if event.text == Key.DownArrow {
+                        notices-list.viewport-y = max(notices-list.visible-height - notices-list.viewport-height, notices-list.viewport-y - Theme.notices-line-step);
+                        return accept;
+                    }
+                    if event.text == Key.PageUp {
+                        notices-list.viewport-y = min(0px, notices-list.viewport-y + notices-list.visible-height);
+                        return accept;
+                    }
+                    if event.text == Key.PageDown {
+                        notices-list.viewport-y = max(notices-list.visible-height - notices-list.viewport-height, notices-list.viewport-y - notices-list.visible-height);
+                        return accept;
+                    }
+                    reject
+                }
+
+                Rectangle {
+                    border-width: Theme.border-width;
+                    border-color: Theme.border;
+                    border-radius: Theme.dialog-radius;
+
+                    notices-list := ListView {
+                        for line in DialogModel.about-notices: Text {
+                            text: line == "" ? " " : line;
+                            color: Theme.text-muted;
+                            wrap: word-wrap;
+                        }
+                    }
+                }
+            }
+
+            about-slint := AboutSlint { }
         }
     }
-
-    about-slint := AboutSlint { }
 
     HorizontalLayout {
         spacing: Theme.dialog-button-gap;
