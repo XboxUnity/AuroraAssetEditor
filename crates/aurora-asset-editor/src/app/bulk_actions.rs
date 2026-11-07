@@ -3,7 +3,7 @@ use aurora_console::{
 };
 use aurora_online::CoverSource;
 
-use crate::console::{PresenceCell, is_connection_failure};
+use crate::console::{ConsoleLink, PresenceCell, is_connection_failure};
 use crate::dialogs::{BulkForm, Modal};
 use crate::jobs::{BulkRequest, ConsoleJob, JobPriority};
 use crate::status::{ConsoleActivity, StatusLine};
@@ -111,7 +111,11 @@ impl App {
 
     fn show_bulk_report(&mut self, report: &BulkReport) {
         let log_failure = self.log_bulk_problems(report);
-        self.mark_uploaded_covers(report);
+        let console_gone = matches!(report.stopped, Some(BulkStop::ConsoleGone(_)));
+        if console_gone {
+            self.console.link = ConsoleLink::Failed;
+        }
+        self.mark_uploaded_covers(report, !console_gone);
         let summary = report.summary().to_string();
         let mut text = summary.clone();
         if let Some(stop) = &report.stopped {
@@ -157,8 +161,8 @@ impl App {
     }
 
     /// The console now has a cover for each uploaded game. A cell that does not say what else the game has
-    /// is filled in by a check instead.
-    fn mark_uploaded_covers(&mut self, report: &BulkReport) {
+    /// is filled in by a check instead, unless the console can no longer be reached.
+    fn mark_uploaded_covers(&mut self, report: &BulkReport, console_reachable: bool) {
         let uploaded: Vec<&Game> = report
             .entries
             .iter()
@@ -168,7 +172,9 @@ impl App {
         if uploaded.is_empty() {
             return;
         }
-        self.console.presence_gate().mark_reachable();
+        if console_reachable {
+            self.console.presence_gate().mark_reachable();
+        }
         for game in uploaded {
             match self.console.table.presence(&game.ids) {
                 PresenceCell::Known(presence) => self.console.table.set_presence(
@@ -179,7 +185,9 @@ impl App {
                     }),
                 ),
                 PresenceCell::Unknown | PresenceCell::Failed => {
-                    self.queue_presence_check(&game.ids);
+                    if console_reachable {
+                        self.queue_presence_check(&game.ids);
+                    }
                 }
             }
         }

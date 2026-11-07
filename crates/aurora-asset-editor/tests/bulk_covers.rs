@@ -3,13 +3,17 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use aurora_asset::{AssetFile, AssetSlot, Compression, RgbaImage, decode, encode};
-use aurora_asset_editor::app::{BULK_FINISHED_TITLE, BULK_TITLE, NO_ASSETS_TEXT};
+use aurora_asset_editor::app::{
+    BULK_FINISHED_TITLE, BULK_TITLE, CONNECTION_FAILED_TITLE, NO_ASSETS_TEXT, NO_CONSOLE_TEXT,
+};
 use aurora_asset_editor::console::{
-    CoverProviderError, GameColumn, OnlineCoverProvider, PresenceCell,
+    ConsoleLink, CoverProviderError, GameColumn, OnlineCoverProvider, PresenceCell,
 };
 use aurora_asset_editor::dialogs::{BulkForm, Modal, ModalAnswer};
-use aurora_asset_editor::jobs::Progress;
-use aurora_console::{CoverProvider, Game, asset_file_name, asset_folder, read_content_db};
+use aurora_asset_editor::jobs::{ConsoleOutcome, JobOutcome, Progress};
+use aurora_console::{
+    CoverProvider, Game, GameListing, asset_file_name, asset_folder, read_content_db,
+};
 use aurora_image::{decode_image, encoder_pixels};
 use aurora_online::{CoverSource, Endpoints, OnlineClient};
 use editor_test_support::{AppHarness, OutcomeStage};
@@ -18,7 +22,6 @@ use test_servers::{FakeConsole, FakeConsoleConfig, RecordedHttp, Route, RouteBeh
 const COVER_WIDTH: u32 = 100;
 const COVER_HEIGHT: u32 = 50;
 const ONLINE_TIMEOUT: Duration = Duration::from_secs(5);
-const UNREACHABLE_URL: &str = "http://127.0.0.1:9/";
 
 fn typical_db() -> Vec<u8> {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -113,7 +116,7 @@ fn cover_routes(games: &[Game], cover_size: (u32, u32), failing: &[&str]) -> Vec
 fn endpoints(server: &RecordedHttp) -> Endpoints {
     Endpoints {
         xboxunity_covers: format!("{}/api/Covers/", server.base_url()),
-        archive_covers: UNREACHABLE_URL.to_owned(),
+        archive_covers: format!("{}/archive/", server.base_url()),
     }
 }
 
@@ -369,6 +372,13 @@ fn bulk_console_gone_is_logged() {
         log.contains("the console could not be reached again"),
         "{log}"
     );
+    let cause = format!(
+        "
+  caused by: could not connect to 127.0.0.1 on port {}",
+        fixture.console.port()
+    );
+    assert!(log.contains(&cause), "{log}");
+    assert_eq!(fixture.harness.app().console().link, ConsoleLink::Failed);
 }
 
 #[test]
@@ -490,4 +500,66 @@ fn cover_provider_reports_a_title_without_cover_and_a_bad_answer() {
         provider.random_cover(&foxtrot().ids.title_id),
         Err(CoverProviderError::Online(_))
     ));
+}
+
+#[test]
+fn bulk_when_console_refuses_connections_shows_connection_failed() {
+    let mut fixture = fixture();
+    fixture.harness.app().open_bulk_actions();
+    fixture.console.drop_connections();
+    fixture.console.refuse_new_connections();
+
+    fixture.harness.app().answer_modal(ModalAnswer::Accept);
+    fixture.harness.run_jobs();
+
+    let text = message(&mut fixture.harness, CONNECTION_FAILED_TITLE);
+    assert!(
+        text.starts_with("FTP Connection could not be established"),
+        "{text}"
+    );
+    assert_eq!(fixture.harness.app().console().link, ConsoleLink::Failed);
+    let log = fixture.harness.error_log_text();
+    assert!(log.contains("could not connect to 127.0.0.1"), "{log}");
+}
+
+#[test]
+fn bulk_without_console_settings_says_so() {
+    let mut harness = AppHarness::new();
+    let app = harness.app();
+    let generation = app.console().refresh_generation();
+    app.on_job_outcome(JobOutcome::Console(ConsoleOutcome::Refreshed {
+        generation,
+        result: Ok(GameListing {
+            games: vec![echo()],
+            cleanup_error: None,
+        }),
+    }));
+
+    harness.app().open_bulk_actions();
+
+    let app = harness.app();
+    assert!(app.modal().is_none());
+    assert_eq!(app.status().text, NO_CONSOLE_TEXT);
+}
+
+#[test]
+fn bulk_logs_an_unreadable_existing_cover_and_leaves_it() {
+    let mut fixture = fixture();
+    let garbage = b"this is not an asset file".to_vec();
+    let path = format!("{}/{}", asset_folder(&echo().ids), cover_name(&echo()));
+    fixture.console.add_file(&path, &garbage);
+    fixture
+        .harness
+        .app()
+        .set_game_filter("", echo().ids.title_id.as_str());
+
+    start_bulk(&mut fixture.harness);
+    fixture.harness.run_jobs();
+
+    assert_eq!(fixture.console.file(&path), Some(garbage));
+    let text = message(&mut fixture.harness, BULK_FINISHED_TITLE);
+    assert!(text.contains("1 unreadable cover skipped"), "{text}");
+    let log = fixture.harness.error_log_text();
+    let expected = format!("of Fable II ({})", echo().ids.title_id);
+    assert!(log.contains(&expected), "{log}");
 }

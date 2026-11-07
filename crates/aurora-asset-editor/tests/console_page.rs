@@ -864,3 +864,27 @@ fn test_connection_applies_the_port_rewrite_to_the_session() {
     assert_eq!(settings.host, "10.0.0.7");
     assert_eq!(settings.port, "21");
 }
+
+#[test]
+fn presence_checks_run_for_a_hand_built_generation_zero_refresh() {
+    let (mut harness, _console) = harness_with_console();
+    let games = typical_games();
+    let first = games[0].ids.clone();
+    let app = harness.app();
+    let generation = app.console().refresh_generation();
+    assert_eq!(generation, 0);
+    app.on_job_outcome(JobOutcome::Console(ConsoleOutcome::Refreshed {
+        generation,
+        result: Ok(GameListing {
+            games,
+            cleanup_error: None,
+        }),
+    }));
+
+    harness.run_jobs();
+
+    assert!(matches!(
+        harness.app().console().table.presence(&first),
+        PresenceCell::Known(_)
+    ));
+}
