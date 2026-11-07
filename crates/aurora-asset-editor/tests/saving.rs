@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use aurora_asset::{AssetFile, AssetKind, AssetSlot, Compression};
+use aurora_asset::{AssetFile, AssetKind, AssetSlot, Compression, ScreenshotNumber};
 use aurora_asset_editor::app::{App, CurrentGame};
 use aurora_asset_editor::dialogs::{Modal, ModalAnswer, ModalField};
 use aurora_asset_editor::editor::{EditorPages, SlotPreview};
@@ -251,6 +251,44 @@ fn saving_screenshots_compacts_without_reencoding() {
     ));
     assert_eq!(*screenshots.preview(shot(5)), SlotPreview::Empty);
     assert!(screenshots.texture_header(shot(5)).is_none());
+}
+
+fn selected_after_save(filled: &[u8], selected: u8, save: fn(&mut AppHarness, &Path)) -> u8 {
+    let folder = TempDir::new().unwrap();
+    let mut harness = AppHarness::new();
+    harness.app().set_current_game(Some(halo_3()));
+    let slots: Vec<AssetSlot> = filled.iter().map(|number| shot(*number)).collect();
+    let source = write_file(folder.path(), "SS4D5307E6.asset", &slots);
+    load(&mut harness, &[&source]);
+    harness
+        .app()
+        .select_screenshot(ScreenshotNumber::new(selected).unwrap());
+    let target = TempDir::new().unwrap();
+    save(&mut harness, target.path());
+    assert_eq!(harness.app().modal(), None, "the save worked");
+    harness.app().selected_screenshot().get()
+}
+
+fn save_screenshots_page(harness: &mut AppHarness, folder: &Path) {
+    harness.dialogs().push_save(folder.join("out.asset"));
+    harness.app().save_kind(AssetKind::Screenshots);
+}
+
+#[test]
+fn selection_follows_the_screenshot_through_compaction() {
+    assert_eq!(selected_after_save(&[1, 3, 7], 7, save_screenshots_page), 3);
+    assert_eq!(selected_after_save(&[1, 3, 7], 3, save_screenshots_page), 2);
+    assert_eq!(
+        selected_after_save(&[1, 3, 7], 5, save_screenshots_page),
+        4,
+        "an empty selection lands on the first free position"
+    );
+    assert_eq!(
+        selected_after_save(&[1, 2, 3], 7, save_screenshots_page),
+        7,
+        "nothing moves on a compact page"
+    );
+    assert_eq!(selected_after_save(&[2, 5], 5, save_all), 2, "Save all");
 }
 
 #[test]

@@ -95,6 +95,29 @@ impl AssetDocument {
             .collect()
     }
 
+    /// Whether the screenshots already sit in positions 1, 2, 3, ... with no gap.
+    pub fn screenshots_are_compact(&self) -> bool {
+        ScreenshotNumber::ALL
+            .into_iter()
+            .skip(self.screenshot_count())
+            .all(|number| !self.holds_screenshot(number))
+    }
+
+    /// Where `number` lands when the page is compacted: a screenshot after the ones before it, an empty
+    /// position on the first free one.
+    pub fn compacted_position(&self, number: ScreenshotNumber) -> ScreenshotNumber {
+        let index = if self.holds_screenshot(number) {
+            ScreenshotNumber::ALL
+                .into_iter()
+                .take_while(|earlier| *earlier != number)
+                .filter(|earlier| self.holds_screenshot(*earlier))
+                .count()
+        } else {
+            self.screenshot_count()
+        };
+        ScreenshotNumber::ALL[index.min(SCREENSHOT_COUNT - 1)]
+    }
+
     /// Packs the screenshots into positions 1, 2, 3, ... by moving stored bytes and previews.
     pub fn compact_screenshots(&mut self) {
         self.file.compact_screenshots();
@@ -132,6 +155,10 @@ impl AssetDocument {
 
     pub fn to_bytes(&mut self) -> Vec<u8> {
         self.file.to_bytes()
+    }
+
+    fn holds_screenshot(&self, number: ScreenshotNumber) -> bool {
+        self.file.get(AssetSlot::Screenshot(number)).is_some()
     }
 
     fn screenshot_previews(&mut self) -> &mut [SlotPreview] {

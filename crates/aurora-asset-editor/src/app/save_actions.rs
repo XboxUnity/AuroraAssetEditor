@@ -7,7 +7,7 @@ use aurora_console::asset_file_name;
 use aurora_image::ExportFormat;
 
 use crate::dialogs::{Modal, TitleIdForm};
-use crate::editor::SlotPreview;
+use crate::editor::{EditorPages, SlotPreview};
 use crate::files::{
     asset_save_filter, file_display_name, image_export_filters, save_all_to_folder, save_page,
 };
@@ -41,7 +41,7 @@ impl App {
         let Some(path) = self.ask_save_file(&request) else {
             return;
         };
-        match save_page(self.pages.get_mut(kind), &path) {
+        match self.save_keeping_selection(|pages| save_page(pages.get_mut(kind), &path)) {
             Ok(()) => self.status = StatusLine::info(format!("Saved {}", file_display_name(&path))),
             Err(error) => self.show_save_failure(&error.path, &error, &error.source, &[]),
         }
@@ -79,7 +79,7 @@ impl App {
         let Some(folder) = self.ask_folder(SAVE_ALL_FOLDER_TITLE) else {
             return;
         };
-        match save_all_to_folder(&mut self.pages, &folder, &title_id) {
+        match self.save_keeping_selection(|pages| save_all_to_folder(pages, &folder, &title_id)) {
             Ok(written) => {
                 self.status = StatusLine::info(format!(
                     "Saved {} asset files to {}",
@@ -91,6 +91,19 @@ impl App {
                 self.show_save_failure(&error.path, &error, &error.source, &error.written);
             }
         }
+    }
+
+    /// Runs a local save, which may compact the screenshots, and moves the selection with the selected
+    /// screenshot. It moves even when the write failed: the page is compacted by then.
+    fn save_keeping_selection<T>(&mut self, save: impl FnOnce(&mut EditorPages) -> T) -> T {
+        let screenshots = &self.pages.screenshots;
+        let had_gaps = !screenshots.screenshots_are_compact();
+        let landing = screenshots.compacted_position(self.selected_screenshot);
+        let outcome = save(&mut self.pages);
+        if had_gaps && self.pages.screenshots.screenshots_are_compact() {
+            self.selected_screenshot = landing;
+        }
+        outcome
     }
 
     /// Saving reads the pages, so it waits for whatever is writing them.
