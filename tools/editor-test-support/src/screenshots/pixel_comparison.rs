@@ -83,22 +83,14 @@ impl PixelDifference {
     fn first(x: u32, y: u32, channel_difference: u8) -> Self {
         Self {
             count: 1,
-            bounds: PixelBounds {
-                left: x,
-                top: y,
-                right: x,
-                bottom: y,
-            },
+            bounds: PixelBounds::around(x, y),
             largest_channel_difference: channel_difference,
         }
     }
 
     fn include(&mut self, x: u32, y: u32, channel_difference: u8) {
         self.count += 1;
-        self.bounds.left = self.bounds.left.min(x);
-        self.bounds.top = self.bounds.top.min(y);
-        self.bounds.right = self.bounds.right.max(x);
-        self.bounds.bottom = self.bounds.bottom.max(y);
+        self.bounds.include(x, y);
         self.largest_channel_difference = self.largest_channel_difference.max(channel_difference);
     }
 }
@@ -130,6 +122,26 @@ pub struct PixelBounds {
     pub top: u32,
     pub right: u32,
     pub bottom: u32,
+}
+
+impl PixelBounds {
+    /// The box holding just the pixel (x, y).
+    pub fn around(x: u32, y: u32) -> Self {
+        Self {
+            left: x,
+            top: y,
+            right: x,
+            bottom: y,
+        }
+    }
+
+    /// Grows the box to hold the pixel (x, y) as well.
+    pub fn include(&mut self, x: u32, y: u32) {
+        self.left = self.left.min(x);
+        self.top = self.top.min(y);
+        self.right = self.right.max(x);
+        self.bottom = self.bottom.max(y);
+    }
 }
 
 /// 1234 becomes "1,234".

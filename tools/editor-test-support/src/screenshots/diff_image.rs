@@ -28,20 +28,8 @@ pub fn diff_image(reference: &RgbaImage, actual: &RgbaImage) -> RgbaImage {
     for (x, y) in changed_pixels(reference, actual) {
         diff.put_pixel(2 * panel_step + x, y, DIFF_CHANGED_COLOUR);
         match bounds.as_mut() {
-            Some(known) => {
-                known.left = known.left.min(x);
-                known.top = known.top.min(y);
-                known.right = known.right.max(x);
-                known.bottom = known.bottom.max(y);
-            }
-            None => {
-                bounds = Some(PixelBounds {
-                    left: x,
-                    top: y,
-                    right: x,
-                    bottom: y,
-                });
-            }
+            Some(known) => known.include(x, y),
+            None => bounds = Some(PixelBounds::around(x, y)),
         }
     }
 
