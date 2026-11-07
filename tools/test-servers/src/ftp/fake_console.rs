@@ -1,11 +1,11 @@
-use std::io;
+use std::io::{self, Write};
 use std::net::{Ipv4Addr, TcpListener};
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
-use super::console_state::{Shared, shut_down};
+use super::console_state::{MAX_SESSIONS, Shared, shut_down};
 use super::file_system::{path_key, resolve_path};
 use super::session;
 use super::{FakeConsoleConfig, FileDate};
@@ -174,6 +174,10 @@ impl Drop for FakeConsole {
         for socket in data_sockets {
             shut_down(&socket);
         }
+        let refused_sockets = std::mem::take(&mut self.shared.state().refused_sockets);
+        for socket in refused_sockets {
+            shut_down(&socket);
+        }
         let sessions = std::mem::take(
             &mut *self
                 .shared
@@ -205,11 +209,16 @@ fn accept_sessions(listener: &TcpListener, shared: &Arc<Shared>) {
 }
 
 fn start_session(stream: std::net::TcpStream, shared: &Arc<Shared>) {
+    if shared.active_sessions.load(Ordering::SeqCst) >= MAX_SESSIONS {
+        refuse_session(stream, shared);
+        return;
+    }
     let registered = stream
         .set_nonblocking(false)
         .and_then(|()| stream.try_clone());
     match registered {
         Ok(control_socket) => {
+            shared.active_sessions.fetch_add(1, Ordering::SeqCst);
             shared.state().control_sockets.push(control_socket);
             let handle = thread::spawn({
                 let shared = Arc::clone(shared);
@@ -223,4 +232,13 @@ fn start_session(stream: std::net::TcpStream, shared: &Arc<Shared>) {
         }
         Err(error) => eprintln!("fake console: preparing a connection failed: {error}"),
     }
+}
+
+/// Like Aurora, answers the greeting with 421 and then leaves the socket open.
+fn refuse_session(mut stream: std::net::TcpStream, shared: &Shared) {
+    if let Err(error) = stream.write_all(b"421 Too many connections\r\n") {
+        eprintln!("fake console: refusing a connection failed: {error}");
+        return;
+    }
+    shared.state().refused_sockets.push(stream);
 }

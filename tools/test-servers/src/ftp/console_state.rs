@@ -1,12 +1,15 @@
 use std::collections::{HashMap, HashSet};
 use std::io;
 use std::net::{Shutdown, TcpStream};
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::sync::{Mutex, MutexGuard};
 use std::thread::JoinHandle;
 
 use super::FakeConsoleConfig;
 use super::file_system::FakeFileSystem;
+
+/// Aurora's FtpDll serves at most this many sessions at once.
+pub(crate) const MAX_SESSIONS: usize = 6;
 
 /// Everything the acceptor, the sessions and the test-facing handle share.
 pub(crate) struct Shared {
@@ -14,6 +17,7 @@ pub(crate) struct Shared {
     pub(crate) stopping: AtomicBool,
     pub(crate) refusing_connections: AtomicBool,
     pub(crate) timing_out_next_command: AtomicBool,
+    pub(crate) active_sessions: AtomicUsize,
     pub(crate) session_threads: Mutex<Vec<JoinHandle<()>>>,
     state: Mutex<ConsoleState>,
 }
@@ -31,6 +35,8 @@ pub(crate) struct ConsoleState {
     pub(crate) login_count: usize,
     pub(crate) control_sockets: Vec<TcpStream>,
     pub(crate) data_sockets: Vec<TcpStream>,
+    /// Connections answered `421 Too many connections`, which Aurora never closes.
+    pub(crate) refused_sockets: Vec<TcpStream>,
 }
 
 impl Shared {
@@ -40,6 +46,7 @@ impl Shared {
             stopping: AtomicBool::new(false),
             refusing_connections: AtomicBool::new(false),
             timing_out_next_command: AtomicBool::new(false),
+            active_sessions: AtomicUsize::new(0),
             session_threads: Mutex::new(Vec::new()),
             state: Mutex::new(ConsoleState::default()),
         }

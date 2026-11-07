@@ -38,6 +38,7 @@ enum Flow {
 /// Serves one control connection until the client quits or the connection closes.
 pub(crate) fn serve(shared: &Shared, stream: TcpStream) {
     let outcome = Session::new(shared, stream).run();
+    shared.active_sessions.fetch_sub(1, Ordering::SeqCst);
     if let Err(error) = outcome
         && !shared.stopping.load(Ordering::SeqCst)
         && !CLIENT_GONE.contains(&error.kind())

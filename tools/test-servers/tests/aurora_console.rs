@@ -330,3 +330,36 @@ fn cwd_does_not_resolve_dot_segments() {
     assert_eq!(session.send("CWD  /Game"), "550 No such directory\r\n");
     assert_eq!(session.send("PWD"), "257 \"/Game/Data/\"\r\n");
 }
+
+#[test]
+fn seventh_session_gets_421_and_stays_open() {
+    let console = aurora_console();
+    let mut held: Vec<RawSession> = (0..6).map(|_| RawSession::logged_in(&console)).collect();
+
+    let mut seventh = RawSession::connect(&console);
+    assert_eq!(seventh.read_line(), "421 Too many connections\r\n");
+    seventh
+        .control
+        .get_ref()
+        .set_read_timeout(Some(std::time::Duration::from_millis(200)))
+        .expect("setting a read timeout");
+    let mut probe = [0u8; 1];
+    let silence = seventh
+        .control
+        .get_mut()
+        .read(&mut probe)
+        .expect_err("the console neither closes nor sends more");
+    assert!(matches!(
+        silence.kind(),
+        std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+    ));
+
+    assert_eq!(held[0].send("QUIT"), "221 Goodbye\r\n");
+    held.remove(0);
+    let freed = (0..100).find_map(|_| {
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        let mut session = RawSession::connect(&console);
+        (session.read_line() == "220 FtpDll Ready\r\n").then_some(session)
+    });
+    assert!(freed.is_some(), "a closed session frees its slot");
+}
