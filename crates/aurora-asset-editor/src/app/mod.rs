@@ -10,6 +10,7 @@ mod file_actions;
 mod image_actions;
 mod kind_choice;
 mod page;
+mod save_actions;
 mod settings_actions;
 mod startup_settings;
 

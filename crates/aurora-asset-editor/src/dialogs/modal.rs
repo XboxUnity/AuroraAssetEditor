@@ -1,4 +1,4 @@
-use super::{ChoiceId, PendingChoice};
+use super::{ChoiceId, PendingChoice, TitleIdForm};
 
 /// A dialog the app shows over the window.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -14,12 +14,18 @@ pub enum Modal {
         choices: Vec<(ChoiceId, String)>,
         pending: PendingChoice,
     },
+    /// Save All's TitleID prompt: OK and Cancel; OK works once the form is valid.
+    TitleId {
+        title: String,
+        label: String,
+        form: TitleIdForm,
+    },
 }
 
 /// How the user closed a modal.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ModalAnswer {
-    /// Cancels a `Choice`, which has no accept button of its own.
+    /// OK of a form; cancels a `Choice`, which has no accept button of its own.
     Accept,
     Cancel,
     Choice(ChoiceId),
@@ -27,4 +33,6 @@ pub enum ModalAnswer {
 
 /// A text field inside a modal's form.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ModalField {}
+pub enum ModalField {
+    TitleId,
+}

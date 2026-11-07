@@ -84,11 +84,16 @@ impl App {
             );
             return;
         }
+        if self.title_id_not_ready(answer) {
+            return;
+        }
         let Some(modal) = self.modals.close_current() else {
             return;
         };
         match (modal, answer) {
             (Modal::Message { .. }, _) => {}
+            (Modal::TitleId { form, .. }, ModalAnswer::Accept) => self.save_all_for_form(&form),
+            (Modal::TitleId { .. }, ModalAnswer::Cancel | ModalAnswer::Choice(_)) => {}
             (Modal::Choice { pending, .. }, ModalAnswer::Choice(choice)) => {
                 self.answer_choice(pending, Some(choice));
             }
@@ -98,6 +103,16 @@ impl App {
         }
     }
 
+    /// OK on the TitleID prompt does nothing until the form holds eight hex digits; the prompt stays open.
+    fn title_id_not_ready(&self, answer: ModalAnswer) -> bool {
+        let (ModalAnswer::Accept, Some(Modal::TitleId { form, .. })) =
+            (answer, self.modals.current())
+        else {
+            return false;
+        };
+        !form.is_valid()
+    }
+
     /// The answer's choice when the dialog on screen does not offer it.
     fn unoffered_choice(&self, answer: ModalAnswer) -> Option<UnofferedChoice> {
         let ModalAnswer::Choice(id) = answer else {
@@ -105,7 +120,7 @@ impl App {
         };
         let offered = match self.modals.current()? {
             Modal::Choice { choices, .. } => choices.iter().any(|(offered, _)| *offered == id),
-            Modal::Message { .. } => false,
+            Modal::Message { .. } | Modal::TitleId { .. } => false,
         };
         if offered {
             None
@@ -115,7 +130,12 @@ impl App {
     }
 
     pub fn edit_modal_field(&mut self, field: ModalField, text: &str) {
-        match (field, text) {}
+        let Some(Modal::TitleId { form, .. }) = self.modals.current_mut() else {
+            return;
+        };
+        match field {
+            ModalField::TitleId => form.edit(text),
+        }
     }
 
     pub fn on_job_outcome(&mut self, outcome: JobOutcome) {
@@ -132,7 +152,6 @@ impl App {
     }
 
     /// Logs the error and shows `text` in a message dialog titled `title`.
-    #[expect(dead_code, reason = "first used by the save actions")]
     pub(super) fn show_error(&mut self, title: &str, text: String, error: &(dyn Error + 'static)) {
         self.show_error_logged_as(title, title, text, error);
     }
@@ -168,14 +187,12 @@ impl App {
     }
 
     /// The chosen file; `None` when the user cancelled or the dialog failed, which is shown.
-    #[expect(dead_code, reason = "first used by the save actions")]
     pub(super) fn ask_save_file(&mut self, request: &SaveRequest) -> Option<PathBuf> {
         let answer = self.environment.dialogs.save_file(request);
         self.dialog_answer(&request.title, answer).flatten()
     }
 
     /// The chosen folder; `None` when the user cancelled or the dialog failed, which is shown.
-    #[expect(dead_code, reason = "first used by the save actions")]
     pub(super) fn ask_folder(&mut self, title: &str) -> Option<PathBuf> {
         let answer = self.environment.dialogs.pick_folder(title);
         self.dialog_answer(title, answer).flatten()

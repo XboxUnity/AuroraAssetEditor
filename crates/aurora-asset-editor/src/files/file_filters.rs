@@ -61,3 +61,22 @@ fn extension_filter(name: &str, extensions: &[&str]) -> FileFilter {
             .collect(),
     }
 }
+
+/// The Save dialog of a single asset file.
+pub fn asset_save_filter() -> FileFilter {
+    extension_filter("Aurora asset file", &["asset"])
+}
+
+/// The formats an image export can write; `ExportFormat::from_path` picks one by the extension.
+pub fn image_export_filters() -> Vec<FileFilter> {
+    [
+        ("PNG", &["png"][..]),
+        ("JPEG", &["jpg", "jpeg"]),
+        ("BMP", &["bmp"]),
+        ("TIFF", &["tif", "tiff"]),
+        ("GIF", &["gif"]),
+        ("WebP", &["webp"]),
+    ]
+    .map(|(name, extensions)| extension_filter(name, extensions))
+    .to_vec()
+}
