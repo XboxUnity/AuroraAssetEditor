@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 
+mod content_db;
 mod crafted;
 mod cross_decode;
 mod dds_corpus;
@@ -10,7 +11,7 @@ mod synthetic;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-const USAGE: &str = "usage: cargo xtask golden <generate [--refresh-inputs] | check>\n       cargo xtask cross-decode [<image files>...]\n       cargo xtask cross-samples";
+const USAGE: &str = "usage: cargo xtask golden <generate [--refresh-inputs] | check>\n       cargo xtask cross-decode [<image files>...]\n       cargo xtask cross-samples\n       cargo xtask content-db-samples";
 
 fn main() -> ExitCode {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
@@ -20,6 +21,7 @@ fn main() -> ExitCode {
         ["golden", "generate", "--refresh-inputs"] => golden::generate(true),
         ["golden", "check"] => golden::check(),
         ["cross-samples"] => cross_decode::write_samples(),
+        ["content-db-samples"] => content_db::write_samples(),
         ["cross-decode", files @ ..] => {
             let files: Vec<PathBuf> = files.iter().map(PathBuf::from).collect();
             cross_decode::run(&files)

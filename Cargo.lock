@@ -1312,6 +1312,7 @@ dependencies = [
  "aurora-asset",
  "hex",
  "image",
+ "rusqlite",
  "serde",
  "sha2",
  "tempfile",
