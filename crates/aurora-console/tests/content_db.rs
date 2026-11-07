@@ -115,3 +115,62 @@ fn filter_is_not_trimmed() {
     let halo = &read_sample("typical.db")[0];
     assert!(!filter(" halo", "").matches(halo));
 }
+
+#[test]
+fn missing_file_is_open_error_and_creates_nothing() {
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let path = directory.path().join("Content.db");
+    let error = read_content_db(&path).unwrap_err();
+    assert!(matches!(error, ContentDbError::Open(_)), "{error:?}");
+    assert!(!path.exists());
+}
+
+#[test]
+fn wal_mode_db_reads_correctly() {
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let path = directory.path().join("Content.db");
+    let connection = rusqlite::Connection::open(&path).expect("create database");
+    connection
+        .query_row("PRAGMA journal_mode=WAL", [], |_| Ok(()))
+        .expect("enable WAL");
+    connection
+        .execute_batch(
+            "CREATE TABLE ContentItems (Id INTEGER PRIMARY KEY, TitleId INTEGER NULL, \
+             MediaId INTEGER NULL, DiscNum INTEGER NULL, TitleName TEXT NULL);
+             INSERT INTO ContentItems VALUES (7, 1297287142, 3, 2, 'Halo 3');",
+        )
+        .expect("insert row");
+    connection.close().expect("close database");
+    let games = read_content_db(&path).expect("WAL database reads");
+    assert_eq!(games.len(), 1);
+    assert_eq!(games[0].ids.title_id.as_str(), "4D5307E6");
+    assert_eq!(games[0].ids.database_id.as_str(), "00000007");
+    assert_eq!(games[0].disc, 2);
+}
+
+#[test]
+fn missing_column_is_named_not_a_bad_value() {
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let path = directory.path().join("Content.db");
+    let connection = rusqlite::Connection::open(&path).expect("create database");
+    connection
+        .execute_batch(
+            "CREATE TABLE ContentItems (Id INTEGER PRIMARY KEY, TitleId INTEGER NULL, \
+             MediaId INTEGER NULL, TitleName TEXT NULL);
+             INSERT INTO ContentItems VALUES (1, 1, 1, 'Halo 3');",
+        )
+        .expect("insert row");
+    connection.close().expect("close database");
+    let error = read_content_db(&path).unwrap_err();
+    assert!(
+        matches!(
+            error,
+            ContentDbError::MissingColumn {
+                column: "DiscNum",
+                ..
+            }
+        ),
+        "{error:?}"
+    );
+    assert_eq!(error.to_string(), "Content.db has no DiscNum column");
+}
