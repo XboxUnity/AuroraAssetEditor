@@ -18,6 +18,7 @@ pub(crate) fn listing_line(
         }
         (ListingStyle::Aurora, false) => {
             let date = entry.modified.aurora_text();
+            let size = aurora_size(size);
             format!("-rw-rw-rw-   1 root root {size:>13} {date} {name}")
         }
         (ListingStyle::Aurora, true) => {
@@ -37,4 +38,9 @@ pub(crate) fn listing_line(
         }
         (ListingStyle::Mlsd, true) => format!("type=dir;modify=20261107120000; {name}"),
     }
+}
+
+/// Aurora prints `nFileSizeLow` with `%u`, so a file of 4 GiB or more shows only its low 32 bits.
+fn aurora_size(size: u64) -> u32 {
+    (size & u64::from(u32::MAX)) as u32
 }

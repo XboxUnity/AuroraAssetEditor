@@ -5,6 +5,6 @@ mod http;
 
 pub use ftp::{
     FAKE_INPUT_HASH, FAKE_STORED_HASH, FakeConsole, FakeConsoleConfig, FakeFeatures, FileDate,
-    ListingStyle,
+    InvalidFileDate, ListingStyle,
 };
 pub use http::{RecordedHttp, Route, RouteBehaviour};

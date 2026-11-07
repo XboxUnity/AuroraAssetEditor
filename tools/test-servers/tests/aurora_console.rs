@@ -193,24 +193,12 @@ fn list_uses_aurora_lines_and_ignores_its_argument() {
     console.add_file("/Game/Data/Content.db", &[0; 1234567]);
     console.set_modified(
         "/Game/Data/Content.db",
-        FileDate {
-            year: 2026,
-            month: 11,
-            day: 3,
-            hour: 14,
-            minute: 5,
-        },
+        FileDate::new(2026, 11, 3, 14, 5).expect("a valid date"),
     );
     console.add_file("/Game/Data/old.bin", &[0; 5]);
     console.set_modified(
         "/Game/Data/old.bin",
-        FileDate {
-            year: 2019,
-            month: 1,
-            day: 5,
-            hour: 9,
-            minute: 0,
-        },
+        FileDate::new(2019, 1, 5, 9, 0).expect("a valid date"),
     );
     let mut session = RawSession::logged_in(&console);
     session.send("CWD /Game/Data");
@@ -275,4 +263,30 @@ fn transfers_answer_with_aurora_texts_and_pasv_keeps_its_port() {
         session.send("RETR nope.bin"),
         "550 Could not open file.  Error:  2\r\n"
     );
+}
+
+#[test]
+fn listed_size_shows_the_low_32_bits() {
+    let console = aurora_console();
+    console.add_file("/Game/big.bin", &[0; 1]);
+    console.list_size_as("/Game/big.bin", (5 << 32) + 7);
+    let mut session = RawSession::logged_in(&console);
+    session.send("CWD /Game");
+
+    let (_, listing, _) = session.download("LIST");
+
+    assert!(
+        listing.starts_with("-rw-rw-rw-   1 root root             7 "),
+        "got {listing:?}"
+    );
+}
+
+#[test]
+fn file_dates_outside_the_calendar_are_refused() {
+    assert!(FileDate::new(2026, 0, 1, 0, 0).is_err());
+    assert!(FileDate::new(2026, 13, 1, 0, 0).is_err());
+    assert!(FileDate::new(2026, 12, 32, 0, 0).is_err());
+    assert!(FileDate::new(2026, 12, 31, 24, 0).is_err());
+    assert!(FileDate::new(2026, 12, 31, 23, 60).is_err());
+    assert!(FileDate::new(2026, 12, 31, 23, 59).is_ok());
 }

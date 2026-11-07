@@ -11,5 +11,5 @@ mod session;
 pub use fake_console::FakeConsole;
 pub use fake_console_config::{FAKE_INPUT_HASH, FAKE_STORED_HASH, FakeConsoleConfig};
 pub use fake_features::FakeFeatures;
-pub use file_date::FileDate;
+pub use file_date::{FileDate, InvalidFileDate};
 pub use listing_style::ListingStyle;
