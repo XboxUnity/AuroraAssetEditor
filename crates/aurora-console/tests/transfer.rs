@@ -14,6 +14,7 @@ const HOST: &str = "127.0.0.1";
 const SHORT: Duration = Duration::from_millis(500);
 const FOLDER: &str = "/Game/Data/GameData/4D5307E6_00000012";
 const COVER_FILE: &str = "/Game/Data/GameData/4D5307E6_00000012/GC4D5307E6.asset";
+const BACKGROUND_FILE: &str = "/Game/Data/GameData/4D5307E6_00000012/BK4D5307E6.asset";
 const EMPTY_ASSET_LEN: usize = 2048;
 /// Under twice the read timeout, so one stalled read cannot be followed by a second.
 const MAX_FAILURE_TIME: Duration = Duration::from_millis(900);
@@ -65,6 +66,16 @@ fn cover_asset_bytes(shade: u8) -> Vec<u8> {
 
 fn empty_asset_bytes() -> Vec<u8> {
     AssetFile::new().to_bytes()
+}
+
+/// A failed transfer abandons the control connection; the next action must log in again and work.
+fn assert_next_download_reconnects(console: &FakeConsole, client: &mut ConsoleClient) {
+    console.add_file(BACKGROUND_FILE, &empty_asset_bytes());
+
+    let next = client.download_asset(&game(), AssetKind::Background);
+
+    assert!(matches!(next, Ok(Some(_))), "{next:?}");
+    assert_eq!(console.login_count(), 2);
 }
 
 fn commands_containing(console: &FakeConsole, verb: &str) -> Vec<String> {
@@ -267,8 +278,9 @@ fn reports_short_read() {
     let console = console_with_game_folder(FakeConsoleConfig::default());
     console.add_file(COVER_FILE, &empty_asset_bytes());
     console.truncate_download(COVER_FILE, 100);
+    let mut client = client_for(&console);
 
-    let error = client_for(&console)
+    let error = client
         .download_asset(&game(), AssetKind::Cover)
         .unwrap_err();
 
@@ -280,6 +292,7 @@ fn reports_short_read() {
             ..
         }
     ));
+    assert_next_download_reconnects(&console, &mut client);
 }
 
 #[test]
@@ -287,8 +300,9 @@ fn reports_extra_bytes() {
     let console = console_with_game_folder(FakeConsoleConfig::default());
     console.add_file(COVER_FILE, &empty_asset_bytes());
     console.list_size_as(COVER_FILE, 1000);
+    let mut client = client_for(&console);
 
-    let error = client_for(&console)
+    let error = client
         .download_asset(&game(), AssetKind::Cover)
         .unwrap_err();
 
@@ -298,6 +312,7 @@ fn reports_extra_bytes() {
             if file == "GC4D5307E6.asset"
     ));
     assert!(error.to_string().ends_with("more than that"));
+    assert_next_download_reconnects(&console, &mut client);
 }
 
 fn assert_read_timeout(error: &ConsoleError) {
@@ -340,6 +355,7 @@ fn stalled_download_times_out() {
 
     assert_read_timeout(&error);
     assert_fails_after_one_timeout(started);
+    assert_next_download_reconnects(&console, &mut client);
 }
 
 #[test]
