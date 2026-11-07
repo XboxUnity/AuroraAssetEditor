@@ -2,6 +2,7 @@ use super::endian::GpuEndian;
 use super::format::{self, ChannelOrder, Compression, FetchFields, TextureFormat};
 use super::layout::{PITCH_UNIT_BYTES, SurfaceLayout};
 use super::{EncodeError, MAX_DIMENSION};
+use crate::bytes::read_u32_be;
 
 pub const TEXTURE_HEADER_LEN: usize = 52;
 
@@ -244,10 +245,7 @@ impl TextureHeader {
     }
 
     fn dword(&self, index: usize) -> u32 {
-        let start = index * DWORD_LEN;
-        let mut bytes = [0u8; DWORD_LEN];
-        bytes.copy_from_slice(&self.0[start..start + DWORD_LEN]);
-        u32::from_be_bytes(bytes)
+        read_u32_be(&self.0, index * DWORD_LEN)
     }
 }
 

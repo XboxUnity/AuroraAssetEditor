@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 
+mod bytes;
 mod container;
 pub mod dds;
 pub mod fsd;

@@ -6,6 +6,7 @@ use std::fmt;
 
 use image::RgbaImage;
 
+use crate::bytes::{BLOCK_SIDE, BYTES_PER_PIXEL, block_array, read_u32_le};
 use crate::texture::{decode_bc1_block, decode_bc3_block};
 
 const MAGIC: &[u8; 4] = b"DDS ";
@@ -29,8 +30,6 @@ const ARGB_MASKS: [u32; 4] = [0x00FF_0000, 0x0000_FF00, 0x0000_00FF, 0xFF00_0000
 const XRGB_MASKS: [u32; 4] = [0x00FF_0000, 0x0000_FF00, 0x0000_00FF, 0];
 const ARGB_BIT_COUNT: u32 = 32;
 
-const BYTES_PER_PIXEL: usize = 4;
-const BLOCK_SIDE: usize = 4;
 const DXT1_BLOCK_BYTES: usize = 8;
 const DXT5_BLOCK_BYTES: usize = 16;
 const OPAQUE: u8 = u8::MAX;
@@ -70,11 +69,11 @@ pub fn decode(bytes: &[u8]) -> Result<RgbaImage, DdsError> {
     if bytes.len() < DATA_START {
         return Err(DdsError::Truncated);
     }
-    if read_u32(bytes, HEADER_SIZE_OFFSET) != HEADER_SIZE {
+    if read_u32_le(bytes, HEADER_SIZE_OFFSET) != HEADER_SIZE {
         return Err(unsupported("the header size is not 124"));
     }
-    let width = read_u32(bytes, WIDTH_OFFSET);
-    let height = read_u32(bytes, HEIGHT_OFFSET);
+    let width = read_u32_le(bytes, WIDTH_OFFSET);
+    let height = read_u32_le(bytes, HEIGHT_OFFSET);
     if width == 0 || height == 0 {
         return Err(unsupported("the image has no pixels"));
     }
@@ -96,16 +95,8 @@ fn unsupported(reason: &str) -> DdsError {
     DdsError::Unsupported(reason.to_string())
 }
 
-fn read_u32(bytes: &[u8], offset: usize) -> u32 {
-    u32::from_le_bytes(block_array(&bytes[offset..]))
-}
-
-fn block_array<const BYTES: usize>(bytes: &[u8]) -> [u8; BYTES] {
-    std::array::from_fn(|offset| bytes[offset])
-}
-
 fn format_of(bytes: &[u8]) -> Result<Format, DdsError> {
-    let flags = read_u32(bytes, PIXEL_FORMAT_FLAGS_OFFSET);
+    let flags = read_u32_le(bytes, PIXEL_FORMAT_FLAGS_OFFSET);
     if flags & PIXEL_FLAG_FOURCC != 0 {
         return match &bytes[FOURCC_OFFSET..FOURCC_OFFSET + 4] {
             fourcc if fourcc == FOURCC_DXT1 => Ok(Format::Dxt1),
@@ -114,9 +105,9 @@ fn format_of(bytes: &[u8]) -> Result<Format, DdsError> {
         };
     }
     let masks: [u32; 4] =
-        std::array::from_fn(|channel| read_u32(bytes, CHANNEL_MASKS_OFFSET + 4 * channel));
+        std::array::from_fn(|channel| read_u32_le(bytes, CHANNEL_MASKS_OFFSET + 4 * channel));
     let is_32_bit_rgb =
-        flags & PIXEL_FLAG_RGB != 0 && read_u32(bytes, BIT_COUNT_OFFSET) == ARGB_BIT_COUNT;
+        flags & PIXEL_FLAG_RGB != 0 && read_u32_le(bytes, BIT_COUNT_OFFSET) == ARGB_BIT_COUNT;
     match masks {
         ARGB_MASKS if is_32_bit_rgb => Ok(Format::Argb8888),
         XRGB_MASKS if is_32_bit_rgb => Ok(Format::Xrgb8888),

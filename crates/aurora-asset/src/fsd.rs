@@ -2,6 +2,8 @@
 
 use std::fmt;
 
+use crate::bytes::read_u32_be;
+
 const MAGIC: u32 = 0x4653_4441;
 const VERSION: u32 = 1;
 const MIN_LEN: usize = 0x1F8;
@@ -93,11 +95,11 @@ impl FsdFile {
         if bytes.len() < MIN_LEN {
             return Err(FsdError::TooShort { len: bytes.len() });
         }
-        let magic = read_u32(bytes, 0);
+        let magic = read_u32_be(bytes, 0);
         if magic != MAGIC {
             return Err(FsdError::BadMagic(magic));
         }
-        let version = read_u32(bytes, 4);
+        let version = read_u32_be(bytes, 4);
         if version != VERSION {
             return Err(FsdError::UnsupportedVersion(version));
         }
@@ -139,19 +141,15 @@ impl FsdFile {
     }
 }
 
-fn read_u32(bytes: &[u8], offset: usize) -> u32 {
-    u32::from_be_bytes(std::array::from_fn(|byte| bytes[offset + byte]))
-}
-
 /// Asset entry rows are `{type, offset, size, total_size}`.
 fn asset_entry(bytes: &[u8], index: usize) -> Result<Entry<'_>, FsdError> {
     let row = ENTRY_TABLE_OFFSET + index * TABLE_ROW_LEN;
     Ok(Entry {
-        asset_type: read_u32(bytes, row),
+        asset_type: read_u32_be(bytes, row),
         data: entry_data(
             bytes,
-            read_u32(bytes, row + 4),
-            read_u32(bytes, row + 8),
+            read_u32_be(bytes, row + 4),
+            read_u32_be(bytes, row + 8),
             index,
         )?,
     })
@@ -162,8 +160,8 @@ fn screenshot_entry(bytes: &[u8], index: usize) -> Result<Option<&[u8]>, FsdErro
     let row = SCREENSHOT_TABLE_OFFSET + index * TABLE_ROW_LEN;
     entry_data(
         bytes,
-        read_u32(bytes, row),
-        read_u32(bytes, row + 4),
+        read_u32_be(bytes, row),
+        read_u32_be(bytes, row + 4),
         ENTRY_COUNT + index,
     )
 }

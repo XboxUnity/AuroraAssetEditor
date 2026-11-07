@@ -1,5 +1,6 @@
 use std::fmt;
 
+use crate::bytes::read_u32_be;
 use crate::texture::{EncodedTexture, TEXTURE_HEADER_LEN, TextureHeader};
 
 const MAGIC: u32 = 0x5258_4541;
@@ -186,11 +187,11 @@ impl AssetFile {
         if bytes.len() < DATA_START {
             return Err(AssetError::TooShort { len: bytes.len() });
         }
-        let magic = read_u32(bytes, 0);
+        let magic = read_u32_be(bytes, 0);
         if magic != MAGIC {
             return Err(AssetError::BadMagic(magic));
         }
-        let version = read_u32(bytes, 4);
+        let version = read_u32_be(bytes, 4);
         if version != VERSION {
             return Err(AssetError::UnsupportedVersion(version));
         }
@@ -199,13 +200,13 @@ impl AssetFile {
         let mut data_cursor = DATA_START;
         for slot in all_slots() {
             let entry_start = ENTRY_TABLE_START + slot.index() * ENTRY_LEN;
-            let size = read_u32(bytes, entry_start + 4) as usize;
+            let size = read_u32_be(bytes, entry_start + 4) as usize;
             let header_start = entry_start + ENTRY_FIXED_FIELDS_LEN;
             let mut header = [0; TEXTURE_HEADER_LEN];
             header.copy_from_slice(&bytes[header_start..header_start + TEXTURE_HEADER_LEN]);
 
             let entry = &mut file.entries[slot.index()];
-            entry.offset = read_u32(bytes, entry_start);
+            entry.offset = read_u32_be(bytes, entry_start);
             if size == 0 {
                 entry.empty_header = header;
                 continue;
@@ -376,10 +377,4 @@ impl AssetFile {
 
 fn all_slots() -> impl Iterator<Item = AssetSlot> {
     (0..ENTRY_COUNT).filter_map(AssetSlot::from_index)
-}
-
-fn read_u32(bytes: &[u8], offset: usize) -> u32 {
-    let mut word = [0; 4];
-    word.copy_from_slice(&bytes[offset..offset + 4]);
-    u32::from_be_bytes(word)
 }

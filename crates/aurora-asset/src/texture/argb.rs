@@ -2,8 +2,7 @@ use image::{Rgba, RgbaImage};
 
 use super::DecodeError;
 use super::layout::SurfaceLayout;
-
-const BYTES_PER_PIXEL: usize = 4;
+use crate::bytes::BYTES_PER_PIXEL;
 
 /// Stores each RGBA pixel as A,R,G,B in rows of `row_pitch` bytes, zero-padded to the full surface.
 pub(super) fn pack(image: &RgbaImage, layout: &SurfaceLayout) -> Vec<u8> {

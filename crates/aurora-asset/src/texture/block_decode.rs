@@ -1,11 +1,12 @@
 use image::{Rgba, RgbaImage};
 
 use super::DecodeError;
+use super::channel::{expand_565, unit_from_byte};
 use super::endian::GpuEndian;
 use super::format::ChannelOrder;
 use super::layout::SurfaceLayout;
+use crate::bytes::{BLOCK_SIDE, CHANNEL_MAX, block_array};
 
-const BLOCK_SIDE: usize = 4;
 const TEXELS_PER_BLOCK: usize = BLOCK_SIDE * BLOCK_SIDE;
 const BC1_BLOCK_BYTES: usize = 8;
 const BC3_BLOCK_BYTES: usize = 16;
@@ -16,15 +17,6 @@ const COLOUR_BLOCK_START: usize = 8;
 const ALPHA_INDEX_BITS: u32 = 3;
 const COLOUR_INDEX_BITS: u32 = 2;
 
-const RED_SHIFT: u32 = 11;
-const GREEN_SHIFT: u32 = 5;
-const RED_BLUE_MASK_5_BITS: u64 = 0b1_1111;
-const GREEN_MASK_6_BITS: u64 = 0b11_1111;
-
-const RED_BITS_MAX: f32 = 31.0;
-const GREEN_BITS_MAX: f32 = 63.0;
-const BLUE_BITS_MAX: f32 = 31.0;
-const CHANNEL_MAX: f32 = 255.0;
 const OPAQUE: f32 = 1.0;
 
 type Texel = [u8; 4];
@@ -61,10 +53,6 @@ impl BlockCodec {
             }
         }
     }
-}
-
-fn block_array<const BYTES: usize>(block: &[u8]) -> [u8; BYTES] {
-    std::array::from_fn(|offset| block[offset])
 }
 
 /// Decodes a BC1 colour block (little-endian words) to RGBA texels, row-major within the block.
@@ -154,20 +142,6 @@ fn channel_to_byte(value: f32) -> u8 {
     (value * CHANNEL_MAX).round_ties_even() as u8
 }
 
-/// The three channels of an RGB565 colour, from 0 to 1.
-// Derived from AuroraAsset.dll for interoperability: times `f32` reciprocals.
-fn expand_565(packed: u16) -> FloatColour {
-    let packed = u64::from(packed);
-    let red = bit_field(packed, RED_SHIFT, RED_BLUE_MASK_5_BITS) as f32;
-    let green = bit_field(packed, GREEN_SHIFT, GREEN_MASK_6_BITS) as f32;
-    let blue = bit_field(packed, 0, RED_BLUE_MASK_5_BITS) as f32;
-    [
-        red * (1.0 / RED_BITS_MAX),
-        green * (1.0 / GREEN_BITS_MAX),
-        blue * (1.0 / BLUE_BITS_MAX),
-    ]
-}
-
 /// The bits of `value` selected by `mask` after shifting right by `shift`.
 fn bit_field(value: u64, shift: u32, mask: u64) -> u64 {
     (value >> shift) & mask
@@ -219,11 +193,6 @@ fn alpha_steps(first: f32, second: f32, intervals: u8) -> [f32; 6] {
         let weight_first = (intervals - step) / intervals;
         first * weight_first + second * weight_second
     })
-}
-
-// Derived from AuroraAsset.dll for interoperability: `n * (1 / 255)` in `f32`, not `n / 255`.
-fn unit_from_byte(value: u8) -> f32 {
-    f32::from(value) * (1.0 / CHANNEL_MAX)
 }
 
 /// Decodes the visible `width` x `height` pixels of a block-compressed surface laid out per

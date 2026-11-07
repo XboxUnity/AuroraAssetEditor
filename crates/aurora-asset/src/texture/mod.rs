@@ -1,6 +1,7 @@
 mod argb;
 mod bc3_encode;
 mod block_decode;
+mod channel;
 mod endian;
 mod format;
 mod header;

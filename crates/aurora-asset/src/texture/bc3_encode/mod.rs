@@ -32,14 +32,14 @@ mod x87;
 
 use image::RgbaImage;
 
+use super::channel::unit_from_byte;
 use super::endian::swap_8in16;
 use super::layout::SurfaceLayout;
+use crate::bytes::BLOCK_SIDE;
 use x87::Fpu;
 
-const BLOCK_SIDE: usize = 4;
 const TEXELS_PER_BLOCK: usize = BLOCK_SIDE * BLOCK_SIDE;
 const BLOCK_BYTES: usize = 16;
-const CHANNEL_MAX: f32 = 255.0;
 
 const ALPHA_HALF: std::ops::Range<usize> = 0..8;
 const COLOR_HALF: std::ops::Range<usize> = 8..16;
@@ -88,7 +88,7 @@ fn block_texels(image: &RgbaImage, block_x: usize, block_y: usize) -> [Texel; TE
         let x = block_x * BLOCK_SIDE + column;
         let y = block_y * BLOCK_SIDE + row;
         let [red, green, blue, alpha] = image.get_pixel(x as u32, y as u32).0;
-        [red, green, blue, alpha].map(channel_to_unit)
+        [red, green, blue, alpha].map(unit_from_byte)
     })
 }
 
@@ -102,12 +102,6 @@ fn source_position(position: usize, positions_inside: usize) -> usize {
         source = PARTIAL_BLOCK_SOURCE[source];
     }
     source
-}
-
-// Derived from AuroraAsset.dll for interoperability: bytes load as `n * (1/255)`, not `n / 255`.
-fn channel_to_unit(channel: u8) -> f32 {
-    const UNIT_PER_LEVEL: f32 = 1.0 / CHANNEL_MAX;
-    f32::from(channel) * UNIT_PER_LEVEL
 }
 
 /// One 16-byte block in little-endian D3D order: the alpha half, then the color half.
@@ -196,7 +190,7 @@ mod tests {
     fn alpha_with_opaque_texels_uses_six_step_mode_low_endpoint_first() {
         let mut texels = solid([0.0, 0.0, 0.0, 1.0]);
         for texel in texels.iter_mut().take(8) {
-            texel[3] = channel_to_unit(0x80);
+            texel[3] = unit_from_byte(0x80);
         }
         let block = encode_bc3_block(&texels, &Bc3Options::DLL);
         assert_eq!((block[0], block[1]), (0x80, 0xff));

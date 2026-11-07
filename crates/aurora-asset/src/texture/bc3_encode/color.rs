@@ -3,6 +3,10 @@
 
 use super::x87::{Fpu, X87};
 use super::{Bc3Options, TEXELS_PER_BLOCK, Texel, diffuse_error, end_weights, spread_error};
+use crate::texture::channel::{
+    BLUE_LEVEL_STEP, BLUE_LEVELS, GREEN_LEVEL_STEP, GREEN_LEVELS, GREEN_SHIFT, RED_LEVEL_STEP,
+    RED_LEVELS, RED_SHIFT, expand_565,
+};
 
 mod underrun;
 
@@ -16,14 +20,6 @@ const GREEN: usize = 1;
 const BLUE: usize = 2;
 const CHANNELS: [usize; 3] = [RED, GREEN, BLUE];
 
-const RED_LEVELS: f32 = 31.0;
-const GREEN_LEVELS: f32 = 63.0;
-const BLUE_LEVELS: f32 = 31.0;
-const RED_LEVEL_STEP: f32 = 1.0 / 31.0;
-const GREEN_LEVEL_STEP: f32 = 1.0 / 63.0;
-const BLUE_LEVEL_STEP: f32 = 1.0 / 31.0;
-const RED_SHIFT: u32 = 11;
-const GREEN_SHIFT: u32 = 5;
 const ROUNDING: f32 = 0.5;
 
 /// Perceptual importance of each channel, relative to green.
@@ -359,8 +355,8 @@ fn wide_dot(a: Rgb, b: Rgb, fpu: Fpu) -> X87 {
 /// Orders the quantized endpoints for four-color mode (first greater than second) and builds the
 /// palette between them.
 fn build_palette(first: u16, second: u16, weights: Rgb) -> Palette {
-    let first_color = scale_rgb(decode_565(first), weights);
-    let second_color = scale_rgb(decode_565(second), weights);
+    let first_color = scale_rgb(expand_565(first), weights);
+    let second_color = scale_rgb(expand_565(second), weights);
 
     let (stored_first, stored_second, start, end) = if first > second {
         (first, second, first_color, second_color)
@@ -452,17 +448,6 @@ fn encode_565(color: Rgb) -> u16 {
     let green_bits = (fpu.load(green) * GREEN_LEVELS + ROUNDING).store() as i32;
     let blue_bits = (fpu.load(blue) * BLUE_LEVELS + ROUNDING).store() as i32;
     ((red_bits << RED_SHIFT) | (green_bits << GREEN_SHIFT) | blue_bits) as u16
-}
-
-fn decode_565(packed: u16) -> Rgb {
-    const RED_MASK: u16 = 0b1_1111;
-    const GREEN_MASK: u16 = 0b11_1111;
-    const BLUE_MASK: u16 = 0b1_1111;
-    [
-        f32::from((packed >> RED_SHIFT) & RED_MASK) * RED_LEVEL_STEP,
-        f32::from((packed >> GREEN_SHIFT) & GREEN_MASK) * GREEN_LEVEL_STEP,
-        f32::from(packed & BLUE_MASK) * BLUE_LEVEL_STEP,
-    ]
 }
 
 fn scale_rgb(color: Rgb, weights: Rgb) -> Rgb {
