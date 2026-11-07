@@ -25,7 +25,7 @@ pub use console_job::{BulkRequest, ConsoleJob, ConsoleJobKind, ConsoleOutcome, C
 pub use console_worker::ConsoleWorker;
 pub use failed_job::FailedJob;
 pub use import_failure::ImportFailure;
-pub use import_job::{ImageSource, ImportJob, ImportRequest, ImportResult};
+pub use import_job::{ImageSource, ImportJob, ImportRequest, ImportResult, ImportSlot};
 pub use job::{Job, JobPriority};
 pub use job_executor::JobExecutor;
 pub use job_outcome::{JobOutcome, Progress};

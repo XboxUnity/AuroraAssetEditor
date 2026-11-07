@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use aurora_asset::{
     AssetFile, AssetSlot, Compression, RgbaImage, ScreenshotNumber, TextureFormat, encode,
 };
-use aurora_asset_editor::app::{App, Page};
+use aurora_asset_editor::app::{App, DROP_DURING_QUESTION_TEXT, Page};
 use aurora_asset_editor::dialogs::{ChoiceId, Modal, ModalAnswer, PendingChoice};
 use aurora_asset_editor::editor::SlotPreview;
 use aurora_asset_editor::files::image_open_filters;
@@ -858,4 +858,80 @@ fn drop_hover_ends_with_the_drop() {
     harness.app().files_dropped(Vec::new());
 
     assert!(!harness.app().drop_hover());
+}
+
+fn is_choice(app: &App) -> bool {
+    matches!(app.modal(), Some(Modal::Choice { .. }))
+}
+
+#[test]
+fn drops_are_refused_while_a_question_is_open() {
+    let folder = TempDir::new().unwrap();
+    let mut harness = harness_with_resize(false);
+    harness.app().show_page(Page::IconBanner);
+    drop_files(&mut harness, &[png(&folder, "icon.png", 8, 8, RED)]);
+    assert!(is_choice(&harness.app()));
+
+    drop_files(&mut harness, &[png(&folder, "banner.png", 8, 8, BLUE)]);
+    assert_eq!(
+        *harness.app().status(),
+        StatusLine::info(DROP_DURING_QUESTION_TEXT)
+    );
+
+    harness
+        .app()
+        .answer_modal(ModalAnswer::Choice(ChoiceId::Icon));
+    assert_eq!(harness.app().modal(), None, "the refused drop asks nothing");
+    harness.run_jobs();
+    let app = harness.app();
+    assert_eq!(pixels(&app, AssetSlot::Icon).get_pixel(0, 0).0, RED);
+    assert!(is_empty(&app, AssetSlot::Banner));
+}
+
+#[test]
+fn queued_screenshot_imports_take_their_own_free_positions() {
+    let folder = TempDir::new().unwrap();
+    let mut harness = harness_with_resize(false);
+    harness.app().show_page(Page::Screenshots);
+    add(&mut harness, &[png(&folder, "first.png", 8, 8, RED)]);
+    drop_files(&mut harness, &[png(&folder, "dropped.png", 8, 8, BLUE)]);
+    assert!(is_choice(&harness.app()), "Replace screenshot?");
+
+    // An Add queued before the answer: both batches look for free positions.
+    harness
+        .dialogs()
+        .push_files(vec![png(&folder, "added.png", 8, 8, GREEN)]);
+    harness.app().add_screenshots();
+    harness
+        .app()
+        .answer_modal(ModalAnswer::Choice(ChoiceId::AddToFreeSlots));
+    harness.run_jobs();
+
+    let app = harness.app();
+    assert_eq!(pixels(&app, shot(1)).get_pixel(0, 0).0, RED);
+    assert_eq!(pixels(&app, shot(2)).get_pixel(0, 0).0, GREEN);
+    assert_eq!(pixels(&app, shot(3)).get_pixel(0, 0).0, BLUE);
+}
+
+#[test]
+fn images_dropped_with_a_screenshots_asset_fill_positions_after_the_load() {
+    let folder = TempDir::new().unwrap();
+    let mut harness = harness_with_resize(false);
+    harness.app().show_page(Page::Screenshots);
+    let mut file = AssetFile::new();
+    for position in [1, 2] {
+        let texture = encode(&solid(8, 8, RED), Compression::None).unwrap();
+        file.set(shot(position), Some(texture));
+    }
+    let asset = folder.path().join("SS4D5307E6.asset");
+    fs::write(&asset, file.to_bytes()).unwrap();
+    let image = png(&folder, "extra.png", 8, 8, GREEN);
+
+    drop_files(&mut harness, &[asset, image]);
+    harness.run_jobs();
+
+    let app = harness.app();
+    assert_eq!(pixels(&app, shot(1)).get_pixel(0, 0).0, RED, "kept");
+    assert_eq!(pixels(&app, shot(2)).get_pixel(0, 0).0, RED, "kept");
+    assert_eq!(pixels(&app, shot(3)).get_pixel(0, 0).0, GREEN);
 }

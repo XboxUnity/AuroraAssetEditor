@@ -36,7 +36,7 @@ pub use console_transfer_actions::{
     SELECT_A_GAME_REASON, UPLOAD_TARGET_TITLE,
 };
 pub use current_game::CurrentGame;
-pub use file_actions::BUSY_TEXT;
+pub use file_actions::{BUSY_TEXT, DROP_DURING_QUESTION_TEXT};
 pub use job_failure_actions::JOB_STOPPED_TEXT;
 pub use kind_choice::KindChoice;
 pub use menu::Menu;

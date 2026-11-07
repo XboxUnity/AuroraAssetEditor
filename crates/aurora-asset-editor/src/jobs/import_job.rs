@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-use aurora_asset::{AssetSlot, Compression};
+use aurora_asset::{AssetSlot, Compression, ScreenshotNumber};
 use aurora_image::{ImageTarget, decode_image};
 
 use crate::editor::PreparedImage;
@@ -9,7 +9,7 @@ use crate::files::file_display_name;
 
 use super::ImportFailure;
 
-/// Reads, decodes, resizes and encodes images for page entries, each into the slot it was queued for.
+/// Reads, decodes, resizes and encodes images for page entries, each for the slot it was queued for.
 #[derive(Debug)]
 pub struct ImportJob {
     pub requests: Vec<ImportRequest>,
@@ -22,9 +22,29 @@ pub struct ImportJob {
 #[derive(Debug)]
 pub struct ImportRequest {
     pub source: ImageSource,
-    pub slot: AssetSlot,
+    pub slot: ImportSlot,
     /// Whether Auto Resize may stretch this image: files yes, results fetched from elsewhere no (spec 6.3).
     pub resize: bool,
+}
+
+/// Where an imported image goes. A free screenshot position is picked when the result is put on the page,
+/// so imports queued one after another never pick the same one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ImportSlot {
+    Slot(AssetSlot),
+    /// `preferred` when it is still free then, else the first free position.
+    FreeScreenshot {
+        preferred: Option<ScreenshotNumber>,
+    },
+}
+
+impl ImportSlot {
+    fn target(self) -> Option<ImageTarget> {
+        match self {
+            ImportSlot::Slot(slot) => ImageTarget::for_slot(slot),
+            ImportSlot::FreeScreenshot { .. } => Some(ImageTarget::Screenshot),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -36,7 +56,7 @@ pub enum ImageSource {
 /// What became of one request; `label` names the image in messages.
 #[derive(Debug)]
 pub struct ImportResult {
-    pub slot: AssetSlot,
+    pub slot: ImportSlot,
     pub label: String,
     pub result: Result<PreparedImage, ImportFailure>,
 }
@@ -75,11 +95,11 @@ fn import(request: ImportRequest, auto_resize: bool, compression: Compression) -
 
 fn prepare(
     source: &ImageSource,
-    slot: AssetSlot,
+    slot: ImportSlot,
     resize: bool,
     compression: Compression,
 ) -> Result<PreparedImage, ImportFailure> {
-    let target = ImageTarget::for_slot(slot).ok_or(ImportFailure::NoPicture)?;
+    let target = slot.target().ok_or(ImportFailure::NoPicture)?;
     let pixels = match source {
         ImageSource::File(path) => {
             let bytes = fs::read(path).map_err(ImportFailure::Read)?;

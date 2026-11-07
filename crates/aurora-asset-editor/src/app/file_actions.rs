@@ -27,6 +27,8 @@ pub const NOT_ENOUGH_SPACE_TEXT: &str = "Not enough space to fit all screenshots
 const LOAD_PROBLEMS_FOOTER: &str = "Details are in error.log.";
 const ASSET_TYPE_COUNT: usize = 5;
 pub const BUSY_TEXT: &str = "Busy, try again when the current work finishes";
+pub const DROP_DURING_QUESTION_TEXT: &str =
+    "Finish the open question first, then drop the files again.";
 const STATUS_SEPARATOR: &str = " · ";
 const MAGIC_LEN: u64 = 4;
 
@@ -58,10 +60,18 @@ impl App {
     }
 
     /// Files dropped on the window. `.asset` and FSD files load on any page, images go where the page on
-    /// screen puts them (the OS does not say where on the window a file landed).
+    /// screen puts them (the OS does not say where on the window a file landed). While a dialog is open they
+    /// are refused: its answer may change where they would go.
     pub fn files_dropped(&mut self, paths: Vec<PathBuf>) {
         self.drop_hover = false;
-        if paths.is_empty() || self.refuse_while_busy() {
+        if paths.is_empty() {
+            return;
+        }
+        if self.modals.current().is_some() {
+            self.status = StatusLine::info(DROP_DURING_QUESTION_TEXT);
+            return;
+        }
+        if self.refuse_while_busy() {
             return;
         }
         let (images, loadable): (Vec<PathBuf>, Vec<PathBuf>) =

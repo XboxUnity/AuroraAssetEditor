@@ -6,7 +6,8 @@ use crate::dialogs::{ChoiceId, Modal, PendingChoice};
 use crate::editor::PreparedImage;
 use crate::files::{IMAGE_OPEN_DEFAULT_FILTER, file_display_name, image_open_filters};
 use crate::jobs::{
-    ImageSource, ImportFailure, ImportJob, ImportRequest, ImportResult, Job, JobPriority,
+    ImageSource, ImportFailure, ImportJob, ImportRequest, ImportResult, ImportSlot, Job,
+    JobPriority,
 };
 use crate::logging::error_chain;
 use crate::platform::OpenRequest;
@@ -21,6 +22,7 @@ pub const NO_SPACE_TEXT: &str = "There is no space left for new screenshots :(";
 pub const IMAGE_ERROR_TITLE: &str = "Could not use image";
 pub const IMAGES_ON_SOURCES_TEXT: &str =
     "Images can only be dropped on Cover, Background, Icon & Banner or Screenshots.";
+const FIRST_FREE_SCREENSHOT: ImportSlot = ImportSlot::FreeScreenshot { preferred: None };
 const ADD_SCREENSHOTS_TITLE: &str = "Select new screenshot(s)";
 const SCREENSHOT_DEFAULT_NAME: &str = "screenshot.png";
 
@@ -48,7 +50,7 @@ impl App {
         if let AssetSlot::Screenshot(number) = slot {
             self.selected_screenshot = number;
         }
-        self.submit_import(vec![(path, slot)]);
+        self.submit_import(vec![(path, ImportSlot::Slot(slot))]);
     }
 
     /// The Screenshots page's Add button: the picked files fill the free positions in order.
@@ -58,7 +60,7 @@ impl App {
         }
         let request = image_open_request(ADD_SCREENSHOTS_TITLE, SCREENSHOT_DEFAULT_NAME);
         let files = self.ask_open_files(&request);
-        self.import_screenshots(files, false);
+        self.import_screenshots(files, FIRST_FREE_SCREENSHOT);
     }
 
     /// Empties the slot; there is no confirmation, as with the old Remove of a screenshot.
@@ -111,8 +113,12 @@ impl App {
         match pending {
             PendingChoice::IconOrBanner { path, remaining } => {
                 match choice {
-                    Some(ChoiceId::Icon) => self.submit_import(vec![(path, AssetSlot::Icon)]),
-                    Some(ChoiceId::Banner) => self.submit_import(vec![(path, AssetSlot::Banner)]),
+                    Some(ChoiceId::Icon) => {
+                        self.submit_import(vec![(path, ImportSlot::Slot(AssetSlot::Icon))]);
+                    }
+                    Some(ChoiceId::Banner) => {
+                        self.submit_import(vec![(path, ImportSlot::Slot(AssetSlot::Banner))]);
+                    }
                     // Cancel skips this file; the other ids are not offered and `answer_modal` rejects them.
                     None | Some(ChoiceId::Replace | ChoiceId::AddToFreeSlots) => {}
                 }
@@ -122,8 +128,13 @@ impl App {
                 let mut files = vec![first];
                 files.extend(rest);
                 match choice {
-                    Some(ChoiceId::Replace) => self.import_screenshots(files, true),
-                    Some(ChoiceId::AddToFreeSlots) => self.import_screenshots(files, false),
+                    Some(ChoiceId::Replace) => {
+                        let selected = AssetSlot::Screenshot(self.selected_screenshot);
+                        self.import_screenshots(files, ImportSlot::Slot(selected));
+                    }
+                    Some(ChoiceId::AddToFreeSlots) => {
+                        self.import_screenshots(files, FIRST_FREE_SCREENSHOT);
+                    }
                     // Cancel loads none of the files; the other ids are not offered and `answer_modal` rejects them.
                     None | Some(ChoiceId::Icon | ChoiceId::Banner) => {}
                 }
@@ -134,7 +145,7 @@ impl App {
     /// The old app loaded the files one after another into the same slot, so the last one is what stays.
     fn import_last_into(&mut self, files: Vec<PathBuf>, slot: AssetSlot) {
         if let Some(last) = files.into_iter().next_back() {
-            self.submit_import(vec![(last, slot)]);
+            self.submit_import(vec![(last, ImportSlot::Slot(slot))]);
         }
     }
 
@@ -166,7 +177,10 @@ impl App {
         let selected = AssetSlot::Screenshot(self.selected_screenshot);
         let selected_is_filled = self.pages.screenshots.texture_header(selected).is_some();
         if !selected_is_filled {
-            self.import_screenshots(images, true);
+            let first = ImportSlot::FreeScreenshot {
+                preferred: Some(self.selected_screenshot),
+            };
+            self.import_screenshots(images, first);
             return;
         }
         let mut files = images.into_iter();
@@ -191,39 +205,14 @@ impl App {
         });
     }
 
-    /// Puts the files on screenshot positions in order: the selected position first when `selected_first`
-    /// (even when it is empty), then the free ones. Files left over are not imported, and the user is told
-    /// once.
-    fn import_screenshots(&mut self, files: Vec<PathBuf>, selected_first: bool) {
-        let selected = self.selected_screenshot;
-        let mut positions = Vec::new();
-        if selected_first {
-            positions.push(selected);
-        }
-        positions.extend(
-            self.pages
-                .screenshots
-                .free_screenshots()
-                .into_iter()
-                .filter(|number| !(selected_first && *number == selected)),
-        );
-        let no_space_for_all = files.len() > positions.len();
-        let placed = files
-            .into_iter()
-            .zip(positions)
-            .map(|(file, number)| (file, AssetSlot::Screenshot(number)))
-            .collect();
-        self.submit_import(placed);
-        if no_space_for_all {
-            self.modals.push(Modal::Message {
-                title: NO_SPACE_TITLE.to_owned(),
-                text: NO_SPACE_TEXT.to_owned(),
-            });
-        }
+    /// Puts the first file on `first`, the others on the positions still free when the images reach the page.
+    fn import_screenshots(&mut self, files: Vec<PathBuf>, first: ImportSlot) {
+        let slots = std::iter::once(first).chain(std::iter::repeat(FIRST_FREE_SCREENSHOT));
+        self.submit_import(files.into_iter().zip(slots).collect());
     }
 
     /// Queues one job for the files; the editor stays locked until it ends.
-    fn submit_import(&mut self, files: Vec<(PathBuf, AssetSlot)>) {
+    fn submit_import(&mut self, files: Vec<(PathBuf, ImportSlot)>) {
         if files.is_empty() {
             return;
         }
@@ -244,20 +233,29 @@ impl App {
         self.environment.jobs.submit(job, JobPriority::User);
     }
 
+    /// Images without a free screenshot position left are not put on the page, and the user is told once.
     pub(super) fn apply_imported(&mut self, results: Vec<ImportResult>) {
         self.active_work.importing = self.active_work.importing.saturating_sub(1);
         let pending_status = self.pending_import_status.take();
         let mut failures = Vec::new();
+        let mut out_of_space = false;
         for ImportResult {
             slot,
             label,
             result,
         } in results
         {
-            match result {
-                Ok(image) => self.put_image(slot, image),
-                Err(failure) => failures.push((label, failure)),
+            match (result, self.place(slot)) {
+                (Ok(image), Some(slot)) => self.put_image(slot, image),
+                (Ok(_), None) => out_of_space = true,
+                (Err(failure), _) => failures.push((label, failure)),
             }
+        }
+        if out_of_space {
+            self.modals.push(Modal::Message {
+                title: NO_SPACE_TITLE.to_owned(),
+                text: NO_SPACE_TEXT.to_owned(),
+            });
         }
         if let Some(pending) = pending_status {
             self.status = if failures.is_empty() {
@@ -267,6 +265,20 @@ impl App {
             };
         }
         self.report_image_failures(failures);
+    }
+
+    /// The slot an imported image goes to now; `None` when no screenshot position is free.
+    fn place(&self, slot: ImportSlot) -> Option<AssetSlot> {
+        match slot {
+            ImportSlot::Slot(slot) => Some(slot),
+            ImportSlot::FreeScreenshot { preferred } => {
+                let free = self.pages.screenshots.free_screenshots();
+                preferred
+                    .filter(|number| free.contains(number))
+                    .or_else(|| free.first().copied())
+                    .map(AssetSlot::Screenshot)
+            }
+        }
     }
 
     fn put_image(&mut self, slot: AssetSlot, image: PreparedImage) {

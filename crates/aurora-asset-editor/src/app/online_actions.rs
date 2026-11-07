@@ -5,8 +5,8 @@ use aurora_online::{CoverQuery, CoverResult, CoverSource, OnlineError, QueryErro
 
 use crate::files::image_export_filters;
 use crate::jobs::{
-    FetchError, FetchedImage, ImageSource, ImportJob, ImportRequest, Job, JobPriority, OnlineJob,
-    OnlineOutcome, query_text,
+    FetchError, FetchedImage, ImageSource, ImportJob, ImportRequest, ImportSlot, Job, JobPriority,
+    OnlineJob, OnlineOutcome, query_text,
 };
 use crate::online::{OnlineState, ResultTile, SearchMode, TileImage};
 use crate::platform::SaveRequest;
@@ -136,7 +136,7 @@ impl App {
         let job = ImportJob {
             requests: vec![ImportRequest {
                 source: ImageSource::Bytes { label, bytes },
-                slot: AssetSlot::Cover,
+                slot: ImportSlot::Slot(AssetSlot::Cover),
                 resize: false,
             }],
             auto_resize: self.settings.auto_resize,
