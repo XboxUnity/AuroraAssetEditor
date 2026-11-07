@@ -98,19 +98,19 @@ export component AboutDialog inherits DialogFrame {
                 height: Theme.notices-height;
                 key-pressed(event) => {
                     if event.text == Key.UpArrow {
-                        notices-list.viewport-y = min(0px, notices-list.viewport-y + Theme.notices-line-step);
+                        notices-list.content-y = min(0px, notices-list.content-y + Theme.notices-line-step);
                         return accept;
                     }
                     if event.text == Key.DownArrow {
-                        notices-list.viewport-y = max(notices-list.visible-height - notices-list.viewport-height, notices-list.viewport-y - Theme.notices-line-step);
+                        notices-list.content-y = max(notices-list.visible-height - notices-list.content-height, notices-list.content-y - Theme.notices-line-step);
                         return accept;
                     }
                     if event.text == Key.PageUp {
-                        notices-list.viewport-y = min(0px, notices-list.viewport-y + notices-list.visible-height);
+                        notices-list.content-y = min(0px, notices-list.content-y + notices-list.visible-height);
                         return accept;
                     }
                     if event.text == Key.PageDown {
-                        notices-list.viewport-y = max(notices-list.visible-height - notices-list.viewport-height, notices-list.viewport-y - notices-list.visible-height);
+                        notices-list.content-y = max(notices-list.visible-height - notices-list.content-height, notices-list.content-y - notices-list.visible-height);
                         return accept;
                     }
                     reject
