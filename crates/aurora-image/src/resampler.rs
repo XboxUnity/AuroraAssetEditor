@@ -1,8 +1,12 @@
 use image::imageops::{self, FilterType};
 use image::{Rgba, RgbaImage};
 
-/// The filter used when stretching to a target size, until the GDI+ comparison picks one.
-pub const RESIZE_FILTER: Resampler = Resampler::Triangle;
+use crate::bilinear::resize_bilinear;
+use crate::gdiplus_resize::resize_gdiplus;
+
+/// The filter used when stretching to a target size: the candidate closest to GDI+ in
+/// docs/image/gdiplus-closeness.md.
+pub const RESIZE_FILTER: Resampler = Resampler::GdiPlusBilinear;
 
 const OPAQUE: u32 = 255;
 
@@ -16,10 +20,12 @@ pub enum Resampler {
     TrianglePremultiplied,
     CatmullRomPremultiplied,
     Lanczos3Premultiplied,
+    Bilinear,
+    GdiPlusBilinear,
 }
 
 impl Resampler {
-    pub const ALL: [Resampler; 8] = [
+    pub const ALL: [Resampler; 10] = [
         Resampler::Nearest,
         Resampler::Triangle,
         Resampler::CatmullRom,
@@ -28,6 +34,8 @@ impl Resampler {
         Resampler::TrianglePremultiplied,
         Resampler::CatmullRomPremultiplied,
         Resampler::Lanczos3Premultiplied,
+        Resampler::Bilinear,
+        Resampler::GdiPlusBilinear,
     ];
 
     pub fn name(self) -> &'static str {
@@ -40,6 +48,8 @@ impl Resampler {
             Resampler::TrianglePremultiplied => "Triangle (premultiplied)",
             Resampler::CatmullRomPremultiplied => "CatmullRom (premultiplied)",
             Resampler::Lanczos3Premultiplied => "Lanczos3 (premultiplied)",
+            Resampler::Bilinear => "Bilinear",
+            Resampler::GdiPlusBilinear => "GDI+ bilinear",
         }
     }
 
@@ -59,6 +69,8 @@ impl Resampler {
             Resampler::Lanczos3Premultiplied => {
                 resize_premultiplied(image, width, height, FilterType::Lanczos3)
             }
+            Resampler::Bilinear => resize_bilinear(image, width, height),
+            Resampler::GdiPlusBilinear => resize_gdiplus(image, width, height),
         }
     }
 }

@@ -2,7 +2,7 @@ use std::io::Cursor;
 
 use aurora_asset::RgbaImage;
 use aurora_asset::dds;
-use image::{ImageError, ImageFormat, ImageReader, Limits};
+use image::{DynamicImage, ImageError, ImageFormat, ImageReader, Limits, Rgba};
 
 use crate::import_error::ImportError;
 
@@ -17,6 +17,7 @@ pub const MAX_IMPORT_ALLOC: u64 = 512 * 1024 * 1024;
 const DDS_MAGIC: &[u8] = b"DDS ";
 const TGA_EXTENSION: &str = "tga";
 const RGBA_BYTES_PER_PIXEL: u64 = 4;
+const BYTE_BITS: u16 = 8;
 
 /// Decodes any import format to straight-alpha RGBA8. `file_name` only matters for TGA,
 /// which has no magic number.
@@ -32,10 +33,39 @@ pub fn decode_image(bytes: &[u8], file_name: Option<&str>) -> Result<RgbaImage, 
     let mut reader = reader_for(bytes, format);
     reader.limits(import_limits());
     match reader.decode() {
-        Ok(image) => Ok(image.into_rgba8()),
+        Ok(image) => Ok(to_rgba8(image, format)),
         Err(ImageError::Limits(_)) => Err(ImportError::TooLarge { width, height }),
         Err(error) => Err(ImportError::Decode(error)),
     }
+}
+
+fn to_rgba8(image: DynamicImage, format: ImageFormat) -> RgbaImage {
+    if format == ImageFormat::Png && is_sixteen_bit(&image) {
+        return high_bytes(&image);
+    }
+    image.into_rgba8()
+}
+
+fn is_sixteen_bit(image: &DynamicImage) -> bool {
+    matches!(
+        image,
+        DynamicImage::ImageLuma16(_)
+            | DynamicImage::ImageLumaA16(_)
+            | DynamicImage::ImageRgb16(_)
+            | DynamicImage::ImageRgba16(_)
+    )
+}
+
+/// GDI+ keeps the high byte of each 16-bit PNG sample, where `image` rounds to the nearest value.
+fn high_bytes(image: &DynamicImage) -> RgbaImage {
+    let wide = image.to_rgba16();
+    RgbaImage::from_fn(wide.width(), wide.height(), |x, y| {
+        Rgba(
+            wide.get_pixel(x, y)
+                .0
+                .map(|sample| (sample >> BYTE_BITS) as u8),
+        )
+    })
 }
 
 fn detect_format(bytes: &[u8], file_name: Option<&str>) -> Result<ImageFormat, ImportError> {

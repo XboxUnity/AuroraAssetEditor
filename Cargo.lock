@@ -6010,9 +6010,11 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aurora-asset",
+ "aurora-image",
  "aurora-online",
  "hex",
  "image",
+ "png",
  "rusqlite",
  "serde",
  "serde_json",

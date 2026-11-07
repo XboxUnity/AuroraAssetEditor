@@ -26,6 +26,14 @@ impl Paths {
         self.root.join("fixtures").join("codec")
     }
 
+    pub(crate) fn root(&self) -> &Path {
+        &self.root
+    }
+
+    pub(crate) fn closeness(&self) -> PathBuf {
+        self.root.join("fixtures").join("image").join("closeness")
+    }
+
     pub(crate) fn inputs(&self) -> PathBuf {
         self.corpus().join("inputs")
     }

@@ -1,13 +1,16 @@
 #![forbid(unsafe_code)]
 
+mod closeness_inputs;
 mod content_db;
 mod crafted;
 mod cross_decode;
 mod dds_sample;
+mod gdiplus_report;
 mod golden;
 mod minimum_read;
 mod prng;
 mod record_online;
+mod srgb_profile;
 mod surface_unit;
 mod synthetic;
 
@@ -25,6 +28,8 @@ fn main() -> ExitCode {
         ["golden", "check"] => golden::check(),
         ["cross-samples"] => cross_decode::write_samples(),
         ["content-db-samples"] => content_db::write_samples(),
+        ["closeness-inputs"] => closeness_inputs::write_gate_inputs(),
+        ["gdiplus-report"] => gdiplus_report::write_report(),
         ["record-online"] => record_online::record(),
         ["cross-decode", files @ ..] => {
             let files: Vec<PathBuf> = files.iter().map(PathBuf::from).collect();
