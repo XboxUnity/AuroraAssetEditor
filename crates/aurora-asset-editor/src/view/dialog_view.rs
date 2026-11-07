@@ -6,7 +6,7 @@ use aurora_ui::{ChoiceView, DialogKind, DialogModel, MainWindow};
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 
 use crate::about::{BuildInfo, notices_text};
-use crate::app::{ABOUT_TITLE, App};
+use crate::app::{ABOUT_TITLE, App, BULK_TITLE};
 use crate::dialogs::{BulkForm, ChoiceId, ConnectionForm, Modal, ModalAnswer, ModalField};
 use crate::status::Severity;
 
@@ -18,7 +18,6 @@ const CHOICE_BUTTONS: usize = 2;
 const CONNECTION_TITLE: &str = "Console connection";
 const APP_NAME: &str = "Aurora Asset Editor";
 const ABOUT_CREDITS: &str = "by Swizzy, thanks to MaesterRowen";
-const BULK_TITLE: &str = "Bulk actions";
 const BULK_SOURCES: [CoverSource; 2] = [CoverSource::XboxUnity, CoverSource::InternetArchive];
 const TITLE_ID_FIELDS: [ModalField; 1] = [ModalField::TitleId];
 const UPLOAD_TARGET_FIELDS: [ModalField; 2] =

@@ -14,7 +14,7 @@ use crate::files::{
 use crate::jobs::{Job, JobPriority, LoadJob};
 use crate::logging::error_chain;
 use crate::platform::OpenRequest;
-use crate::status::StatusLine;
+use crate::status::{STATUS_SEPARATOR, StatusLine};
 
 use super::{App, Page};
 
@@ -29,7 +29,6 @@ const ASSET_TYPE_COUNT: usize = 5;
 pub const BUSY_TEXT: &str = "Busy, try again when the current work finishes";
 pub const DROP_DURING_QUESTION_TEXT: &str =
     "Finish the open question first, then drop the files again.";
-const STATUS_SEPARATOR: &str = " · ";
 const MAGIC_LEN: u64 = 4;
 
 impl App {

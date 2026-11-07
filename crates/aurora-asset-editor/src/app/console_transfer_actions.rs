@@ -9,7 +9,7 @@ use crate::files::slot_label;
 use crate::jobs::{
     AfterDownload, AssetUpload, ConsoleJob, JobPriority, KindDownload, TransferReport,
 };
-use crate::status::{ConsoleActivity, StatusLine};
+use crate::status::{ConsoleActivity, STATUS_SEPARATOR, StatusLine};
 
 use super::console_actions::NO_CONSOLE_TEXT;
 use super::file_actions::BUSY_TEXT;
@@ -25,7 +25,6 @@ const REMOVE_CONFIRM_LABEL: &str = "Remove";
 const EMPTY_UPLOAD_CONFIRM_LABEL: &str = "Upload";
 const ALREADY_LOADED_LABEL: &str = "Already loaded:";
 const ALREADY_SENT_LABEL: &str = "Already sent:";
-const STATUS_SEPARATOR: &str = " · ";
 
 impl App {
     /// Why the Save menu's "Save all to console…" is disabled, if it is.

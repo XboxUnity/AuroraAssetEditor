@@ -9,7 +9,7 @@ use crate::console::{ConsoleLink, ConsoleState, GameColumn, PresenceCell, is_con
 use crate::dialogs::{ConnectionForm, Modal};
 use crate::jobs::{ConsoleJob, ConsoleJobKind, ConsoleOutcome, ConsoleRequest, Job, JobPriority};
 use crate::logging::error_chain;
-use crate::status::{ConsoleActivity, Severity, StatusLine};
+use crate::status::{ConsoleActivity, STATUS_SEPARATOR, Severity, StatusLine};
 
 use super::file_actions::BUSY_TEXT;
 use super::{App, CurrentGame};
@@ -27,7 +27,6 @@ const TEMP_CLEANUP_FAILED: &str = "Could not remove the temporary copy of Conten
 const SUPERSEDED_REFRESH_FAILED: &str = "A refresh that was replaced failed";
 const PRESENCE_UNREACHABLE: &str = "The console could not be reached to check the assets";
 const PRESENCE_FAILED: &str = "Could not check the assets on the console";
-const STATUS_SEPARATOR: &str = " · ";
 const LAST_REFRESH_FORMAT: &str = "%H:%M";
 
 impl App {

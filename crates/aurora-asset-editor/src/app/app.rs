@@ -12,13 +12,12 @@ use crate::logging::error_chain;
 use crate::online::OnlineState;
 use crate::platform::{DialogError, OpenRequest, SaveRequest};
 use crate::settings::AppSettings;
-use crate::status::{ActiveWork, Locks, StatusLine};
+use crate::status::{ActiveWork, Locks, STATUS_SEPARATOR, StatusLine};
 
 use super::{AppEnvironment, CurrentGame, Menu, Page, PendingImportStatus, StartupProblem};
 
 pub const LOG_WRITE_FAILED: &str = "Could not write error.log";
 pub const DIALOG_FAILED_TITLE: &str = "Could not open the file dialog";
-const STATUS_SEPARATOR: &str = " · ";
 
 /// The app's state and every action the window offers. It holds no UI: the view reads it and calls its
 /// methods, and work that may take a while goes to the job runner.
