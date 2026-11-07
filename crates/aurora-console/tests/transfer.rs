@@ -15,6 +15,8 @@ const SHORT: Duration = Duration::from_millis(500);
 const FOLDER: &str = "/Game/Data/GameData/4D5307E6_00000012";
 const COVER_FILE: &str = "/Game/Data/GameData/4D5307E6_00000012/GC4D5307E6.asset";
 const EMPTY_ASSET_LEN: usize = 2048;
+/// Under twice the read timeout, so one stalled read cannot be followed by a second.
+const MAX_FAILURE_TIME: Duration = Duration::from_millis(900);
 const MEBIBYTE: u64 = 1024 * 1024;
 
 fn client_for(console: &FakeConsole) -> ConsoleClient {
@@ -317,7 +319,7 @@ fn assert_read_timeout(error: &ConsoleError) {
 
 fn assert_fails_after_one_timeout(started: Instant) {
     assert!(
-        started.elapsed() < SHORT.mul_f32(1.5),
+        started.elapsed() < MAX_FAILURE_TIME,
         "{:?}",
         started.elapsed()
     );
@@ -604,4 +606,14 @@ fn two_downloads_share_one_connection() {
 
     assert_eq!(commands_containing(&console, "RETR").len(), 2);
     assert_eq!(console.login_count(), 1);
+}
+
+#[test]
+fn transient_refusal_during_presence_is_not_all_false() {
+    let console = console_with_game_folder(FakeConsoleConfig::default());
+    console.answer_folder_changes_with(Some("421 Service not available"));
+
+    let error = client_for(&console).asset_presence(&game()).unwrap_err();
+
+    assert!(matches!(error, ConsoleError::Refused { .. }));
 }

@@ -71,12 +71,12 @@ impl ConsoleConnection {
         self.features
     }
 
-    pub(super) fn list(&mut self, path: &str) -> Result<Vec<String>, ConsoleError> {
-        self.read_listing("LIST", path)
+    pub(super) fn list(&mut self, path: &str, limit: u64) -> Result<Vec<String>, ConsoleError> {
+        self.read_listing("LIST", path, limit)
     }
 
-    pub(super) fn mlsd(&mut self, path: &str) -> Result<Vec<String>, ConsoleError> {
-        self.read_listing("MLSD", path)
+    pub(super) fn mlsd(&mut self, path: &str, limit: u64) -> Result<Vec<String>, ConsoleError> {
+        self.read_listing("MLSD", path, limit)
     }
 
     /// Reads the file, which the listing gave as `listed` bytes, and fails on any other length.
@@ -109,8 +109,13 @@ impl ConsoleConnection {
             .map_err(protocol_error(format!("upload {name}")))
     }
 
-    /// Lines are split like the old `ReadLine`; the listing has no size cap, as in the old app.
-    fn read_listing(&mut self, verb: &str, path: &str) -> Result<Vec<String>, ConsoleError> {
+    /// Lines are split like the old `ReadLine`. A listing longer than `limit` bytes is an error.
+    fn read_listing(
+        &mut self,
+        verb: &str,
+        path: &str,
+        limit: u64,
+    ) -> Result<Vec<String>, ConsoleError> {
         let action = format!("list {path}");
         let (_, mut transfer) = self
             .stream
@@ -119,7 +124,14 @@ impl ConsoleConnection {
                 &[Status::AboutToSend, Status::AlreadyOpen],
             )
             .map_err(protocol_error(action.clone()))?;
-        let bytes = self.read_data(&mut transfer, u64::MAX, &action)?;
+        let bytes = self.read_data(&mut transfer, limit.saturating_add(1), &action)?;
+        if bytes.len() as u64 > limit {
+            self.abandon_control_connection();
+            return Err(ConsoleError::ListingTooLarge {
+                path: path.to_owned(),
+                limit,
+            });
+        }
         transfer.finish().map_err(protocol_error(action))?;
         Ok(terminated_lines(&bytes).collect())
     }
@@ -152,7 +164,7 @@ impl ConsoleConnection {
         if let Err(error) = self.stream.get_ref().shutdown(Shutdown::Both)
             && error.kind() != io::ErrorKind::NotConnected
         {
-            eprintln!("could not close the control connection: {error}");
+            log::warn!("could not close the control connection: {error}");
         }
     }
 

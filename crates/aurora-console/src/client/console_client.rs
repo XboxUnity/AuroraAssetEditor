@@ -1,6 +1,7 @@
 use std::io;
 
 use super::console_connection::ConsoleConnection;
+use super::transfer::MAX_LISTING_BYTES;
 use super::{AuroraRevision, ConsoleError, ConsoleStatus, Timeouts};
 use crate::ftp::FtpReply;
 use crate::settings::FtpSettings;
@@ -14,6 +15,7 @@ pub struct ConsoleClient {
     timeouts: Timeouts,
     on_status: Box<dyn FnMut(&ConsoleStatus) + Send>,
     connection: Option<ConsoleConnection>,
+    pub(super) listing_limit: u64,
 }
 
 impl ConsoleClient {
@@ -27,6 +29,7 @@ impl ConsoleClient {
             timeouts,
             on_status: Box::new(on_status),
             connection: None,
+            listing_limit: MAX_LISTING_BYTES,
         }
     }
 

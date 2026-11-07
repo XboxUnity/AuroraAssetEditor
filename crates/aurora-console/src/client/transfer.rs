@@ -6,6 +6,7 @@ use crate::ids::GameIds;
 use crate::paths::{asset_file_name, asset_folder};
 
 /// 20 uncompressed 1000x562 screenshots are about 47 MB.
+pub(crate) const MAX_LISTING_BYTES: u64 = 64 * 1024 * 1024;
 pub(crate) const MAX_ASSET_FILE_BYTES: u64 = 256 * 1024 * 1024;
 #[expect(dead_code, reason = "the Content.db download uses it in the next task")]
 pub(crate) const MAX_CONTENT_DB_BYTES: u64 = 512 * 1024 * 1024;
@@ -99,11 +100,12 @@ impl ConsoleClient {
 
     pub(crate) fn list_folder(&mut self, path: &str) -> Result<Vec<ListingEntry>, ConsoleError> {
         self.open_folder(path)?;
+        let listing_limit = self.listing_limit;
         let connection = self.connection(&format!("list {path}"))?;
         let lines = if connection.features().mlsd {
-            connection.mlsd(path)?
+            connection.mlsd(path, listing_limit)?
         } else {
-            connection.list(path)?
+            connection.list(path, listing_limit)?
         };
         Ok(parse_listing(&lines))
     }
@@ -148,4 +150,50 @@ fn is_present(entries: &[ListingEntry], file_name: &str, empty_asset_len: u64) -
     find_entry(entries, file_name)
         .and_then(|entry| entry.size)
         .is_some_and(|size| size > empty_asset_len)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use test_servers::{FakeConsole, FakeConsoleConfig};
+
+    use super::*;
+    use crate::{FtpSettings, Timeouts};
+
+    const SMALL_LISTING_LIMIT: u64 = 100;
+
+    #[test]
+    fn listing_longer_than_the_limit_is_an_error() {
+        let console = FakeConsole::start(FakeConsoleConfig::default());
+        for number in 0..10 {
+            console.add_file(&format!("/Game/Data/DataBases/file{number}.bin"), &[1]);
+        }
+        let timeout = Duration::from_millis(500);
+        let mut client = ConsoleClient::new(
+            FtpSettings {
+                host: "127.0.0.1".to_owned(),
+                port: console.port().to_string(),
+                username: "xboxftp".to_owned(),
+                password: "xboxftp".to_owned(),
+            },
+            Timeouts {
+                connect: timeout,
+                read: timeout,
+            },
+            |_| {},
+        );
+        client.ensure_connected().unwrap();
+        client.listing_limit = SMALL_LISTING_LIMIT;
+
+        let error = client.list_folder("/Game/Data/DataBases").unwrap_err();
+
+        assert!(matches!(
+            error,
+            ConsoleError::ListingTooLarge {
+                limit: SMALL_LISTING_LIMIT,
+                ..
+            }
+        ));
+    }
 }

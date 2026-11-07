@@ -38,6 +38,10 @@ pub enum ConsoleError {
         action: String,
         reply: String,
     },
+    ListingTooLarge {
+        path: String,
+        limit: u64,
+    },
     FileTooLarge {
         file: String,
         size: u64,
@@ -75,6 +79,10 @@ impl fmt::Display for ConsoleError {
             Self::Refused { action, reply } => {
                 write!(f, "the console refused to {action}: {reply}")
             }
+            Self::ListingTooLarge { path, limit } => write!(
+                f,
+                "the listing of {path} is longer than the {limit} bytes the editor accepts"
+            ),
             Self::FileTooLarge { file, size, limit } => write!(
                 f,
                 "{file} is listed as {size} bytes, more than the {limit} bytes the editor accepts"
@@ -113,6 +121,7 @@ impl std::error::Error for ConsoleError {
             | Self::NotAurora { .. }
             | Self::MissingFolder { .. }
             | Self::Refused { .. }
+            | Self::ListingTooLarge { .. }
             | Self::FileTooLarge { .. }
             | Self::SizeMismatch { .. } => None,
         }

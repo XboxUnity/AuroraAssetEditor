@@ -50,6 +50,7 @@ dependencies = [
  "aurora-asset",
  "directories",
  "image",
+ "log",
  "regex",
  "rusqlite",
  "serde",
