@@ -14,16 +14,18 @@ use super::reference_mode::ReferenceMode;
 
 const UNUSABLE_REFERENCE_REMEDY: &str =
     "delete it and run `cargo xtask ui-screenshots update` to recreate it";
-const PNG_EXTENSION: &str = "png";
-const ACTUAL_FOLDER: &str = "actual";
-const DIFF_FOLDER: &str = "diff";
-const REFERENCE_COPY_FOLDER: &str = "reference";
+pub(super) const PNG_EXTENSION: &str = "png";
+pub(super) const ACTUAL_FOLDER: &str = "actual";
+pub(super) const DIFF_FOLDER: &str = "diff";
+pub(super) const REFERENCE_COPY_FOLDER: &str = "reference";
+const OUTPUT_FOLDERS: [&str; 3] = [ACTUAL_FOLDER, DIFF_FOLDER, REFERENCE_COPY_FOLDER];
 
 /// The approved reference images and the folder one run writes its results into.
 ///
 /// Output layout: `<output>/actual/<image>.png` for every image checked, and for an image that
 /// differs also `<output>/reference/<image>.png` (a copy of the reference as it was) and
 /// `<output>/diff/<image>.png`.
+#[derive(Debug, Clone)]
 pub struct ReferenceStore {
     references: PathBuf,
     output: PathBuf,
@@ -72,23 +74,14 @@ impl ReferenceStore {
 
     /// The names (file stems) of all reference PNGs; empty when the folder does not exist yet.
     pub fn reference_names(&self) -> io::Result<BTreeSet<String>> {
-        let entries = match fs::read_dir(&self.references) {
-            Ok(entries) => entries,
-            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(BTreeSet::new()),
-            Err(error) => return Err(error),
-        };
+        png_names(&self.references)
+    }
 
+    /// The names of every image an earlier run left an output for, in any of the output folders.
+    pub fn output_names(&self) -> io::Result<BTreeSet<String>> {
         let mut names = BTreeSet::new();
-        for entry in entries {
-            let path = entry?.path();
-            if path.extension() != Some(OsStr::new(PNG_EXTENSION)) {
-                continue;
-            }
-            let name = path
-                .file_stem()
-                .and_then(OsStr::to_str)
-                .ok_or_else(|| invalid_name(&path))?;
-            names.insert(name.to_owned());
+        for folder in OUTPUT_FOLDERS {
+            names.extend(png_names(&self.output.join(folder))?);
         }
         Ok(names)
     }
@@ -245,6 +238,29 @@ fn unusable_reference(path: &Path, error: PngFileError) -> String {
     )
 }
 
+/// The file stems of the PNGs in `folder`; empty when the folder does not exist.
+fn png_names(folder: &Path) -> io::Result<BTreeSet<String>> {
+    let entries = match fs::read_dir(folder) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(BTreeSet::new()),
+        Err(error) => return Err(error),
+    };
+
+    let mut names = BTreeSet::new();
+    for entry in entries {
+        let path = entry?.path();
+        if path.extension() != Some(OsStr::new(PNG_EXTENSION)) {
+            continue;
+        }
+        let name = path
+            .file_stem()
+            .and_then(OsStr::to_str)
+            .ok_or_else(|| invalid_name(&path))?;
+        names.insert(name.to_owned());
+    }
+    Ok(names)
+}
+
 fn png_path(folder: &Path, image: &str) -> PathBuf {
     folder.join(format!("{image}.{PNG_EXTENSION}"))
 }
@@ -256,10 +272,7 @@ fn failure(action: &str, path: &Path, error: impl Display) -> String {
 fn invalid_name(path: &Path) -> io::Error {
     io::Error::new(
         io::ErrorKind::InvalidData,
-        format!(
-            "the reference file name {} is not valid Unicode",
-            path.display()
-        ),
+        format!("the file name {} is not valid Unicode", path.display()),
     )
 }
 
