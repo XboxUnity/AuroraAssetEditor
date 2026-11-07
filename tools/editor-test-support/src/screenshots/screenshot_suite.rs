@@ -10,7 +10,7 @@ use std::thread;
 use aurora_asset_editor::settings::ThemeChoice;
 use image::RgbaImage;
 
-use super::contact_sheet::write_contact_sheet;
+use super::contact_sheet::{CONTACT_SHEET_FILE, write_contact_sheet};
 use super::reference_mode::{CI_VARIABLE, ReferenceMode, read_variable};
 use super::reference_store::{ImageStatus, ReferenceStore};
 use super::scene::Scene;
@@ -80,6 +80,7 @@ impl ScreenshotSuite {
             problems: Vec::new(),
             sheet: None,
         };
+        self.remove_previous_results(&mut report);
         for area in areas {
             let images: Vec<ImageReport> = area
                 .screens
@@ -245,6 +246,8 @@ impl ScreenshotSuite {
         }
     }
 
+    /// A sheet that could not be written is removed, so a half-written page or one from an
+    /// earlier write of this run never shows an outdated verdict.
     fn write_sheet(&self, report: &mut SuiteReport) {
         let output = self.store.output();
         match write_contact_sheet(report, output) {
@@ -255,7 +258,16 @@ impl ScreenshotSuite {
                     "Could not write the contact sheet in {}: {error}",
                     output.display()
                 ));
+                remove_result_file(&output.join(CONTACT_SHEET_FILE), report);
             }
+        }
+    }
+
+    /// The previous run's sheet and text report go first, so a run whose writes fail never
+    /// leaves an older verdict on disk.
+    fn remove_previous_results(&self, report: &mut SuiteReport) {
+        for file in [CONTACT_SHEET_FILE, REPORT_FILE] {
+            remove_result_file(&self.store.output().join(file), report);
         }
     }
 }
@@ -303,6 +315,17 @@ fn panic_text(payload: &(dyn Any + Send)) -> String {
         return text.clone();
     }
     PANIC_WITHOUT_TEXT.to_owned()
+}
+
+/// A file that is not there is fine; any other failure to remove it is a problem of the run.
+fn remove_result_file(path: &Path, report: &mut SuiteReport) {
+    match fs::remove_file(path) {
+        Ok(()) => {}
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+        Err(error) => report
+            .problems
+            .push(format!("Could not remove {}: {error}", path.display())),
+    }
 }
 
 fn write_text(path: &Path, text: &str) -> io::Result<()> {

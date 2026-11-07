@@ -20,6 +20,9 @@ const UPDATE_COMMAND: &str = "cargo xtask ui-screenshots update";
 const MAGENTA: Rgba<u8> = Rgba([0xff, 0x00, 0xff, 0xff]);
 
 static STAGING_THREADS: Mutex<Vec<ThreadId>> = Mutex::new(Vec::new());
+/// Files a stage looks for, and whether each was on disk while the screen was staged.
+static WATCHED_FILES: Mutex<Vec<PathBuf>> = Mutex::new(Vec::new());
+static WATCHED_FILES_SEEN: Mutex<Vec<bool>> = Mutex::new(Vec::new());
 
 fn menu_scene(theme: ThemeChoice, menu: Menu) -> Scene {
     let scene = Scene::start(AppHarness::new(), theme);
@@ -54,6 +57,17 @@ fn stage_gear_menu_recording_thread(theme: ThemeChoice) -> Scene {
 fn stage_open_menu_recording_thread(theme: ThemeChoice) -> Scene {
     record_thread();
     stage_open_menu(theme)
+}
+
+fn stage_gear_menu_watching_files(theme: ThemeChoice) -> Scene {
+    let watched = WATCHED_FILES
+        .lock()
+        .expect("no thread panicked while holding the list");
+    WATCHED_FILES_SEEN
+        .lock()
+        .expect("no thread panicked while holding the list")
+        .extend(watched.iter().map(|path| path.exists()));
+    stage_gear_menu(theme)
 }
 
 const SCREEN_A: Screen = Screen {
@@ -480,4 +494,42 @@ fn screen_filter_is_refused_on_ci() {
         ScreenFilterOnCi.to_string(),
         "A screen filter is not allowed on CI; unset AURORA_UI_SCREENS"
     );
+}
+
+#[test]
+fn previous_sheet_and_report_are_removed_before_staging() {
+    const WATCHING_SCREEN: &[ScreenArea] = &[ScreenArea {
+        title: AREA_TITLE,
+        screens: &[Screen {
+            name: "a",
+            description: SCREEN_A_DESCRIPTION,
+            stage: stage_gear_menu_watching_files,
+        }],
+    }];
+    const STALE_MARKER: &str = "stale result of an earlier run";
+    let folders = SuiteFolders::new();
+    let previous = [
+        folders.output.join("index.html"),
+        folders.output.join("report.txt"),
+    ];
+    fs::create_dir_all(&folders.output).expect("the output folder is created");
+    for path in &previous {
+        fs::write(path, STALE_MARKER).expect("the stale result is written");
+    }
+    *WATCHED_FILES
+        .lock()
+        .expect("no thread panicked while holding the list") = previous.to_vec();
+
+    let report = folders.run(ReferenceMode::Update, None, WATCHING_SCREEN);
+
+    let seen = WATCHED_FILES_SEEN
+        .lock()
+        .expect("no thread panicked while holding the list");
+    assert_eq!(
+        *seen,
+        [false, false, false, false],
+        "index.html, report.txt per theme"
+    );
+    assert!(report.passed(), "{report}");
+    assert!(!folders.sheet(&report).contains(STALE_MARKER));
 }
