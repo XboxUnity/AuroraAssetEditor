@@ -21,6 +21,7 @@ impl ConsoleConnection {
         timeouts: Timeouts,
         on_status: &mut dyn FnMut(&ConsoleStatus),
     ) -> Result<(ConsoleConnection, AuroraRevision), ConsoleError> {
+        timeouts.check()?;
         let host = &settings.host;
         on_status(&ConsoleStatus::Connecting { host: host.clone() });
         let port = settings.port_number()?;

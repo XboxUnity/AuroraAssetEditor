@@ -93,12 +93,12 @@ fn port_number_rules() {
         "- 5",
         "--5",
         "\u{a0}2121",
+        "0",
     ] {
         assert_eq!(port(fallback).unwrap(), 21, "{fallback:?}");
     }
     for (text, value) in [
         ("70000", 70000),
-        ("0", 0),
         ("-1", -1),
         ("2147483647", i32::MAX),
         ("-2147483648", i32::MIN),

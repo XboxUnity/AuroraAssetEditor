@@ -5,6 +5,9 @@ use super::{AuroraRevision, ConsoleError, ConsoleStatus, Timeouts};
 use crate::ftp::FtpReply;
 use crate::settings::FtpSettings;
 
+/// Servers send `421` before they close an idle connection.
+const SERVICE_NOT_AVAILABLE: u16 = 421;
+
 /// A connection to the console's FTP server, opened on demand and checked before each reuse.
 pub struct ConsoleClient {
     settings: FtpSettings,
@@ -42,9 +45,10 @@ impl ConsoleClient {
             return self.connect().map(|_| ());
         }
         match self.execute("NOOP") {
-            Ok(_) => Ok(()),
-            // A dropped link fails the probe, which is expected; a failed reconnect is reported.
-            Err(ConsoleError::Protocol { .. }) => self.connect().map(|_| ()),
+            Ok(reply) if reply.code != SERVICE_NOT_AVAILABLE => Ok(()),
+            // A dropped link fails the probe or answers 421, which is expected; a failed
+            // reconnect is reported.
+            Ok(_) | Err(ConsoleError::Protocol { .. }) => self.connect().map(|_| ()),
             Err(other) => Err(other),
         }
     }

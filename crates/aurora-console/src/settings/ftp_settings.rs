@@ -126,7 +126,7 @@ impl FtpSettings {
         std::fs::write(path, json).map_err(write_error)
     }
 
-    /// Follows the old `int.TryParse` (NumberStyles.Integer): text that is not an `i32` falls back to 21.
+    /// Follows the old `int.TryParse` (NumberStyles.Integer): text that is not an `i32`, and port 0 (netftp's `Port` getter), fall back to 21.
     pub fn port_number(&self) -> Result<u16, SettingsError> {
         let number = self
             .port
@@ -136,7 +136,8 @@ impl FtpSettings {
             return Ok(DEFAULT_PORT);
         };
         match u16::try_from(port) {
-            Ok(port) if port != 0 => Ok(port),
+            Ok(0) => Ok(DEFAULT_PORT),
+            Ok(port) => Ok(port),
             _ => Err(SettingsError::PortOutOfRange { port }),
         }
     }

@@ -172,7 +172,10 @@ fn silent_server_times_out() {
     let started = Instant::now();
     let result = client.test_connection();
 
-    assert!(result.is_err());
+    assert!(
+        matches!(&result, Err(ConsoleError::Protocol { action, .. }) if action == "read the greeting"),
+        "{result:?}"
+    );
     assert!(started.elapsed() < Duration::from_secs(3));
     drop(listener);
 }
@@ -244,5 +247,89 @@ fn non_numeric_port_falls_back_to_21() {
     match client.test_connection() {
         Err(ConsoleError::Connect { port, .. }) => assert_eq!(port, 21),
         other => panic!("expected Connect, got {other:?}"),
+    }
+}
+
+#[test]
+fn reconnects_after_console_sends_421_before_closing() {
+    let console = FakeConsole::start(FakeConsoleConfig::default());
+    let mut client = client_for(&console);
+    client.ensure_connected().unwrap();
+
+    console.time_out_next_command();
+
+    client.ensure_connected().unwrap();
+    assert_eq!(console.login_count(), 2);
+}
+
+#[test]
+fn not_aurora_drops_the_stream() {
+    let console = console_with_site_reply(None);
+    let mut client = client_for(&console);
+
+    assert!(matches!(
+        client.ensure_connected(),
+        Err(ConsoleError::NotAurora { .. })
+    ));
+    assert!(matches!(
+        client.ensure_connected(),
+        Err(ConsoleError::NotAurora { .. })
+    ));
+    assert_eq!(console.login_count(), 2);
+}
+
+#[test]
+fn login_rejected_drops_the_stream() {
+    let console = FakeConsole::start(FakeConsoleConfig::default());
+    let mut client = ConsoleClient::new(
+        settings(console.port(), "xboxftp", "wrong"),
+        timeouts(),
+        |_| {},
+    );
+
+    for _ in 0..2 {
+        assert!(matches!(
+            client.ensure_connected(),
+            Err(ConsoleError::LoginRejected { .. })
+        ));
+    }
+    assert_eq!(
+        console
+            .commands()
+            .iter()
+            .filter(|c| c.starts_with("USER"))
+            .count(),
+        2
+    );
+}
+
+#[test]
+fn zero_timeout_is_named_in_the_error() {
+    let console = FakeConsole::start(FakeConsoleConfig::default());
+    for (name, timeouts) in [
+        (
+            "connect",
+            Timeouts {
+                connect: Duration::ZERO,
+                read: SHORT,
+            },
+        ),
+        (
+            "read",
+            Timeouts {
+                connect: SHORT,
+                read: Duration::ZERO,
+            },
+        ),
+    ] {
+        let mut client = ConsoleClient::new(
+            settings(console.port(), "xboxftp", "xboxftp"),
+            timeouts,
+            |_| {},
+        );
+        match client.test_connection() {
+            Err(ConsoleError::InvalidTimeout { timeout }) => assert_eq!(timeout, name),
+            other => panic!("expected InvalidTimeout, got {other:?}"),
+        }
     }
 }

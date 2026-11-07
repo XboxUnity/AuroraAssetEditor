@@ -223,6 +223,20 @@ fn drop_connections_closes_the_session() {
 }
 
 #[test]
+fn time_out_next_command_answers_421_and_closes() {
+    let console = FakeConsole::start(FakeConsoleConfig::default());
+    let mut ftp = logged_in(&console);
+
+    console.time_out_next_command();
+
+    let reply = reply_text(ftp.custom_command("NOOP", &[Status::CommandOk]));
+    assert!(reply.starts_with("421"), "got {reply:?}");
+    assert!(ftp.noop().is_err());
+    let mut fresh = logged_in(&console);
+    fresh.noop().expect("later commands are unaffected");
+}
+
+#[test]
 fn refuse_new_connections_rejects_new_logins() {
     let console = FakeConsole::start(FakeConsoleConfig::default());
     let mut open_session = logged_in(&console);

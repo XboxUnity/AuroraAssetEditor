@@ -88,6 +88,15 @@ impl<'a> Session<'a> {
         let (verb, argument) = line.split_once(' ').unwrap_or((line, ""));
         let verb = verb.to_uppercase();
         self.log_command(&verb, line);
+        if self
+            .shared
+            .timing_out_next_command
+            .swap(false, Ordering::SeqCst)
+        {
+            self.reply("421 Timeout")?;
+            shut_down(self.control.get_ref());
+            return Ok(Flow::Close);
+        }
         if !self.logged_in && !matches!(verb.as_str(), "USER" | "PASS" | "QUIT") {
             self.reply("530 Please log in")?;
             return Ok(Flow::Continue);

@@ -115,6 +115,14 @@ impl FakeConsole {
         self.join_acceptor();
     }
 
+    /// The next command from any session is answered `421 Timeout` and the session closes, like
+    /// a console giving up on an idle connection.
+    pub fn time_out_next_command(&self) {
+        self.shared
+            .timing_out_next_command
+            .store(true, Ordering::SeqCst);
+    }
+
     /// Every command received, in order, with the password masked.
     pub fn commands(&self) -> Vec<String> {
         self.shared.state().commands.clone()

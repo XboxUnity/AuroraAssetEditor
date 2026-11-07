@@ -13,6 +13,7 @@ pub(crate) struct Shared {
     pub(crate) config: FakeConsoleConfig,
     pub(crate) stopping: AtomicBool,
     pub(crate) refusing_connections: AtomicBool,
+    pub(crate) timing_out_next_command: AtomicBool,
     pub(crate) session_threads: Mutex<Vec<JoinHandle<()>>>,
     state: Mutex<ConsoleState>,
 }
@@ -36,6 +37,7 @@ impl Shared {
             config,
             stopping: AtomicBool::new(false),
             refusing_connections: AtomicBool::new(false),
+            timing_out_next_command: AtomicBool::new(false),
             session_threads: Mutex::new(Vec::new()),
             state: Mutex::new(ConsoleState::default()),
         }

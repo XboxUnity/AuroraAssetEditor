@@ -6,6 +6,9 @@ use crate::settings::SettingsError;
 #[derive(Debug)]
 pub enum ConsoleError {
     Settings(SettingsError),
+    InvalidTimeout {
+        timeout: &'static str,
+    },
     Resolve {
         host: String,
         source: io::Error,
@@ -30,7 +33,10 @@ pub enum ConsoleError {
 impl fmt::Display for ConsoleError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Settings(source) => write!(f, "the FTP settings are not usable: {source}"),
+            Self::Settings(_) => write!(f, "the FTP settings are not usable"),
+            Self::InvalidTimeout { timeout } => {
+                write!(f, "the {timeout} timeout must be longer than zero")
+            }
             Self::Resolve { host, .. } => write!(f, "could not find the console at {host}"),
             Self::Connect { host, port, .. } => {
                 write!(f, "could not connect to {host} on port {port}")
@@ -50,7 +56,9 @@ impl std::error::Error for ConsoleError {
             Self::Settings(source) => Some(source),
             Self::Resolve { source, .. } | Self::Connect { source, .. } => Some(source),
             Self::Protocol { source, .. } => Some(source),
-            Self::LoginRejected { .. } | Self::NotAurora { .. } => None,
+            Self::InvalidTimeout { .. } | Self::LoginRejected { .. } | Self::NotAurora { .. } => {
+                None
+            }
         }
     }
 }
