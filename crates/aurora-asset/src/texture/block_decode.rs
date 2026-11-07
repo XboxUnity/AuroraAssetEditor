@@ -13,14 +13,14 @@ const BC3_BLOCK_BYTES: usize = 16;
 
 const ALPHA_ENDPOINTS: std::ops::Range<usize> = 0..2;
 const ALPHA_INDEX_BYTES: std::ops::Range<usize> = 2..8;
-const COLOUR_BLOCK_START: usize = 8;
+const COLOR_BLOCK_START: usize = 8;
 const ALPHA_INDEX_BITS: u32 = 3;
-const COLOUR_INDEX_BITS: u32 = 2;
+const COLOR_INDEX_BITS: u32 = 2;
 
 const OPAQUE: f32 = 1.0;
 
 type Texel = [u8; 4];
-type FloatColour = [f32; 3];
+type FloatColor = [f32; 3];
 /// Channels as the DLL holds them between decoding a block and writing pixels: `f32`, 0 to 1.
 type FloatTexel = [f32; 4];
 
@@ -61,12 +61,12 @@ pub(crate) fn decode_bc1_block(block: &[u8; 8]) -> [Texel; TEXELS_PER_BLOCK] {
 }
 
 fn decode_bc1_block_values(block: &[u8; 8]) -> [FloatTexel; TEXELS_PER_BLOCK] {
-    let colours = dxt1_palette(block);
-    let indices = colour_indices(block);
-    std::array::from_fn(|texel| colours[indices[texel]])
+    let colors = dxt1_palette(block);
+    let indices = color_indices(block);
+    std::array::from_fn(|texel| colors[indices[texel]])
 }
 
-fn opaque([red, green, blue]: FloatColour) -> FloatTexel {
+fn opaque([red, green, blue]: FloatColor) -> FloatTexel {
     [red, green, blue, OPAQUE]
 }
 
@@ -96,7 +96,7 @@ fn dxt1_palette(block: &[u8; 8]) -> [FloatTexel; 4] {
 }
 
 // Derived from AuroraAsset.dll for interoperability: SSE `f32` lerp.
-fn step_between(first: FloatColour, second: FloatColour, weight: f32) -> FloatColour {
+fn step_between(first: FloatColor, second: FloatColor, weight: f32) -> FloatColor {
     std::array::from_fn(|channel| first[channel] + (second[channel] - first[channel]) * weight)
 }
 
@@ -106,18 +106,18 @@ pub(crate) fn decode_bc3_block(block: &[u8; 16], divide_alpha: bool) -> [Texel; 
 }
 
 fn decode_bc3_block_values(block: &[u8; 16], divide_alpha: bool) -> [FloatTexel; TEXELS_PER_BLOCK] {
-    let colour_block: [u8; 8] = std::array::from_fn(|offset| block[COLOUR_BLOCK_START + offset]);
-    let colours = dxt1_palette(&colour_block).map(|[red, green, blue, _]| [red, green, blue]);
-    let colour_indices = colour_indices(&colour_block);
+    let color_block: [u8; 8] = std::array::from_fn(|offset| block[COLOR_BLOCK_START + offset]);
+    let colors = dxt1_palette(&color_block).map(|[red, green, blue, _]| [red, green, blue]);
+    let color_indices = color_indices(&color_block);
     let alphas = alpha_ramp(block[ALPHA_ENDPOINTS][0], block[ALPHA_ENDPOINTS][1]);
     let alpha_indices = alpha_indices(block);
     std::array::from_fn(|texel| {
-        let colour = colours[colour_indices[texel]];
+        let color = colors[color_indices[texel]];
         let alpha = alphas[alpha_indices[texel]];
         let [red, green, blue] = if divide_alpha {
-            colour.map(|channel| divide_by_alpha(channel, alpha))
+            color.map(|channel| divide_by_alpha(channel, alpha))
         } else {
-            colour
+            color
         };
         [red, green, blue, alpha]
     })
@@ -153,14 +153,14 @@ fn index_at(packed: u64, bits_per_index: u32, texel: usize) -> usize {
     bit_field(packed, bits_per_index * texel as u32, mask) as usize
 }
 
-fn colour_indices(colour_block: &[u8; 8]) -> [usize; TEXELS_PER_BLOCK] {
+fn color_indices(color_block: &[u8; 8]) -> [usize; TEXELS_PER_BLOCK] {
     let bits = u32::from_le_bytes([
-        colour_block[4],
-        colour_block[5],
-        colour_block[6],
-        colour_block[7],
+        color_block[4],
+        color_block[5],
+        color_block[6],
+        color_block[7],
     ]);
-    std::array::from_fn(|texel| index_at(u64::from(bits), COLOUR_INDEX_BITS, texel))
+    std::array::from_fn(|texel| index_at(u64::from(bits), COLOR_INDEX_BITS, texel))
 }
 
 fn alpha_indices(block: &[u8; 16]) -> [usize; TEXELS_PER_BLOCK] {
@@ -234,14 +234,14 @@ pub(super) fn decode_surface(
 mod tests {
     use super::*;
 
-    fn block_with(colour: u16, colour_bits: u32, alpha: [u8; 2], alpha_bits: u64) -> [u8; 16] {
+    fn block_with(color: u16, color_bits: u32, alpha: [u8; 2], alpha_bits: u64) -> [u8; 16] {
         let mut block = [0u8; 16];
         block[0] = alpha[0];
         block[1] = alpha[1];
         block[2..8].copy_from_slice(&alpha_bits.to_le_bytes()[..6]);
-        block[8..10].copy_from_slice(&colour.to_le_bytes());
-        block[10..12].copy_from_slice(&colour.to_le_bytes());
-        block[12..16].copy_from_slice(&colour_bits.to_le_bytes());
+        block[8..10].copy_from_slice(&color.to_le_bytes());
+        block[10..12].copy_from_slice(&color.to_le_bytes());
+        block[12..16].copy_from_slice(&color_bits.to_le_bytes());
         block
     }
 
@@ -265,7 +265,7 @@ mod tests {
     }
 
     #[test]
-    fn bc1_uses_four_opaque_colours_when_first_endpoint_is_greater() {
+    fn bc1_uses_four_opaque_colors_when_first_endpoint_is_greater() {
         let block = [0xFF, 0xFF, 0x00, 0x00, 0b1110_0100, 0, 0, 0];
         let texels = decode_bc1_block(&block);
         assert_eq!(texels[0], [255, 255, 255, 255]);
@@ -285,20 +285,20 @@ mod tests {
     }
 
     #[test]
-    fn equal_endpoints_use_the_three_colour_palette() {
+    fn equal_endpoints_use_the_three_color_palette() {
         let block = [0x1F, 0x00, 0x1F, 0x00, 0b1110_0100, 0, 0, 0];
         assert_eq!(decode_bc1_block(&block)[3], [0, 0, 0, 0]);
     }
 
     #[test]
-    fn bc3_colour_half_uses_the_three_colour_palette_without_transparency() {
+    fn bc3_color_half_uses_the_three_color_palette_without_transparency() {
         let mut block = block_with(0xFFFF, 0b11, [255, 255], 0);
         block[8..12].copy_from_slice(&[0x00, 0x00, 0xFF, 0xFF]);
         assert_eq!(decode_bc3_block(&block, false)[0], [0, 0, 0, 255]);
     }
 
     #[test]
-    fn without_divide_colour_and_alpha_are_rounded_directly() {
+    fn without_divide_color_and_alpha_are_rounded_directly() {
         let block = block_with(0xFFFF, 0, [128, 128], 0);
         assert_eq!(decode_bc3_block(&block, false)[0], [255, 255, 255, 128]);
     }

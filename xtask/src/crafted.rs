@@ -53,8 +53,8 @@ const BLOCK_ROWS_ALIGNMENT: usize = 32;
 const BLOCK_SIDE_TEXELS: usize = 4;
 const DXT1_BLOCK_BYTES: usize = 8;
 const BC3_BLOCK_BYTES: usize = 16;
-const BC3_COLOUR_HALF_OFFSET: usize = 8;
-const COLOUR_ENDPOINT_BYTES: usize = 2;
+const BC3_COLOR_HALF_OFFSET: usize = 8;
+const COLOR_ENDPOINT_BYTES: usize = 2;
 
 const SMALL_SIZE: (u32, u32) = (32, 32);
 const ODD_SIZE: (u32, u32) = (130, 70);
@@ -138,7 +138,7 @@ impl Crafted {
 enum VideoPattern {
     Random,
     /// Both colour endpoints of every block are equal, probing the "first greater than second" test.
-    EqualColourEndpoints,
+    EqualColorEndpoints,
 }
 
 /// How a surface is divided into the units its rows are made of.
@@ -269,8 +269,8 @@ impl Case {
         self.labelled(&format!("pitch{pitch_units}"))
     }
 
-    fn with_equal_colour_endpoints(mut self) -> Self {
-        self.pattern = VideoPattern::EqualColourEndpoints;
+    fn with_equal_color_endpoints(mut self) -> Self {
+        self.pattern = VideoPattern::EqualColorEndpoints;
         self.labelled("equal_endpoints")
     }
 
@@ -313,7 +313,7 @@ impl Case {
     fn video_file_name(&self) -> String {
         let pattern = match self.pattern {
             VideoPattern::Random => "random",
-            VideoPattern::EqualColourEndpoints => "equal_endpoints",
+            VideoPattern::EqualColorEndpoints => "equal_endpoints",
         };
         let pitch = match self.pitch_units {
             Some(units) => format!("_pitch{units}"),
@@ -340,18 +340,18 @@ impl Case {
         let mut video: Vec<u8> = (0..self.video_len()).map(|_| prng.next_byte()).collect();
         match self.pattern {
             VideoPattern::Random => {}
-            VideoPattern::EqualColourEndpoints => self.equalise_colour_endpoints(&mut video),
+            VideoPattern::EqualColorEndpoints => self.equalise_color_endpoints(&mut video),
         }
         video
     }
 
-    fn equalise_colour_endpoints(&self, video: &mut [u8]) {
-        let colour_offset = match self.surface {
-            Surface::Bc3 => BC3_COLOUR_HALF_OFFSET,
+    fn equalise_color_endpoints(&self, video: &mut [u8]) {
+        let color_offset = match self.surface {
+            Surface::Bc3 => BC3_COLOR_HALF_OFFSET,
             _ => 0,
         };
         for block in video.chunks_exact_mut(self.surface.unit_bytes()) {
-            let first = colour_offset..colour_offset + COLOUR_ENDPOINT_BYTES;
+            let first = color_offset..color_offset + COLOR_ENDPOINT_BYTES;
             let second_start = first.end;
             block.copy_within(first, second_start);
         }
@@ -397,7 +397,7 @@ fn cases() -> Vec<Case> {
         cases.push(
             Case::new(format, 1, RGBA, ODD_SIZE).with_pitch_units(PITCH_UNITS_WIDER_THAN_NEEDED),
         );
-        cases.push(Case::new(format, 1, RGBA, SMALL_SIZE).with_equal_colour_endpoints());
+        cases.push(Case::new(format, 1, RGBA, SMALL_SIZE).with_equal_color_endpoints());
     }
     cases.push(Case::argb(ARGB_ODD_SIZE));
     cases.push(Case::argb(ARGB_ODD_SIZE).with_pitch_units(ARGB_PITCH_UNITS_WIDER_THAN_NEEDED));

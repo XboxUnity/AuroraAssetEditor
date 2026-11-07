@@ -169,12 +169,12 @@ fn decode_blocks(
     for (index, block) in blocks.chunks_exact(block_bytes).enumerate() {
         let origin_x = index % blocks_across * BLOCK_SIDE;
         let origin_y = index / blocks_across * BLOCK_SIDE;
-        for (texel, colour) in decode_block(block).iter().enumerate() {
+        for (texel, color) in decode_block(block).iter().enumerate() {
             let x = origin_x + texel % BLOCK_SIDE;
             let y = origin_y + texel / BLOCK_SIDE;
             if x < width && y < height {
                 let start = (y * width + x) * BYTES_PER_PIXEL;
-                rgba[start..start + BYTES_PER_PIXEL].copy_from_slice(colour);
+                rgba[start..start + BYTES_PER_PIXEL].copy_from_slice(color);
             }
         }
     }
@@ -199,9 +199,9 @@ mod tests {
         bytes[FOURCC_OFFSET..FOURCC_OFFSET + 4].copy_from_slice(FOURCC_DXT1);
         let block_count = width.div_ceil(4) * height.div_ceil(4);
         for number in 0..block_count as u16 {
-            let colour = (number + 1) << 11;
-            bytes.extend(colour.to_le_bytes());
-            bytes.extend(colour.to_le_bytes());
+            let color = (number + 1) << 11;
+            bytes.extend(color.to_le_bytes());
+            bytes.extend(color.to_le_bytes());
             bytes.extend([0; 4]);
         }
         bytes
@@ -213,10 +213,10 @@ mod tests {
         let image = decode(&numbered_dxt1(width, height)).unwrap();
         let blocks_across = width.div_ceil(4);
         let block_bytes = |n: u32| {
-            let colour = (n as u16 + 1) << 11;
+            let color = (n as u16 + 1) << 11;
             let mut block = [0u8; 8];
-            block[..2].copy_from_slice(&colour.to_le_bytes());
-            block[2..4].copy_from_slice(&colour.to_le_bytes());
+            block[..2].copy_from_slice(&color.to_le_bytes());
+            block[2..4].copy_from_slice(&color.to_le_bytes());
             block
         };
         for y in 0..height {
