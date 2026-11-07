@@ -38,7 +38,6 @@ fn extension_filters_reduce_patterns_to_extensions() {
         vec![
             entry("Aurora Asset Files (*.asset)", &["asset"]),
             entry("FSD Assets Files (*.assets)", &["assets"]),
-            entry("All files", &["*"]),
         ]
     );
 

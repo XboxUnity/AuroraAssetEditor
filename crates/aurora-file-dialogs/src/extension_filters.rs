@@ -1,11 +1,11 @@
 use super::DialogFilter;
 
-const ALL_FILES_PATTERN: &str = "*";
 const EXTENSION_PATTERN_PREFIX: &str = "*.";
 
 /// The filters as name and extensions, for dialogs that filter by extension only (macOS): `*.asset` gives
-/// `asset` and `*` stays `*`. An entry with a pattern such as `GC*.asset` cannot be expressed and is left out.
-/// The default filter comes first, because such dialogs have no way to choose a default.
+/// `asset`. An entry with a pattern such as `GC*.asset` or `*` cannot be expressed and is left out, so an
+/// "All files" entry is too. The default filter comes first, because such dialogs have no way to choose a
+/// default.
 pub fn extension_filters(
     filters: &[DialogFilter],
     default_filter: usize,
@@ -30,9 +30,6 @@ fn extensions_of(patterns: &[String]) -> Option<Vec<String>> {
 }
 
 fn extension_of(pattern: &str) -> Option<String> {
-    if pattern == ALL_FILES_PATTERN {
-        return Some(ALL_FILES_PATTERN.to_owned());
-    }
     pattern
         .strip_prefix(EXTENSION_PATTERN_PREFIX)
         .filter(|extension| !extension.is_empty() && !extension.contains(['*', '?', '.']))

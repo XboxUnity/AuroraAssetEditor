@@ -5,8 +5,6 @@ use rfd::{FileDialog, MessageButtons, MessageDialog, MessageLevel};
 
 use super::{DialogError, DialogParent, DialogRequest, extension_filters};
 
-const ALL_FILES: &str = "*";
-
 // rfd reports no errors on macOS: a dialog that could not be shown answers like a cancel.
 
 pub fn open_files(request: &DialogRequest) -> Result<Vec<PathBuf>, DialogError> {
@@ -44,16 +42,10 @@ fn dialog(request: &DialogRequest) -> FileDialog {
     if let Some(name) = &request.default_name {
         dialog = dialog.set_file_name(name);
     }
-    let filters = extension_filters(&request.filters, request.default_filter);
-    // rfd hands NSOpenPanel one list of allowed types for all filters, so an "All files" entry allows every file.
-    let allows_all_files = filters
-        .iter()
-        .any(|(_, extensions)| extensions.iter().any(|extension| extension == ALL_FILES));
-    // Ruled: with "All files" offered, no type list at all, so any file can be picked as on Windows.
-    if allows_all_files {
-        return dialog;
-    }
-    for (name, extensions) in filters {
+    // As close to the Windows list as rfd allows: the save panel gets a format menu with the default first,
+    // the open panel has no menu and shows every file one of the filters matches. "All files" is left out,
+    // because in the open panel's single type list it would let every file through.
+    for (name, extensions) in extension_filters(&request.filters, request.default_filter) {
         dialog = dialog.add_filter(name, &extensions);
     }
     dialog
