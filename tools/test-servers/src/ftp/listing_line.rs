@@ -1,11 +1,29 @@
 use super::ListingStyle;
 use super::file_system::FolderEntry;
 
-/// One listing line in the given style, reporting `size` for a file. The date is fixed, so the
-/// output is deterministic.
-pub(crate) fn listing_line(style: ListingStyle, entry: &FolderEntry, size: u64) -> String {
+const ROOT_DATE: &str = "Jan 01  2000";
+
+/// One listing line in the given style, reporting `size` for a file. `at_root` selects Aurora's
+/// drive lines. Every date derives from the entry, so the output is deterministic.
+pub(crate) fn listing_line(
+    style: ListingStyle,
+    entry: &FolderEntry,
+    size: u64,
+    at_root: bool,
+) -> String {
     let name = &entry.name;
     match (style, entry.is_folder) {
+        (ListingStyle::Aurora, _) if at_root => {
+            format!("drwxrwxrwx   1 root root {:>13} {ROOT_DATE} {name}", 0)
+        }
+        (ListingStyle::Aurora, false) => {
+            let date = entry.modified.aurora_text();
+            format!("-rw-rw-rw-   1 root root {size:>13} {date} {name}")
+        }
+        (ListingStyle::Aurora, true) => {
+            let date = entry.modified.aurora_text();
+            format!("drwxrwxrwx   1 root root {:>13} {date} {name}", 0)
+        }
         (ListingStyle::Unix, false) => {
             format!("-rw-r--r--   1 root  root  {size:>10} Nov 07 12:00 {name}")
         }

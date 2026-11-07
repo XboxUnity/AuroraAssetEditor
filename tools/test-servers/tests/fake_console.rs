@@ -46,7 +46,7 @@ fn logs_in_and_answers_site_revision() {
     let mut ftp = logged_in(&console);
 
     let reply = reply_text(ftp.custom_command("SITE REVISION", &[Status::CommandOk]));
-    assert!(reply.starts_with("200 1234"), "got {reply:?}");
+    assert_eq!(reply.trim_end(), "200 1655");
 
     let mut wrong = connect(&console);
     let Err(FtpError::UnexpectedResponse(response)) = wrong.login("xboxftp", "wrong") else {
@@ -77,7 +77,7 @@ fn feat_follows_configuration() {
     };
     assert!(String::from_utf8_lossy(&response.body).starts_with("500"));
 
-    let console = FakeConsole::start(FakeConsoleConfig::default());
+    let console = FakeConsole::start(config_with(FakeFeatures::MlsdAndUtf8));
     let mut ftp = logged_in(&console);
     let reply = reply_text(ftp.custom_command("OPTS UTF8 ON", &[Status::CommandOk]));
     assert!(reply.starts_with("200"), "got {reply:?}");
@@ -192,7 +192,7 @@ fn site_answers_only_the_revision_command() {
     let revision = reply_text(ftp.custom_command("site revision", &[Status::CommandOk]));
     let other = reply_text(ftp.custom_command("SITE HELP", &[Status::CommandOk]));
 
-    assert!(revision.starts_with("200 1234"), "got {revision:?}");
+    assert_eq!(revision.trim_end(), "200 1655");
     assert!(other.starts_with("502"), "got {other:?}");
 }
 

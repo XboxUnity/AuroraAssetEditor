@@ -6,6 +6,7 @@ use std::time::{Duration, Instant};
 
 use super::ListingStyle;
 use super::console_state::{Shared, shut_down};
+use super::fake_console_config::{FAKE_INPUT_HASH, FAKE_STORED_HASH};
 use super::file_system::{path_key, resolve_path};
 use super::listing_line::listing_line;
 
@@ -40,7 +41,7 @@ struct Session<'a> {
     shared: &'a Shared,
     control: BufReader<TcpStream>,
     current_folder: Vec<String>,
-    pending_user: Option<String>,
+    user_accepted: bool,
     logged_in: bool,
     passive_listener: Option<TcpListener>,
 }
@@ -51,7 +52,7 @@ impl<'a> Session<'a> {
             shared,
             control: BufReader::new(stream),
             current_folder: Vec::new(),
-            pending_user: None,
+            user_accepted: false,
             logged_in: false,
             passive_listener: None,
         }
@@ -61,7 +62,7 @@ impl<'a> Session<'a> {
         self.control
             .get_ref()
             .set_read_timeout(Some(POLL_INTERVAL))?;
-        self.reply("220 Fake Xbox 360 FTP ready")?;
+        self.reply("220 FtpDll Ready")?;
         let mut line = String::new();
         loop {
             match self.control.read_line(&mut line) {
@@ -98,7 +99,7 @@ impl<'a> Session<'a> {
             return Ok(Flow::Close);
         }
         if !self.logged_in && !matches!(verb.as_str(), "USER" | "PASS" | "QUIT") {
-            self.reply("530 Please log in")?;
+            self.reply("530 Not logged in")?;
             return Ok(Flow::Continue);
         }
         match verb.as_str() {
@@ -107,11 +108,13 @@ impl<'a> Session<'a> {
             "FEAT" => self.feat()?,
             "OPTS" => self.opts(argument)?,
             "SITE" => self.site(argument)?,
-            "NOOP" | "TYPE" => self.reply("200 OK")?,
+            "NOOP" => self.reply("200 ori r0, r0, 0")?,
+            "TYPE" => self.reply(&format!("200 Type set to {argument}"))?,
             "PWD" => self.pwd()?,
             "CWD" => self.cwd(argument)?,
+            "CDUP" => self.cdup()?,
             "PASV" => self.pasv()?,
-            "LIST" => self.list(argument)?,
+            "LIST" | "NLST" => self.list()?,
             "MLSD" => self.mlsd(argument)?,
             "RETR" => self.retr(argument)?,
             "STOR" => self.stor(argument)?,
@@ -120,7 +123,7 @@ impl<'a> Session<'a> {
                 self.reply("221 Goodbye")?;
                 return Ok(Flow::Close);
             }
-            _ => self.reply("500 Unknown command")?,
+            _ => self.reply("502 Command not found")?,
         }
         Ok(Flow::Continue)
     }
@@ -143,20 +146,32 @@ impl<'a> Session<'a> {
     }
 
     fn user(&mut self, name: &str) -> io::Result<()> {
-        self.pending_user = Some(name.to_owned());
-        self.reply("331 Password required")
+        if self.logged_in {
+            return self.reply("530 Already logged in");
+        }
+        self.user_accepted = name.eq_ignore_ascii_case(&self.shared.config.username);
+        if self.user_accepted {
+            self.reply(&format!("331 User {name} OK, need password"))
+        } else {
+            self.reply("332 User not OK")
+        }
     }
 
     fn pass(&mut self, password: &str) -> io::Result<()> {
-        let config = &self.shared.config;
-        let accepted = self.pending_user.as_deref() == Some(config.username.as_str())
-            && password == config.password;
-        if accepted {
+        if self.logged_in {
+            return self.reply("530 Already logged in");
+        }
+        if !std::mem::take(&mut self.user_accepted) {
+            return self.reply("530 Need username");
+        }
+        if password == self.shared.config.password {
             self.logged_in = true;
             self.shared.state().login_count += 1;
-            self.reply("230 Logged in")
+            self.reply("230 User logged in")
         } else {
-            self.reply("530 Login incorrect")
+            self.reply(&format!(
+                "530 Login failed: input = {FAKE_INPUT_HASH}, pass = {FAKE_STORED_HASH}"
+            ))
         }
     }
 
@@ -164,16 +179,19 @@ impl<'a> Session<'a> {
         let Some(info_lines) = self.shared.config.features.info_lines() else {
             return self.reply("500 Unknown command");
         };
-        let mut body = String::from("211-Features:\r\n");
+        let mut body = String::from("211-Extensions supported:\r\n");
         for info_line in info_lines {
             body.push_str(info_line);
             body.push_str("\r\n");
         }
-        body.push_str("211 End\r\n");
+        body.push_str("211 END\r\n");
         self.write_raw(&body)
     }
 
     fn opts(&mut self, argument: &str) -> io::Result<()> {
+        if !self.shared.config.features.accepts_utf8_option() {
+            return self.reply("502 Command not found");
+        }
         if argument.eq_ignore_ascii_case("UTF8 ON") {
             self.reply("200 UTF8 is on")
         } else {
@@ -183,7 +201,7 @@ impl<'a> Session<'a> {
 
     fn site(&mut self, argument: &str) -> io::Result<()> {
         if !argument.eq_ignore_ascii_case("REVISION") {
-            return self.reply("502 Command not implemented");
+            return self.reply("502 Command SITE not implemented for this argument.");
         }
         let reply = self
             .shared
@@ -212,30 +230,58 @@ impl<'a> Session<'a> {
             return self.reply(&reply);
         }
         let target = resolve_path(&self.current_folder, argument);
-        if self.shared.state().file_system.is_folder(&target) {
+        self.change_folder(target)
+    }
+
+    fn cdup(&mut self) -> io::Result<()> {
+        let mut parent = self.current_folder.clone();
+        parent.pop();
+        self.change_folder(parent)
+    }
+
+    fn change_folder(&mut self, target: Vec<String>) -> io::Result<()> {
+        let (is_folder, is_file) = {
+            let state = self.shared.state();
+            (
+                state.file_system.is_folder(&target),
+                state.file_system.file(&target).is_some(),
+            )
+        };
+        if is_folder {
+            let reply = format!("250 Current directory is {}", folder_text(&target));
             self.current_folder = target;
-            self.reply("250 Folder changed")
+            self.reply(&reply)
+        } else if is_file {
+            self.reply("550 Not a directory")
         } else {
-            self.reply("550 No such folder")
+            self.reply("550 No such directory")
         }
     }
 
+    /// Like Aurora's `PASV`, the session keeps one listener, so every `PASV` names the same port.
     fn pasv(&mut self) -> io::Result<()> {
-        let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0))?;
-        let port = listener.local_addr()?.port();
-        self.passive_listener = Some(listener);
+        let port = match &self.passive_listener {
+            Some(listener) => listener.local_addr()?.port(),
+            None => {
+                let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0))?;
+                let port = listener.local_addr()?.port();
+                self.passive_listener = Some(listener);
+                port
+            }
+        };
         let (high, low) = (port / 256, port % 256);
         self.reply(&format!(
             "227 Entering Passive Mode (127,0,0,1,{high},{low})"
         ))
     }
 
-    fn list(&mut self, argument: &str) -> io::Result<()> {
+    /// `LIST` and `NLST` list the working directory whatever argument they get, like Aurora.
+    fn list(&mut self) -> io::Result<()> {
         let style = match self.shared.config.listing_style {
             ListingStyle::Mlsd => ListingStyle::Unix,
             style => style,
         };
-        self.send_listing(style, argument)
+        self.send_listing(style, "")
     }
 
     fn mlsd(&mut self, argument: &str) -> io::Result<()> {
@@ -243,7 +289,7 @@ impl<'a> Session<'a> {
         if config.listing_style == ListingStyle::Mlsd || config.features.advertises_mlsd() {
             self.send_listing(ListingStyle::Mlsd, argument)
         } else {
-            self.reply("500 Unknown command")
+            self.reply("502 Command not found")
         }
     }
 
@@ -263,23 +309,25 @@ impl<'a> Session<'a> {
             let state = self.shared.state();
             if !state.file_system.is_folder(&folder) {
                 drop(state);
-                return self.reply("550 No such folder");
+                return self.reply("550 No such directory");
             }
+            let at_root = folder.is_empty();
             state
                 .file_system
                 .entries_in(&folder)
                 .iter()
+                .filter(|entry| !(at_root && !entry.is_folder))
                 .map(|entry| {
                     let size = state
                         .listed_sizes
                         .get(&entry.key)
                         .copied()
                         .unwrap_or(entry.size);
-                    listing_line(style, entry, size)
+                    listing_line(style, entry, size, at_root)
                 })
                 .collect::<Vec<_>>()
         };
-        let Some(mut data) = self.begin_transfer()? else {
+        let Some(mut data) = self.begin_transfer("150 Opening connection")? else {
             return Ok(());
         };
         if stalled {
@@ -304,9 +352,9 @@ impl<'a> Session<'a> {
             )
         };
         let Some(bytes) = bytes else {
-            return self.reply("550 No such file");
+            return self.reply("550 Could not open file.  Error:  2");
         };
-        let Some(mut data) = self.begin_transfer()? else {
+        let Some(mut data) = self.begin_transfer("150 Waiting for connection")? else {
             return Ok(());
         };
         if let Some(after) = stall_after {
@@ -316,7 +364,7 @@ impl<'a> Session<'a> {
         let sent = keep.map_or(bytes.len(), |keep| keep.min(bytes.len()));
         data.write_all(&bytes[..sent])?;
         shut_down(&data);
-        self.reply("226 Transfer complete")
+        self.reply("226 File transferred")
     }
 
     fn stor(&mut self, argument: &str) -> io::Result<()> {
@@ -325,32 +373,44 @@ impl<'a> Session<'a> {
             .split_last()
             .is_some_and(|(_, parent)| self.shared.state().file_system.is_folder(parent));
         if !parent_exists {
-            return self.reply("550 No such folder");
+            return self.reply("550 Could not create file");
         }
-        let Some(mut data) = self.begin_transfer()? else {
+        let Some(mut data) = self.begin_transfer("150 Opening connection")? else {
             return Ok(());
         };
         let bytes = self.read_upload(&mut data)?;
         self.shared.state().file_system.put_file(&path, &bytes);
-        self.reply("226 Transfer complete")
+        self.reply("226 File transferred")
     }
 
     fn size(&mut self, argument: &str) -> io::Result<()> {
         let path = resolve_path(&self.current_folder, argument);
-        let length = self.shared.state().file_system.file(&path).map(<[u8]>::len);
+        let (length, is_folder) = {
+            let state = self.shared.state();
+            (
+                state.file_system.file(&path).map(<[u8]>::len),
+                state.file_system.is_folder(&path),
+            )
+        };
         match length {
             Some(length) => self.reply(&format!("213 {length}")),
-            None => self.reply("550 No such file"),
+            None if is_folder => self.reply("550 Not a file"),
+            None => self.reply("550 File not found"),
         }
     }
 
-    /// Answers `150` and accepts the client's connection to the port `PASV` announced.
-    fn begin_transfer(&mut self) -> io::Result<Option<TcpStream>> {
-        let Some(listener) = self.passive_listener.take() else {
+    /// Answers with `preliminary` and accepts the client's connection to the port `PASV` announced.
+    fn begin_transfer(&mut self, preliminary: &str) -> io::Result<Option<TcpStream>> {
+        let listener = self
+            .passive_listener
+            .as_ref()
+            .map(TcpListener::try_clone)
+            .transpose()?;
+        let Some(listener) = listener else {
             self.reply("425 Use PASV first")?;
             return Ok(None);
         };
-        self.reply("150 Opening data connection")?;
+        self.reply(preliminary)?;
         listener.set_nonblocking(true)?;
         let deadline = Instant::now() + DATA_CONNECT_TIMEOUT;
         loop {
@@ -416,6 +476,14 @@ impl<'a> Session<'a> {
         }
         Ok(())
     }
+}
+
+/// A folder as Aurora echoes it: absolute, with a trailing slash.
+fn folder_text(segments: &[String]) -> String {
+    if segments.is_empty() {
+        return "/".to_owned();
+    }
+    format!("/{}/", segments.join("/"))
 }
 
 fn is_read_timeout(error: &io::Error) -> bool {

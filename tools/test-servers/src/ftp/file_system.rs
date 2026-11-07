@@ -1,5 +1,7 @@
 use std::collections::BTreeMap;
 
+use super::file_date::{FAKE_NOW, FileDate};
+
 const ROOT_KEY: &str = "/";
 
 /// One entry of a folder, as a listing reports it.
@@ -8,6 +10,7 @@ pub(crate) struct FolderEntry {
     pub(crate) name: String,
     pub(crate) is_folder: bool,
     pub(crate) size: u64,
+    pub(crate) modified: FileDate,
 }
 
 enum NodeKind {
@@ -18,6 +21,7 @@ enum NodeKind {
 struct Node {
     name: String,
     kind: NodeKind,
+    modified: FileDate,
 }
 
 /// An in-memory file system whose paths ignore case, like the console's FATX volume. A node keeps
@@ -72,6 +76,7 @@ impl FakeFileSystem {
             self.nodes.entry(path_key(prefix)).or_insert_with(|| Node {
                 name: prefix[depth - 1].clone(),
                 kind: NodeKind::Folder,
+                modified: FAKE_NOW,
             });
         }
     }
@@ -88,8 +93,10 @@ impl FakeFileSystem {
             .or_insert_with(|| Node {
                 name: name.clone(),
                 kind: NodeKind::File(Vec::new()),
+                modified: FAKE_NOW,
             });
         node.kind = NodeKind::File(bytes.to_vec());
+        node.modified = FAKE_NOW;
     }
 
     pub(crate) fn file(&self, segments: &[String]) -> Option<&[u8]> {
@@ -97,6 +104,15 @@ impl FakeFileSystem {
             NodeKind::File(bytes) => Some(bytes),
             NodeKind::Folder => None,
         }
+    }
+
+    /// Returns whether the path exists.
+    pub(crate) fn set_modified(&mut self, segments: &[String], modified: FileDate) -> bool {
+        let Some(node) = self.nodes.get_mut(&path_key(segments)) else {
+            return false;
+        };
+        node.modified = modified;
+        true
     }
 
     pub(crate) fn is_folder(&self, segments: &[String]) -> bool {
@@ -134,6 +150,7 @@ impl FakeFileSystem {
                     NodeKind::File(bytes) => bytes.len() as u64,
                     NodeKind::Folder => 0,
                 },
+                modified: node.modified,
             })
             .collect()
     }

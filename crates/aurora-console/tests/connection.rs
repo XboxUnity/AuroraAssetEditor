@@ -59,21 +59,22 @@ fn test_connection_reports_aurora_revision() {
 
     let revision = client.test_connection().unwrap();
 
-    assert_eq!(revision.as_str(), "1234");
+    assert_eq!(revision.as_str(), "1655");
     assert_eq!(
         *statuses.lock().unwrap(),
         [
             "Connecting to 127.0.0.1...",
             "Connected to 127.0.0.1, checking for Aurora...",
-            "Connected to Aurora revision 1234",
+            "Connected to Aurora revision 1655",
         ]
     );
     assert_eq!(
-        console.commands()[..5],
+        console.commands()[..6],
         [
             "USER xboxftp",
             "PASS ****",
             "FEAT",
+            "OPTS UTF8 ON",
             "SITE REVISION",
             "TYPE I"
         ]
@@ -136,7 +137,7 @@ fn refused_feat_still_connects() {
         features: FakeFeatures::Refused,
         ..FakeConsoleConfig::default()
     });
-    assert_eq!(revision_of(&console).unwrap().as_str(), "1234");
+    assert_eq!(revision_of(&console).unwrap().as_str(), "1655");
     assert!(
         console
             .commands()

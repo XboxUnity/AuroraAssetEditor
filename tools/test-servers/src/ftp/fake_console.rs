@@ -5,10 +5,10 @@ use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
-use super::FakeConsoleConfig;
 use super::console_state::{Shared, shut_down};
 use super::file_system::{path_key, resolve_path};
 use super::session;
+use super::{FakeConsoleConfig, FileDate};
 
 const ACCEPT_POLL: Duration = Duration::from_millis(5);
 const AURORA_DATA_FOLDER: &str = "/Game/Data";
@@ -79,6 +79,16 @@ impl FakeConsole {
             .file_system
             .file(&resolve_path(&[], path))
             .map(<[u8]>::to_vec)
+    }
+
+    /// Sets the modification time listings report for an existing file or folder.
+    pub fn set_modified(&self, path: &str, modified: FileDate) {
+        let found = self
+            .shared
+            .state()
+            .file_system
+            .set_modified(&resolve_path(&[], path), modified);
+        assert!(found, "no such path in the fake console: {path}");
     }
 
     /// Listings report `size` for the file, whatever its real length.
