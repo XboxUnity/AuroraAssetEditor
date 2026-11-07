@@ -120,6 +120,14 @@ impl FakeConsole {
         self.shared.state().folder_change_reply = reply.map(str::to_owned);
     }
 
+    /// Transfers no longer accept the client's data connection: they wait out the configured time,
+    /// answer `425` and close the connections that queued up.
+    pub fn refuse_data_connections(&self) {
+        self.shared
+            .refusing_data_connections
+            .store(true, Ordering::SeqCst);
+    }
+
     /// Closes every control connection that is open now.
     pub fn drop_connections(&self) {
         let sockets = std::mem::take(&mut self.shared.state().control_sockets);

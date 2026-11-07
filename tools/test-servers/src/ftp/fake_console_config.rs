@@ -1,6 +1,10 @@
+use std::time::Duration;
+
 use super::{FakeFeatures, ListingStyle};
 
 const DEFAULT_CREDENTIAL: &str = "xboxftp";
+/// How long Aurora waits for the data connection before it answers 425.
+const DEFAULT_DATA_CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
 const DEFAULT_SITE_REVISION_REPLY: &str = "200 1655";
 
 /// What Aurora's failed-login reply carries in place of its real MD5 values.
@@ -16,6 +20,8 @@ pub struct FakeConsoleConfig {
     pub site_revision_reply: Option<String>,
     pub features: FakeFeatures,
     pub listing_style: ListingStyle,
+    /// How long a transfer waits for the client's data connection before it fails with `425`.
+    pub data_connect_timeout: Duration,
 }
 
 impl Default for FakeConsoleConfig {
@@ -26,6 +32,7 @@ impl Default for FakeConsoleConfig {
             site_revision_reply: Some(DEFAULT_SITE_REVISION_REPLY.to_owned()),
             features: FakeFeatures::default(),
             listing_style: ListingStyle::default(),
+            data_connect_timeout: DEFAULT_DATA_CONNECT_TIMEOUT,
         }
     }
 }

@@ -421,47 +421,51 @@ impl<'a> Session<'a> {
     }
 
     /// Answers with `preliminary` and accepts the client's connection to the port `PASV` announced.
+    /// Without a connection within the configured time the transfer fails with `425`, as in Aurora.
     fn begin_transfer(&mut self, preliminary: &str) -> io::Result<Option<TcpStream>> {
         let listener = self
             .passive_listener
             .as_ref()
             .map(TcpListener::try_clone)
             .transpose()?;
-        let Some(listener) = listener else {
-            self.reply("425 Use PASV first")?;
-            return Ok(None);
-        };
         self.reply(preliminary)?;
-        listener.set_nonblocking(true)?;
-        let deadline = Instant::now() + DATA_CONNECT_TIMEOUT;
-        loop {
-            match listener.accept() {
-                Ok((data, _)) => {
-                    data.set_nonblocking(false)?;
-                    data.set_write_timeout(Some(DATA_CONNECT_TIMEOUT))?;
-                    self.shared.state().data_sockets.push(data.try_clone()?);
-                    return Ok(Some(data));
-                }
-                Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
-                    self.ensure_running(deadline)?;
-                    thread::sleep(POLL_INTERVAL);
-                }
-                Err(error) => return Err(error),
-            }
+        if let Some(listener) = &listener {
+            listener.set_nonblocking(true)?;
         }
+        let refusing = self.shared.refusing_data_connections.load(Ordering::SeqCst);
+        let deadline = Instant::now() + self.shared.config.data_connect_timeout;
+        while Instant::now() <= deadline {
+            self.ensure_running()?;
+            let accepted = match &listener {
+                Some(listener) if !refusing => listener.accept().map(Some).or_else(|error| {
+                    if error.kind() == io::ErrorKind::WouldBlock {
+                        Ok(None)
+                    } else {
+                        Err(error)
+                    }
+                })?,
+                _ => None,
+            };
+            if let Some((data, _)) = accepted {
+                data.set_nonblocking(false)?;
+                data.set_write_timeout(Some(DATA_CONNECT_TIMEOUT))?;
+                self.shared.state().data_sockets.push(data.try_clone()?);
+                return Ok(Some(data));
+            }
+            thread::sleep(POLL_INTERVAL);
+        }
+        self.reply("425 Cannot open data connection")?;
+        if let Some(listener) = &listener {
+            close_queued_connections(listener)?;
+        }
+        Ok(None)
     }
 
-    fn ensure_running(&self, deadline: Instant) -> io::Result<()> {
+    fn ensure_running(&self) -> io::Result<()> {
         if self.shared.stopping.load(Ordering::SeqCst) {
             return Err(io::Error::new(
                 io::ErrorKind::Interrupted,
                 "the fake console is stopping",
-            ));
-        }
-        if Instant::now() > deadline {
-            return Err(io::Error::new(
-                io::ErrorKind::TimedOut,
-                "the client never opened the data connection",
             ));
         }
         Ok(())
@@ -476,7 +480,7 @@ impl<'a> Session<'a> {
                 Ok(0) => return Ok(bytes),
                 Ok(count) => bytes.extend_from_slice(&chunk[..count]),
                 Err(error) if is_read_timeout(&error) => {
-                    self.ensure_running(Instant::now() + DATA_CONNECT_TIMEOUT)?;
+                    self.ensure_running()?;
                 }
                 Err(error) => return Err(error),
             }
@@ -518,6 +522,18 @@ fn resolve_verb(typed: &str) -> Option<&'static str> {
                 .into_iter()
                 .find(|name| name.eq_ignore_ascii_case(typed))
         })
+}
+
+/// Hands back the connections that arrived but were never accepted, so their clients see the end
+/// of the stream.
+fn close_queued_connections(listener: &TcpListener) -> io::Result<()> {
+    loop {
+        match listener.accept() {
+            Ok((queued, _)) => shut_down(&queued),
+            Err(error) if error.kind() == io::ErrorKind::WouldBlock => return Ok(()),
+            Err(error) => return Err(error),
+        }
+    }
 }
 
 /// A folder as Aurora echoes it: absolute, with a trailing slash.

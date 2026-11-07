@@ -363,3 +363,19 @@ fn seventh_session_gets_421_and_stays_open() {
     });
     assert!(freed.is_some(), "a closed session frees its slot");
 }
+
+#[test]
+fn transfer_without_a_data_connection_ends_in_425() {
+    let console = FakeConsole::start(FakeConsoleConfig {
+        data_connect_timeout: std::time::Duration::from_millis(100),
+        ..FakeConsoleConfig::default()
+    });
+    console.add_file("/Game/a.bin", &[1]);
+    let mut session = RawSession::logged_in(&console);
+    session.send("CWD /Game");
+
+    session.passive_port();
+    assert_eq!(session.send("RETR a.bin"), "150 Waiting for connection\r\n");
+    assert_eq!(session.read_line(), "425 Cannot open data connection\r\n");
+    assert_eq!(session.send("NOOP"), "200 ori r0, r0, 0\r\n");
+}
