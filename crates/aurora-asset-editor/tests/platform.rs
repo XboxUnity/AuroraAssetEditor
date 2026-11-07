@@ -42,15 +42,22 @@ fn file_drop_collector_batches_one_drop() {
 }
 
 /// Answers every job with a `Progress::Bulk` whose position is the job's refresh generation; the gate job
-/// waits until the test opens the gate.
+/// says it started and waits until the test opens the gate.
 struct GatedExecutor {
     gate: Arc<Mutex<Option<mpsc::Receiver<()>>>>,
+    /// Told when the gate job starts.
+    started: Option<mpsc::Sender<()>>,
 }
 
 impl JobExecutor for GatedExecutor {
     fn execute(&mut self, job: Job, _progress: &ProgressSink) -> JobOutcome {
         let generation = refresh_generation(&job);
         if generation == GATE_JOB {
+            if let Some(started) = &self.started {
+                started
+                    .send(())
+                    .expect("the test waits for the gate job to start");
+            }
             let gate = self
                 .gate
                 .lock()
@@ -100,6 +107,7 @@ fn thread_runner_runs_user_jobs_before_background() {
     let mut runner = ThreadRunner::new(
         || GatedExecutor {
             gate: Arc::clone(&gate),
+            started: None,
         },
         sender,
     )
@@ -131,17 +139,27 @@ fn outcomes_after_shutdown_are_quiet() {
     let log = ErrorLog::in_dir(config_dir.path());
     LogBridge::install(log.clone()).expect("no other test in this file installs a logger");
     install_panic_hook(log);
+    let (open_gate, gate) = mpsc::channel();
+    let gate = Arc::new(Mutex::new(Some(gate)));
+    let (report_start, started) = mpsc::channel();
     let (sender, receiver) = async_channel::unbounded();
     let mut runner = ThreadRunner::new(
         || GatedExecutor {
-            gate: Arc::new(Mutex::new(None)),
+            gate: Arc::clone(&gate),
+            started: Some(report_start.clone()),
         },
         sender,
     )
     .expect("the test can start worker threads");
 
+    runner.submit(refresh_job(GATE_JOB), JobPriority::User);
+    started
+        .recv()
+        .expect("the console worker starts the gate job");
     drop(receiver);
-    runner.submit(refresh_job(SECOND_USER_JOB), JobPriority::User);
+    open_gate
+        .send(())
+        .expect("the console worker holds the gate");
     runner.shutdown();
 
     assert!(!config_dir.path().join(ERROR_LOG_FILE).exists());

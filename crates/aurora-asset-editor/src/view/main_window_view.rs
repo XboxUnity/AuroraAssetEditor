@@ -36,6 +36,10 @@ impl MainWindowView {
         &self.window
     }
 
+    pub fn system_theme(&self) -> SystemTheme {
+        self.system_theme.get()
+    }
+
     /// The OS theme that `ThemeChoice::System` follows; takes effect with the next render.
     pub fn set_system_theme(&self, system_theme: SystemTheme) {
         self.system_theme.set(system_theme);

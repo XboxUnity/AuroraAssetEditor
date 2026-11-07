@@ -2,7 +2,7 @@
 // A release build is a window app: no console window opens with it on Windows.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 use std::env;
 use std::error::Error;
 use std::ffi::OsString;
@@ -113,10 +113,9 @@ fn run(
     };
     let app = Rc::new(RefCell::new(App::new(environment)));
     let view = Rc::new(MainWindowView::new(window));
-    let system_theme = Rc::new(Cell::new(SystemTheme::default()));
     view.connect(Rc::clone(&app));
     receive_outcomes(outcome_receiver, &app, &view)?;
-    watch_window_events(&app, &view, &system_theme);
+    watch_window_events(&app, &view);
     save_geometry_on_close(&app, &view);
 
     window_placement::restore_size(view.window().window(), geometry.as_ref());
@@ -126,11 +125,13 @@ fn run(
         geometry,
         paths,
     };
-    finish_window_setup(&app, &view, &system_theme, setup)?;
+    finish_window_setup(&app, &view, setup)?;
     slint::run_event_loop()?;
-    view.window().hide()?;
     // A bulk run would otherwise keep the closed app running until its last game.
     app.borrow_mut().stop_bulk();
+    if let Err(error) = view.window().hide() {
+        log::error!("Could not hide the window at exit: {error}");
+    }
     runner.shutdown();
     Ok(())
 }
@@ -218,22 +219,16 @@ fn receive_outcomes(
 }
 
 /// Dropped files and theme changes come from winit, which reports each dropped file as its own event.
-fn watch_window_events(
-    app: &Rc<RefCell<App>>,
-    view: &Rc<MainWindowView>,
-    system_theme: &Rc<Cell<SystemTheme>>,
-) {
+fn watch_window_events(app: &Rc<RefCell<App>>, view: &Rc<MainWindowView>) {
     let app = Rc::clone(app);
     let events_view = Rc::clone(view);
-    let system_theme = Rc::clone(system_theme);
     let collector = Rc::new(RefCell::new(FileDropCollector::default()));
     view.window()
         .window()
         .on_winit_window_event(move |_window, event| {
             if let WindowEvent::ThemeChanged(theme) = event {
-                let mut changed = system_theme.get();
+                let mut changed = events_view.system_theme();
                 changed.update(*theme == Theme::Dark);
-                system_theme.set(changed);
                 events_view.set_system_theme(changed);
                 events_view.render(&app.borrow());
                 return EventResult::Propagate;
@@ -277,12 +272,10 @@ fn save_geometry_on_close(app: &Rc<RefCell<App>>, view: &Rc<MainWindowView>) {
 fn finish_window_setup(
     app: &Rc<RefCell<App>>,
     view: &Rc<MainWindowView>,
-    system_theme: &Rc<Cell<SystemTheme>>,
     setup: WindowSetup,
 ) -> Result<(), slint::EventLoopError> {
     let app = Rc::clone(app);
     let view = Rc::clone(view);
-    let system_theme = Rc::clone(system_theme);
     slint::spawn_local(async move {
         match view.window().window().winit_window().await {
             Ok(winit_window) => winit_window.set_window_icon(setup.icon),
@@ -290,7 +283,6 @@ fn finish_window_setup(
         }
         window_placement::restore_position(view.window().window(), setup.geometry.as_ref());
         let initial_theme = SystemTheme::read_initial(view.window());
-        system_theme.set(initial_theme);
         view.set_system_theme(initial_theme);
         view.render(&app.borrow());
         app.borrow_mut().open_paths(setup.paths);
