@@ -16,6 +16,8 @@ pub struct FileProblem {
 #[derive(Debug)]
 pub enum LoadProblem {
     NotFound,
+    /// A dropped folder.
+    Folder,
     Unrecognised,
     Read(io::Error),
     Asset(AssetError),
@@ -29,6 +31,7 @@ impl fmt::Display for LoadProblem {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             LoadProblem::NotFound => f.write_str("file not found"),
+            LoadProblem::Folder => f.write_str("this is a folder, drop the files in it instead"),
             LoadProblem::Unrecognised => f.write_str("not an Aurora .asset or FSD .assets file"),
             LoadProblem::Read(error) => write!(f, "the file could not be read: {error}"),
             LoadProblem::Asset(error) => error.fmt(f),

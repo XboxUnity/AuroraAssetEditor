@@ -1,3 +1,5 @@
+use aurora_asset::Compression;
+
 use crate::settings::{APP_SETTINGS_FILE, AppSettings, ThemeChoice, WindowGeometry};
 
 use super::App;
@@ -19,6 +21,15 @@ impl App {
 
     pub fn set_theme(&mut self, theme: ThemeChoice) {
         self.change_settings(|settings| settings.theme = theme);
+    }
+
+    /// "Use Compression" as the encoder takes it; read when an image is loaded.
+    pub(super) fn compression(&self) -> Compression {
+        if self.environment.settings.use_compression {
+            Compression::Dxt
+        } else {
+            Compression::None
+        }
     }
 
     /// Stores where the window was when it closed. Moving the window is not a change of a setting, so an

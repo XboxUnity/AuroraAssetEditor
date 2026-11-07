@@ -45,6 +45,14 @@ impl EditorPages {
         }
     }
 
+    /// The page that owns `slot`; `None` for the unused fourth entry.
+    pub fn document_for_mut(&mut self, slot: AssetSlot) -> Option<&mut AssetDocument> {
+        let kind = AssetKind::ALL
+            .into_iter()
+            .find(|kind| kind.slots().any(|owned| owned == slot))?;
+        Some(self.get_mut(kind))
+    }
+
     /// Fresh documents, as the old `Reset()`.
     pub fn reset(&mut self) {
         *self = Self::new();

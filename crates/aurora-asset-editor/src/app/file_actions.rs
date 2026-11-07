@@ -1,13 +1,15 @@
 use std::error::Error;
+use std::fs::File;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 
-use aurora_asset::{AssetKind, AssetSlot, Compression};
+use aurora_asset::{AssetKind, AssetSlot};
 
 use crate::dialogs::Modal;
 use crate::editor::{DecodedKind, EditorPages, PreparedImage};
 use crate::files::{
-    ASSET_OPEN_DEFAULT_FILTER, FileProblem, FsdImages, LoadProblem, LoadedFile, LoadedFiles,
-    asset_open_filters, slot_label,
+    ASSET_OPEN_DEFAULT_FILTER, FileKind, FileProblem, FsdImages, LoadProblem, LoadedFile,
+    LoadedFiles, asset_open_filters, detect, file_display_name, slot_label,
 };
 use crate::jobs::{Job, JobPriority, LoadJob};
 use crate::logging::error_chain;
@@ -26,6 +28,7 @@ const LOAD_PROBLEMS_FOOTER: &str = "Details are in error.log.";
 const ASSET_TYPE_COUNT: usize = 5;
 pub const BUSY_TEXT: &str = "Busy, try again when the current work finishes";
 const STATUS_SEPARATOR: &str = " · ";
+const MAGIC_LEN: u64 = 4;
 
 impl App {
     /// The Open menu's "Open asset files…".
@@ -48,14 +51,32 @@ impl App {
         if paths.is_empty() || self.refuse_while_busy() {
             return;
         }
-        let compression = if self.environment.settings.use_compression {
-            Compression::Dxt
-        } else {
-            Compression::None
-        };
+        let compression = self.compression();
         let job = Job::Load(LoadJob { paths, compression });
         self.active_work.loading += 1;
         self.environment.jobs.submit(job, JobPriority::User);
+    }
+
+    /// Files dropped on the window. `.asset` and FSD files load on any page, images go where the page on
+    /// screen puts them (the OS does not say where on the window a file landed).
+    pub fn files_dropped(&mut self, paths: Vec<PathBuf>) {
+        self.drop_hover = false;
+        if paths.is_empty() || self.refuse_while_busy() {
+            return;
+        }
+        let (images, loadable): (Vec<PathBuf>, Vec<PathBuf>) =
+            paths.into_iter().partition(|path| is_dropped_image(path));
+        self.open_paths(loadable);
+        self.drop_images(images);
+    }
+
+    pub fn set_drop_hover(&mut self, hover: bool) {
+        self.drop_hover = hover;
+    }
+
+    /// Whether files are being dragged over the window.
+    pub fn drop_hover(&self) -> bool {
+        self.drop_hover
     }
 
     /// The Open menu's "New asset set": empty pages, the current game stays.
@@ -68,7 +89,7 @@ impl App {
     }
 
     /// The old busy indicator blocked all input while a load ran; here the request is refused and says so.
-    fn refuse_while_busy(&mut self) -> bool {
+    pub(super) fn refuse_while_busy(&mut self) -> bool {
         if !self.locks().editor {
             return false;
         }
@@ -92,7 +113,7 @@ impl App {
                 }
             };
             if contributed {
-                last_loaded = Some(file_name(&path));
+                last_loaded = Some(file_display_name(&path));
             }
         }
         if let Some(name) = last_loaded {
@@ -186,7 +207,7 @@ impl App {
         error: &(dyn Error + 'static),
         unread_images: &mut Vec<String>,
     ) {
-        let file = file_name(path);
+        let file = file_display_name(path);
         let context = format!("{entry} in {file} could not be decoded");
         if let Some(log_failure) = self.record_error(&context, error) {
             self.status = StatusLine::error(log_failure);
@@ -216,7 +237,7 @@ impl App {
             if let Some(log_failure) = self.record_error(&context, &problem) {
                 self.status = StatusLine::error(log_failure);
             }
-            let file = file_name(&path);
+            let file = file_display_name(&path);
             match problem {
                 LoadProblem::NoAssets if only_problem => self.modals.push(Modal::Message {
                     title: NO_ASSETS_TITLE.to_owned(),
@@ -270,9 +291,10 @@ impl FsdReceived {
     }
 }
 
-fn file_name(path: &Path) -> String {
-    path.file_name()
-        .unwrap_or(path.as_os_str())
-        .to_string_lossy()
-        .into_owned()
+/// Whether a dropped file is left for the image rules: not an `.asset` or FSD file, not a folder, and readable.
+/// Anything else goes to the loader, which reports what is wrong with it.
+fn is_dropped_image(path: &Path) -> bool {
+    let mut first_bytes = Vec::new();
+    let read = File::open(path).and_then(|file| file.take(MAGIC_LEN).read_to_end(&mut first_bytes));
+    read.is_ok() && detect(&first_bytes) == FileKind::Unrecognised
 }

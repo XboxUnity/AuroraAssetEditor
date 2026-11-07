@@ -51,6 +51,9 @@ fn load_file(path: &Path, compression: Compression) -> Result<LoadedFile, LoadPr
 }
 
 fn read_file(path: &Path) -> Result<Vec<u8>, LoadProblem> {
+    if path.is_dir() {
+        return Err(LoadProblem::Folder);
+    }
     fs::read(path).map_err(|error| match error.kind() {
         io::ErrorKind::NotFound => LoadProblem::NotFound,
         _ => LoadProblem::Read(error),

@@ -1,6 +1,8 @@
 use std::error::Error;
 use std::path::{Path, PathBuf};
 
+use aurora_asset::ScreenshotNumber;
+
 use crate::dialogs::{Modal, ModalAnswer, ModalField, ModalQueue};
 use crate::editor::EditorPages;
 use crate::jobs::JobOutcome;
@@ -24,6 +26,8 @@ pub struct App {
     pub(super) status: StatusLine,
     pub(super) active_work: ActiveWork,
     pub(super) modals: ModalQueue,
+    pub(super) selected_screenshot: ScreenshotNumber,
+    pub(super) drop_hover: bool,
 }
 
 impl App {
@@ -37,6 +41,8 @@ impl App {
             status: StatusLine::ready(),
             active_work: ActiveWork::default(),
             modals: ModalQueue::new(),
+            selected_screenshot: ScreenshotNumber::ALL[0],
+            drop_hover: false,
         };
         app.report_startup_problems(&startup_problems);
         app
@@ -75,7 +81,13 @@ impl App {
             return;
         };
         match (modal, answer) {
-            (Modal::Message { .. }, ModalAnswer::Accept | ModalAnswer::Cancel) => {}
+            (Modal::Message { .. }, _) => {}
+            (Modal::Choice { pending, .. }, ModalAnswer::Choice(choice)) => {
+                self.answer_choice(pending, Some(choice));
+            }
+            (Modal::Choice { pending, .. }, ModalAnswer::Accept | ModalAnswer::Cancel) => {
+                self.answer_choice(pending, None);
+            }
         }
     }
 
@@ -86,6 +98,7 @@ impl App {
     pub fn on_job_outcome(&mut self, outcome: JobOutcome) {
         match outcome {
             JobOutcome::Loaded(loaded) => self.apply_loaded(loaded),
+            JobOutcome::Imported(results) => self.apply_imported(results),
         }
     }
 
@@ -126,7 +139,6 @@ impl App {
     }
 
     /// The picked file; `None` when the user cancelled or the dialog failed, which is shown.
-    #[expect(dead_code, reason = "first used by the image actions")]
     pub(super) fn ask_open_file(&mut self, request: &OpenRequest) -> Option<PathBuf> {
         let answer = self.environment.dialogs.open_file(request);
         self.dialog_answer(&request.title, answer).flatten()

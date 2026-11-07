@@ -1,4 +1,4 @@
-use super::LoadJob;
+use super::{ImportJob, LoadJob};
 
 /// Which queue a job waits in: a worker takes every `User` job before any `Background` one.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -11,4 +11,5 @@ pub enum JobPriority {
 #[derive(Debug)]
 pub enum Job {
     Load(LoadJob),
+    Import(ImportJob),
 }

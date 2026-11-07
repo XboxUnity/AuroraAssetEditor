@@ -1,3 +1,5 @@
+mod import_failure;
+mod import_job;
 mod job;
 mod job_outcome;
 mod job_runner;
@@ -5,6 +7,8 @@ mod job_workers;
 mod load_job;
 mod progress_sink;
 
+pub use import_failure::ImportFailure;
+pub use import_job::{ImageSource, ImportJob, ImportRequest, ImportResult};
 pub use job::{Job, JobPriority};
 pub use job_outcome::JobOutcome;
 pub use job_runner::JobRunner;

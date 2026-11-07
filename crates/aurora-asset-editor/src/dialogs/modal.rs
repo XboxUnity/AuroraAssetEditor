@@ -1,7 +1,19 @@
+use super::{ChoiceId, PendingChoice};
+
 /// A dialog the app shows over the window.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Modal {
-    Message { title: String, text: String },
+    Message {
+        title: String,
+        text: String,
+    },
+    /// A question with one button per choice, and Cancel.
+    Choice {
+        title: String,
+        text: String,
+        choices: Vec<(ChoiceId, String)>,
+        pending: PendingChoice,
+    },
 }
 
 /// How the user closed a modal.
@@ -9,6 +21,7 @@ pub enum Modal {
 pub enum ModalAnswer {
     Accept,
     Cancel,
+    Choice(ChoiceId),
 }
 
 /// A text field inside a modal's form.
