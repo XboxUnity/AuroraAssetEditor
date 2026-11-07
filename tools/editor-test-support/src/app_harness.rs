@@ -189,6 +189,20 @@ impl AppHarness {
         self.run_jobs_with(|_, _| {});
     }
 
+    /// Runs the job a worker would take next; `false` when none is queued.
+    pub fn run_next_job(&mut self) -> bool {
+        self.running();
+        let Some(job) = self.jobs.next_job() else {
+            return false;
+        };
+        let running = self
+            .running
+            .as_mut()
+            .expect("the app was built before the first job");
+        run_job(running, job, &mut |_, _| {});
+        true
+    }
+
     /// Like `run_jobs`, calling `hook` right after each outcome, progress included, has been applied.
     pub fn run_jobs_with(&mut self, mut hook: impl FnMut(&mut App, OutcomeStage)) {
         self.running();

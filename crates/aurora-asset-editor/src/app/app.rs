@@ -8,6 +8,7 @@ use crate::dialogs::{Modal, ModalAnswer, ModalField, ModalQueue, UnofferedChoice
 use crate::editor::EditorPages;
 use crate::jobs::{JobOutcome, Progress};
 use crate::logging::error_chain;
+use crate::online::OnlineState;
 use crate::platform::{DialogError, OpenRequest, SaveRequest};
 use crate::settings::AppSettings;
 use crate::status::{ActiveWork, Locks, StatusLine};
@@ -29,6 +30,7 @@ pub struct App {
     pub(super) pages: EditorPages,
     pub(super) current_game: Option<CurrentGame>,
     pub(super) console: ConsoleState,
+    pub(super) online: OnlineState,
     pub(super) status: StatusLine,
     pub(super) active_work: ActiveWork,
     pub(super) modals: ModalQueue,
@@ -50,6 +52,7 @@ impl App {
             pages: EditorPages::new(),
             current_game: None,
             console,
+            online: OnlineState::new(),
             status: StatusLine::ready(),
             active_work: ActiveWork::default(),
             modals: ModalQueue::new(),
@@ -190,6 +193,7 @@ impl App {
             JobOutcome::Loaded(loaded) => self.apply_loaded(loaded),
             JobOutcome::Imported(results) => self.apply_imported(results),
             JobOutcome::Console(outcome) => self.apply_console_outcome(outcome),
+            JobOutcome::Online(outcome) => self.apply_online_outcome(outcome),
             JobOutcome::Progress(Progress::Console { kind, status }) => {
                 self.apply_console_status(kind, &status);
             }

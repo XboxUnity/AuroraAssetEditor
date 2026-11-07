@@ -12,8 +12,12 @@ impl App {
 
     pub fn set_current_game(&mut self, game: Option<CurrentGame>) {
         self.current_game = game;
-        if self.current_game.is_none() {
-            self.console.table.clear_selection();
+        match &self.current_game {
+            Some(game) => self.online.title_id_text = game.ids.title_id.to_string(),
+            None => {
+                self.online.title_id_text.clear();
+                self.console.table.clear_selection();
+            }
         }
     }
 

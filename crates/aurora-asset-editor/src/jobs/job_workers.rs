@@ -33,6 +33,7 @@ impl JobWorkers {
             Job::Load(load) => JobOutcome::Loaded(load.run()),
             Job::Import(import) => JobOutcome::Imported(import.run()),
             Job::Console(request) => JobOutcome::Console(self.console.run(request, &self.online)),
+            Job::Online(online) => JobOutcome::Online(online.run(&self.online)),
         }
     }
 }

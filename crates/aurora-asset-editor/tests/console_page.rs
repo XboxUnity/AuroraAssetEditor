@@ -507,7 +507,7 @@ fn title_sort_ignores_case() {
 }
 
 #[test]
-fn selecting_a_game_sets_current_game() {
+fn selecting_a_game_sets_current_game_and_online_title_id() {
     let mut harness = AppHarness::new();
     show_games(&mut harness, mixed_case_games());
     harness.app().sort_games(GameColumn::Title);
@@ -523,6 +523,7 @@ fn selecting_a_game_sets_current_game() {
         selected.map(|game| game.title_name),
         Some("banana".to_owned())
     );
+    assert_eq!(harness.app().online().title_id_text, "4D5307E6");
 }
 
 #[test]
@@ -536,6 +537,7 @@ fn clearing_game_clears_table_selection() {
 
     assert!(harness.app().current_game().is_none());
     assert!(harness.app().console().table.selected().is_none());
+    assert_eq!(harness.app().online().title_id_text, "");
 }
 
 #[test]

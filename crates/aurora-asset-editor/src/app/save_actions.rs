@@ -2,7 +2,7 @@ use std::error::Error;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use aurora_asset::{AssetKind, AssetSlot};
+use aurora_asset::{AssetKind, AssetSlot, RgbaImage};
 use aurora_console::asset_file_name;
 use aurora_image::ExportFormat;
 
@@ -123,15 +123,20 @@ impl App {
         let Some(path) = self.ask_save_file(&request) else {
             return;
         };
-        match ExportFormat::from_path(&path).encode(&pixels) {
-            Ok(bytes) => match fs::write(&path, bytes) {
+        self.write_image_file(&pixels, &path);
+    }
+
+    /// Encodes `pixels` in the format the extension of `path` names and writes the file; the outcome is
+    /// shown.
+    pub(super) fn write_image_file(&mut self, pixels: &RgbaImage, path: &Path) {
+        match ExportFormat::from_path(path).encode(pixels) {
+            Ok(bytes) => match fs::write(path, bytes) {
                 Ok(()) => {
-                    self.status =
-                        StatusLine::info(format!("Exported {}", file_display_name(&path)));
+                    self.status = StatusLine::info(format!("Exported {}", file_display_name(path)));
                 }
-                Err(error) => self.show_save_failure(&path, &error, &error, &[]),
+                Err(error) => self.show_save_failure(path, &error, &error, &[]),
             },
-            Err(error) => self.show_save_failure(&path, &error, &error, &[]),
+            Err(error) => self.show_save_failure(path, &error, &error, &[]),
         }
     }
 

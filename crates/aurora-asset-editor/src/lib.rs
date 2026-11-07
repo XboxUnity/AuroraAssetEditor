@@ -8,6 +8,7 @@ pub mod editor;
 pub mod files;
 pub mod jobs;
 pub mod logging;
+pub mod online;
 pub mod platform;
 pub mod settings;
 pub mod status;
