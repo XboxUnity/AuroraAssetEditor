@@ -21,8 +21,9 @@ pub enum ConsoleError {
         port: u16,
         source: io::Error,
     },
+    /// Only the reply code is kept: Aurora's reply to a wrong password echoes the stored password hash.
     LoginRejected {
-        reply: String,
+        code: u32,
     },
     NotAurora {
         reply: String,
@@ -75,7 +76,10 @@ impl fmt::Display for ConsoleError {
             Self::Connect { host, port, .. } => {
                 write!(f, "could not connect to {host} on port {port}")
             }
-            Self::LoginRejected { reply } => write!(f, "the console rejected the login: {reply}"),
+            Self::LoginRejected { code } => write!(
+                f,
+                "the console rejected the login (reply {code}), check the FTP user name and password"
+            ),
             Self::NotAurora { reply } => {
                 write!(f, "the console does not look like it runs Aurora: {reply}")
             }

@@ -4,7 +4,9 @@ use aurora_console::{
 use std::net::TcpListener;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
-use test_servers::{FakeConsole, FakeConsoleConfig, FakeFeatures, ListingStyle};
+use test_servers::{
+    FAKE_INPUT_HASH, FAKE_STORED_HASH, FakeConsole, FakeConsoleConfig, FakeFeatures, ListingStyle,
+};
 
 const HOST: &str = "127.0.0.1";
 const SHORT: Duration = Duration::from_millis(500);
@@ -103,17 +105,72 @@ fn refused_site_revision_is_not_aurora() {
 }
 
 #[test]
-fn wrong_password_is_login_rejected() {
+fn wrong_password_is_login_rejected_without_the_reply_text() {
     let console = FakeConsole::start(FakeConsoleConfig::default());
     let mut client = ConsoleClient::new(
         settings(console.port(), "xboxftp", "wrong"),
         timeouts(),
         |_| {},
     );
-    match client.test_connection() {
-        Err(ConsoleError::LoginRejected { reply }) => assert!(reply.contains("530"), "{reply}"),
-        other => panic!("expected LoginRejected, got {other:?}"),
+
+    let error = client.test_connection().unwrap_err();
+
+    assert!(
+        matches!(error, ConsoleError::LoginRejected { code: 530 }),
+        "{error:?}"
+    );
+    assert_login_text_is_hidden(&error);
+}
+
+#[test]
+fn unknown_user_is_login_rejected_not_a_protocol_error() {
+    let console = FakeConsole::start(FakeConsoleConfig::default());
+    let mut client = ConsoleClient::new(
+        settings(console.port(), "nobody", "xboxftp"),
+        timeouts(),
+        |_| {},
+    );
+
+    let error = client.test_connection().unwrap_err();
+
+    assert!(
+        matches!(error, ConsoleError::LoginRejected { code: 332 }),
+        "{error:?}"
+    );
+    assert_login_text_is_hidden(&error);
+}
+
+fn assert_login_text_is_hidden(error: &ConsoleError) {
+    let shown = format!("{error} {error:?}");
+    for hidden in [
+        FAKE_INPUT_HASH,
+        FAKE_STORED_HASH,
+        "Login failed",
+        "User not OK",
+    ] {
+        assert!(!shown.contains(hidden), "{shown}");
     }
+}
+
+#[test]
+fn opts_utf8_refusal_is_not_an_error() {
+    let console = FakeConsole::start(FakeConsoleConfig::default());
+    let statuses = Arc::new(Mutex::new(Vec::<String>::new()));
+    let mut client = ConsoleClient::new(
+        settings(console.port(), "xboxftp", "xboxftp"),
+        timeouts(),
+        {
+            let statuses = Arc::clone(&statuses);
+            move |status: &ConsoleStatus| statuses.lock().unwrap().push(status.to_string())
+        },
+    );
+
+    client
+        .test_connection()
+        .expect("the 502 to OPTS UTF8 ON is ignored");
+
+    assert!(console.commands().contains(&"OPTS UTF8 ON".to_owned()));
+    assert_eq!(statuses.lock().unwrap().len(), 3);
 }
 
 #[test]

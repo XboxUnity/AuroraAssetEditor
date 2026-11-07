@@ -168,11 +168,12 @@ impl ConsoleConnection {
         }
     }
 
+    /// Any refusal of USER or PASS, Aurora's 332 for an unknown user included, is a rejected login.
     fn log_in(&mut self, settings: &FtpSettings) -> Result<(), ConsoleError> {
         match self.stream.login(&settings.username, &settings.password) {
             Ok(()) => Ok(()),
             Err(FtpError::UnexpectedResponse(response)) => Err(ConsoleError::LoginRejected {
-                reply: String::from_utf8_lossy(&response.body).trim().to_owned(),
+                code: response.status.code(),
             }),
             Err(source) => Err(ConsoleError::Protocol {
                 action: "log in".to_owned(),
