@@ -22,6 +22,7 @@ mod page;
 mod pending_import_status;
 mod save_actions;
 mod settings_actions;
+mod shutdown_actions;
 mod startup_settings;
 
 pub use about_actions::{ABOUT_TITLE, COPY_BUILD_INFO_FAILED, OPEN_LOG_FOLDER_FAILED};

@@ -19,7 +19,10 @@ const ONLINE_THREAD: &str = "online";
 /// thread takes its `User` jobs before its `Background` ones; outcomes and progress go to `outcomes`.
 pub struct ThreadRunner {
     queues: Arc<RunnerQueues>,
-    threads: Vec<JoinHandle<()>>,
+    /// Waited for at the shutdown: an interrupted console upload would leave a half-written file behind.
+    joined_threads: Vec<JoinHandle<()>>,
+    /// Not waited for: an online fetch can take until its timeout, and nothing is lost when it is cut off.
+    online_thread: Option<JoinHandle<()>>,
 }
 
 impl ThreadRunner {
@@ -32,7 +35,8 @@ impl ThreadRunner {
         let queues = Arc::new(RunnerQueues::default());
         let mut runner = ThreadRunner {
             queues: Arc::clone(&queues),
-            threads: Vec::new(),
+            joined_threads: Vec::new(),
+            online_thread: None,
         };
         let threads = [
             (LOAD_THREAD, QueueId::Load),
@@ -46,7 +50,10 @@ impl ThreadRunner {
             let thread = thread::Builder::new()
                 .name(format!("{name} worker"))
                 .spawn(move || work(&*make_executor, queues.queue(queue_id), &outcomes))?;
-            runner.threads.push(thread);
+            match queue_id {
+                QueueId::Online => runner.online_thread = Some(thread),
+                QueueId::Load | QueueId::Console => runner.joined_threads.push(thread),
+            }
         }
         Ok(runner)
     }
@@ -58,14 +65,16 @@ impl ThreadRunner {
         }
     }
 
-    /// Drops the jobs that have not started, waits for the running ones to end and joins the threads.
+    /// Drops the jobs that have not started and waits for the running load and console jobs to end. The online
+    /// thread is left to end on its own; dropping its handle detaches it.
     pub fn shutdown(mut self) {
         self.stop();
     }
 
     fn stop(&mut self) {
         self.queues.close_all();
-        for thread in self.threads.drain(..) {
+        self.online_thread = None;
+        for thread in self.joined_threads.drain(..) {
             let name = thread.thread().name().unwrap_or_default().to_owned();
             if thread.join().is_err() {
                 log::error!("The {name} thread ended with a panic");

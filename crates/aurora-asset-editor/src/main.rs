@@ -97,6 +97,7 @@ fn run(
 
     let window = MainWindow::new()?;
     let (outcomes, outcome_receiver) = async_channel::unbounded();
+    let outcomes_after_close = outcome_receiver.clone();
     let timeouts = Timeouts::default();
     let online = OnlineClient::new(Endpoints::live(), DEFAULT_TIMEOUT);
     let runner = ThreadRunner::new(move || JobWorkers::new(timeouts, online.clone()), outcomes)?;
@@ -138,6 +139,8 @@ fn run(
         report_outside_event_loop(&exit_log, HIDE_FAILED, &error);
     }
     runner.shutdown();
+    app.borrow_mut()
+        .apply_outcomes_after_close(&outcomes_after_close);
     Ok(())
 }
 

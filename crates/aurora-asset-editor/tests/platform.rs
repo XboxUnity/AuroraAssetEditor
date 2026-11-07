@@ -4,12 +4,14 @@ use std::sync::mpsc;
 use std::sync::{Arc, Mutex, PoisonError};
 
 use aurora_asset_editor::jobs::{
-    ConsoleJob, ConsoleJobKind, ConsoleRequest, FailedJob, Job, JobExecutor, JobOutcome,
-    JobPriority, JobRunner, Progress, ProgressSink, ThreadRunner,
+    ConsoleJob, ConsoleJobKind, ConsoleOutcome, ConsoleRequest, FailedJob, Job, JobExecutor,
+    JobOutcome, JobPriority, JobRunner, OnlineJob, Progress, ProgressSink, ThreadRunner,
 };
 use aurora_asset_editor::logging::{ERROR_LOG_FILE, ErrorLog, LogBridge, install_panic_hook};
 use aurora_asset_editor::platform::{DropSignal, FileDropCollector};
-use aurora_console::FtpSettings;
+use aurora_console::{ConsoleError, FtpSettings};
+use aurora_online::{CoverQuery, CoverSource, TitleId};
+use editor_test_support::AppHarness;
 use slint::winit_030::winit::event::WindowEvent;
 
 const GATE_JOB: u64 = 1;
@@ -18,6 +20,8 @@ const SECOND_USER_JOB: u64 = 3;
 const PANIC_JOB: u64 = 4;
 const AFTER_PANIC_JOB: u64 = 5;
 const WORKER_THREADS: usize = 3;
+/// Far longer than joining two threads that have finished their jobs takes.
+const SHUTDOWN_LIMIT: std::time::Duration = std::time::Duration::from_secs(10);
 
 /// The panic hook and the logger are global: the tests that install them or panic take turns.
 static GLOBAL_HOOKS: Mutex<()> = Mutex::new(());
@@ -246,4 +250,85 @@ fn panicking_job_fails_and_the_next_job_gets_a_fresh_executor() {
     runner.shutdown();
     // One executor per thread, plus the one built after the panic.
     assert_eq!(built.load(Ordering::SeqCst), WORKER_THREADS + 1);
+}
+
+/// Holds the console job and the online job until the test opens their gates; the console job then fails.
+struct ShutdownExecutor {
+    console_gate: Arc<Mutex<mpsc::Receiver<()>>>,
+    online_gate: Arc<Mutex<mpsc::Receiver<()>>>,
+    started: mpsc::Sender<()>,
+}
+
+impl JobExecutor for ShutdownExecutor {
+    fn execute(&mut self, job: Job, _progress: &ProgressSink) -> JobOutcome {
+        self.started.send(()).expect("the test waits for both jobs");
+        let gate = match &job {
+            Job::Console(_) => &self.console_gate,
+            Job::Online(_) => &self.online_gate,
+            other => panic!("the test only submits console and online jobs, got {other:?}"),
+        };
+        let opened = gate.lock().unwrap_or_else(PoisonError::into_inner).recv();
+        assert!(
+            opened.is_ok() || matches!(job, Job::Online(_)),
+            "the console gate opens"
+        );
+        JobOutcome::Console(ConsoleOutcome::Tested(Err(ConsoleError::LoginRejected {
+            code: 530,
+        })))
+    }
+}
+
+#[test]
+fn shutdown_waits_for_the_console_job_only_and_its_failure_is_logged() {
+    let (open_console, console_gate) = mpsc::channel();
+    let (open_online, online_gate) = mpsc::channel::<()>();
+    let console_gate = Arc::new(Mutex::new(console_gate));
+    let online_gate = Arc::new(Mutex::new(online_gate));
+    let (report_start, started) = mpsc::channel();
+    let (sender, receiver) = async_channel::unbounded();
+    let mut runner = ThreadRunner::new(
+        move || ShutdownExecutor {
+            console_gate: Arc::clone(&console_gate),
+            online_gate: Arc::clone(&online_gate),
+            started: report_start.clone(),
+        },
+        sender,
+    )
+    .expect("the test can start worker threads");
+    runner.submit(refresh_job(GATE_JOB), JobPriority::User);
+    let query = CoverQuery::TitleId(TitleId::parse("4D5307E6").expect("a valid TitleID"));
+    runner.submit(
+        Job::Online(OnlineJob::Search {
+            generation: 1,
+            source: CoverSource::XboxUnity,
+            query,
+        }),
+        JobPriority::User,
+    );
+    for _ in 0..2 {
+        started.recv().expect("both jobs start");
+    }
+
+    // The window has closed: nothing receives outcomes any more. The console job ends during the shutdown.
+    open_console
+        .send(())
+        .expect("the console worker holds its gate");
+    let (report_shutdown, shut_down) = mpsc::channel();
+    std::thread::spawn(move || {
+        runner.shutdown();
+        report_shutdown
+            .send(())
+            .expect("the test waits for the shutdown");
+    });
+    // A failed wait unwinds, which drops `open_online` and lets the online job end.
+    shut_down
+        .recv_timeout(SHUTDOWN_LIMIT)
+        .expect("the shutdown does not wait for the online job");
+    let mut harness = AppHarness::new();
+    harness.app().apply_outcomes_after_close(&receiver);
+
+    let log = harness.error_log_text();
+    assert!(log.contains("The connection test failed"), "{log}");
+    assert!(receiver.is_empty(), "every outcome was applied");
+    drop(open_online);
 }
