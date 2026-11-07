@@ -315,6 +315,36 @@ fn transparent_colour_counts(references: &[Reference]) -> (usize, usize) {
     (transparent, coloured)
 }
 
+/// The committed gate inputs must be exactly what `closeness-inputs` writes today.
+fn ensure_gate_inputs_current(committed_dir: &Path, regenerated_dir: &Path) -> Result<()> {
+    let committed = sorted_files(committed_dir)?;
+    let regenerated = sorted_files(regenerated_dir)?;
+    let names = |files: &[PathBuf]| -> Vec<String> {
+        files
+            .iter()
+            .map(|file| {
+                file.file_name()
+                    .map(|name| name.to_string_lossy().into_owned())
+                    .unwrap_or_default()
+            })
+            .collect()
+    };
+    ensure!(
+        names(&committed) == names(&regenerated),
+        "the committed gate inputs {:?} differ from the generated set {:?}",
+        names(&committed),
+        names(&regenerated)
+    );
+    for (committed, regenerated) in committed.iter().zip(&regenerated) {
+        ensure!(
+            std::fs::read(committed)? == std::fs::read(regenerated)?,
+            "the committed gate input {} differs from `cargo xtask closeness-inputs`",
+            committed.display()
+        );
+    }
+    Ok(())
+}
+
 fn ensure_references_current(committed: &[Reference], regenerated: &[Reference]) -> Result<()> {
     ensure!(
         committed.len() == regenerated.len(),
@@ -495,8 +525,12 @@ pub fn write_report() -> Result<()> {
 
     let gate_inputs = gate_directory(&paths);
     let gate_references = read_references(&paths.closeness().join(REFERENCE_DIRECTORY))?;
+    let fresh_gate_inputs = work.join("gate-inputs");
+    std::fs::create_dir_all(&fresh_gate_inputs)?;
+    closeness_inputs::write_gate_set(&paths, &fresh_gate_inputs)?;
+    ensure_gate_inputs_current(&gate_inputs, &fresh_gate_inputs)?;
     let fresh_gate_dir = work.join("gate-gdiplus");
-    run_reference_tool(&paths, &gate_inputs, &fresh_gate_dir)?;
+    run_reference_tool(&paths, &fresh_gate_inputs, &fresh_gate_dir)?;
     ensure_references_current(&gate_references, &read_references(&fresh_gate_dir)?)?;
     let gate_rows = measure_gate(&decode_inputs(&gate_inputs)?, &gate_references)?;
 

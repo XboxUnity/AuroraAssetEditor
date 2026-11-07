@@ -10,6 +10,7 @@ C:\Windows\SysWOW64\WindowsPowerShell\v1.0\powershell.exe.
 For an input already at one of the target sizes only that size is written; any other input
 is written at every target, as <name>.<width>x<height>.argb in the output folder.
 #>
+#Requires -PSEdition Desktop
 param(
     [Parameter(Mandatory = $true)][string]$InputDir,
     [Parameter(Mandatory = $true)][string]$OutputDir,

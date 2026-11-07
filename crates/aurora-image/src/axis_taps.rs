@@ -41,18 +41,36 @@ pub(crate) struct AxisTaps {
 
 /// The 16.16 source distance between two output pixels.
 fn fixed_point_step(source_len: u32, output_len: u32) -> u64 {
-    (u64::from(source_len) << FIXED_POINT_SHIFT) / u64::from(output_len)
+    (u64::from(source_len) << FIXED_POINT_SHIFT)
+        .checked_div(u64::from(output_len))
+        .unwrap_or(0)
 }
 
 fn rounded_fixed_point_step(source_len: u32, output_len: u32) -> u64 {
     let output = u64::from(output_len);
-    ((u64::from(source_len) << FIXED_POINT_SHIFT) + output / 2) / output
+    ((u64::from(source_len) << FIXED_POINT_SHIFT) + output / 2)
+        .checked_div(output)
+        .unwrap_or(0)
 }
 
 impl AxisTaps {
+    /// Every output pixel transparent black: there is no source pixel to read.
+    fn empty_source(output_len: u32) -> Self {
+        let per_output = (0..output_len)
+            .map(|_| OutputTaps {
+                taps: Vec::new(),
+                divisor: 1,
+            })
+            .collect();
+        Self { per_output }
+    }
+
     /// Two taps around the sample position, pixel centres aligned (`(x + 0.5) * scale - 0.5`),
     /// edges repeating the nearest pixel, whatever the scale.
     pub(crate) fn centred_bilinear(output_len: u32, source_len: u32) -> Self {
+        if source_len == 0 {
+            return Self::empty_source(output_len);
+        }
         let scale = f64::from(source_len) / f64::from(output_len);
         let last = f64::from(source_len - 1);
         let per_output = (0..output_len)
@@ -132,7 +150,7 @@ impl AxisTaps {
                     .collect();
                 OutputTaps {
                     taps,
-                    divisor: end - start,
+                    divisor: (end - start).max(1),
                 }
             })
             .collect();

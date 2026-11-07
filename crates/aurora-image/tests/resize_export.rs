@@ -181,3 +181,13 @@ fn jpeg_export_drops_alpha() {
         assert!(pixel[1].abs_diff(40) <= 6, "green {}", pixel[1]);
     }
 }
+
+#[test]
+fn every_resampler_survives_empty_sizes() {
+    for resampler in Resampler::ALL {
+        let from_empty = resampler.resize(&RgbaImage::new(0, 0), 3, 2);
+        assert_eq!(from_empty.dimensions(), (3, 2), "{}", resampler.name());
+        let to_empty = resampler.resize(&with_transparent_pixels(), 0, 0);
+        assert_eq!(to_empty.dimensions(), (0, 0), "{}", resampler.name());
+    }
+}
