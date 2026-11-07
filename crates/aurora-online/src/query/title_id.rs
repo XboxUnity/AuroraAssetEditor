@@ -1,5 +1,7 @@
 use std::fmt;
 
+use dotnet_number_text::trim_number_text;
+
 const TITLE_ID_DIGITS: usize = 8;
 const HEX_RADIX: u32 = 16;
 const HEX_DIGIT_BITS: u32 = 4;
@@ -41,7 +43,7 @@ impl TitleId {
     }
 
     pub fn parse(text: &str) -> Result<TitleId, QueryError> {
-        let trimmed = trim_like_dotnet(text);
+        let trimmed = trim_number_text(text);
         if trimmed.is_empty() {
             return Err(QueryError::Empty);
         }
@@ -67,14 +69,6 @@ impl TitleId {
         };
         Ok(TitleId(value))
     }
-}
-
-/// `NumberStyles.HexNumber` allows white space (U+0009 to U+000D, U+0020) at both ends and
-/// trailing NUL characters; `str::trim` would also strip other Unicode white space.
-fn trim_like_dotnet(text: &str) -> &str {
-    let is_white_space = |c: char| matches!(c, '\u{9}'..='\u{D}' | ' ');
-    text.trim_start_matches(is_white_space)
-        .trim_end_matches(|c: char| is_white_space(c) || c == '\0')
 }
 
 impl fmt::Display for TitleId {
@@ -119,6 +113,9 @@ mod tests {
     fn trims_like_dotnet() {
         assert_eq!(parsed("\t\n1F\r "), Ok("0000001F".to_string()));
         assert_eq!(parsed("1F\0"), Ok("0000001F".to_string()));
+        assert_eq!(parsed("1F \0"), Ok("0000001F".to_string()));
+        assert!(matches!(parsed("1F\0 "), Err(QueryError::NotHex { .. })));
+        assert!(matches!(parsed("1F \0 "), Err(QueryError::NotHex { .. })));
         assert!(matches!(parsed("\u{A0}1F"), Err(QueryError::NotHex { .. })));
     }
 

@@ -7,6 +7,7 @@ rust-version.workspace = true
 [dependencies]
 aurora-asset = { path = "../aurora-asset" }
 directories = "6.0.0"
+dotnet-number-text = { path = "../dotnet-number-text" }
 regex = "1.13.1"
 rusqlite = { version = "0.41.1", features = ["bundled"] }
 serde = { version = "1.0.229", features = ["derive"] }

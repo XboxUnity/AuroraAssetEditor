@@ -5,6 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+dotnet-number-text = { path = "../dotnet-number-text" }
 fastrand = "2.5.0"
 regex = "1.13.1"
 serde = { version = "1.0.229", features = ["derive"] }

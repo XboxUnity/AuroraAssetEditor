@@ -4,6 +4,7 @@ members = [
     "crates/aurora-asset",
     "crates/aurora-console",
     "crates/aurora-online",
+    "crates/dotnet-number-text",
     "tools/golden/harness",
     "tools/test-servers",
     "xtask",

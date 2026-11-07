@@ -1,3 +1,4 @@
+use dotnet_number_text::trim_number_text;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::io;
@@ -128,11 +129,7 @@ impl FtpSettings {
 
     /// Follows the old `int.TryParse` (NumberStyles.Integer): text that is not an `i32`, and port 0 (netftp's `Port` getter), fall back to 21.
     pub fn port_number(&self) -> Result<u16, SettingsError> {
-        let number = self
-            .port
-            .trim_end_matches('\0')
-            .trim_matches(is_dotnet_whitespace);
-        let Ok(port) = number.parse::<i32>() else {
+        let Ok(port) = trim_number_text(&self.port).parse::<i32>() else {
             return Ok(DEFAULT_PORT);
         };
         match u16::try_from(port) {
@@ -141,9 +138,4 @@ impl FtpSettings {
             _ => Err(SettingsError::PortOutOfRange { port }),
         }
     }
-}
-
-/// .NET's `NumberStyles.Integer` white space: U+0009 to U+000D and U+0020 only.
-fn is_dotnet_whitespace(c: char) -> bool {
-    matches!(c, '\u{9}'..='\u{d}' | ' ')
 }
