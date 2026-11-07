@@ -35,7 +35,7 @@ impl ConsoleState {
         self.presence_gate.current()
     }
 
-    pub(crate) fn presence_gate(&self) -> &PresenceGate {
+    pub fn presence_gate(&self) -> &PresenceGate {
         &self.presence_gate
     }
 

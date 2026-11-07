@@ -23,6 +23,8 @@ pub const EMPTY_UPLOAD_TITLE: &str = "Upload empty assets?";
 pub const NOTHING_TO_UPLOAD_TEXT: &str = "Nothing to upload: every page in the editor is empty.";
 const REMOVE_CONFIRM_LABEL: &str = "Remove";
 const EMPTY_UPLOAD_CONFIRM_LABEL: &str = "Upload";
+const ALREADY_LOADED_LABEL: &str = "Already loaded:";
+const ALREADY_SENT_LABEL: &str = "Already sent:";
 const STATUS_SEPARATOR: &str = " · ";
 
 impl App {
@@ -180,12 +182,17 @@ impl App {
         true
     }
 
+    /// The bytes an upload of the page sends: its asset file as it is, gaps and offsets kept.
+    pub fn page_bytes(&mut self, kind: AssetKind) -> Vec<u8> {
+        self.pages.get_mut(kind).to_bytes()
+    }
+
     fn page_files(&mut self, kinds: &[AssetKind]) -> Vec<AssetUpload> {
         kinds
             .iter()
             .map(|kind| AssetUpload {
                 kind: *kind,
-                bytes: self.pages.get_mut(*kind).to_bytes(),
+                bytes: self.page_bytes(*kind),
             })
             .collect()
     }
@@ -287,7 +294,12 @@ impl App {
                 self.show_connection_failed(&error);
             } else {
                 let context = format!("Could not download {}", kind_name(kind));
-                self.report_console_error(&context, &error);
+                if loaded.is_empty() {
+                    self.report_console_error(&context, &error);
+                } else {
+                    let note = format!("{ALREADY_LOADED_LABEL} {}", kind_list(&loaded));
+                    self.report_console_error_noting(&context, &error, &note);
+                }
             }
             return;
         }
@@ -332,7 +344,12 @@ impl App {
             }
             Some((kind, error)) => {
                 let context = format!("Could not {verb} {}", kind_name(kind));
-                self.report_console_error(&context, &error);
+                if done.is_empty() {
+                    self.report_console_error(&context, &error);
+                } else {
+                    let note = format!("{ALREADY_SENT_LABEL} {}", kind_list(&done));
+                    self.report_console_error_noting(&context, &error, &note);
+                }
             }
             None => {
                 self.status = StatusLine::info(format!(

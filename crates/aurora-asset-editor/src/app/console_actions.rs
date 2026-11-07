@@ -333,6 +333,18 @@ impl App {
         self.set_error_status(format!("{context}: {}", error_sentence(error)), log_failure);
     }
 
+    /// Like `report_console_error`, with `note` (what the failed job had done before) after the error.
+    pub(super) fn report_console_error_noting(
+        &mut self,
+        context: &str,
+        error: &(dyn Error + 'static),
+        note: &str,
+    ) {
+        let log_failure = self.record_error(context, error);
+        let text = format!("{context}: {}. {note}", error_sentence(error));
+        self.set_error_status(text, log_failure);
+    }
+
     pub(super) fn refuse_while_console_busy(&mut self) -> bool {
         if self.active_work.console.is_none() {
             return false;

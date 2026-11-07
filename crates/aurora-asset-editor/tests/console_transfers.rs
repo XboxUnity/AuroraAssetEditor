@@ -7,19 +7,26 @@ use aurora_asset::{
 use aurora_asset_editor::app::Page;
 use aurora_asset_editor::app::{
     BUSY_TEXT, CONNECTION_FAILED_TITLE, CurrentGame, EMPTY_UPLOAD_TITLE, KindChoice,
-    NO_CONSOLE_SET_UP_REASON, REMOVE_CONFIRM_TITLE, SELECT_A_GAME_REASON, UPLOAD_TARGET_TITLE,
+    NO_CONSOLE_SET_UP_REASON, NOTHING_TO_UPLOAD_TEXT, REMOVE_CONFIRM_TITLE, SELECT_A_GAME_REASON,
+    UPLOAD_TARGET_TITLE,
 };
 use aurora_asset_editor::console::PresenceCell;
 use aurora_asset_editor::dialogs::{Modal, ModalAnswer, ModalField};
 use aurora_asset_editor::editor::SlotPreview;
+use aurora_asset_editor::jobs::Progress;
 use aurora_asset_editor::status::Severity;
 use aurora_console::{
-    AssetPresence, FtpSettings, GameIds, HexId, asset_file_name, asset_folder, read_content_db,
+    AssetPresence, ConsoleStatus, FtpSettings, GameIds, HexId, asset_file_name, asset_folder,
+    read_content_db,
 };
 use editor_test_support::{AppHarness, OutcomeStage, asset_file_with};
 use test_servers::{FakeConsole, FakeConsoleConfig};
 
 const GAME_TITLE: &str = "Halo";
+
+fn typical_db_path() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/console/content-db/typical.db")
+}
 
 fn ids(title_id: &str, database_id: &str) -> GameIds {
     GameIds {
@@ -248,6 +255,7 @@ fn upload_cover_sends_page_bytes_unchanged() {
     let mut cover = cover_file(10);
     load_into_editor(&mut harness, "cover.asset", &mut cover);
     select_halo(&mut harness);
+    let page_bytes = harness.app().page_bytes(AssetKind::Cover);
 
     harness
         .app()
@@ -256,7 +264,7 @@ fn upload_cover_sends_page_bytes_unchanged() {
 
     assert_eq!(
         console.file(&console_path(&halo(), AssetKind::Cover)),
-        Some(cover.to_bytes())
+        Some(page_bytes)
     );
     assert_eq!(harness.app().status().text, "Uploaded cover to the console");
 }
@@ -271,6 +279,7 @@ fn upload_screenshots_keeps_gaps() {
     ]);
     load_into_editor(&mut harness, "screenshots.asset", &mut screenshots);
     select_halo(&mut harness);
+    let page_bytes = harness.app().page_bytes(AssetKind::Screenshots);
 
     harness
         .app()
@@ -280,6 +289,7 @@ fn upload_screenshots_keeps_gaps() {
     let bytes = console
         .file(&console_path(&halo(), AssetKind::Screenshots))
         .expect("the screenshots were uploaded");
+    assert_eq!(bytes, page_bytes);
     let uploaded = AssetFile::parse(&bytes).unwrap();
     let filled: Vec<u8> = ScreenshotNumber::ALL
         .into_iter()
@@ -396,6 +406,7 @@ fn save_all_to_console_uploads_only_kinds_with_content() {
     console.add_dir(&asset_folder(&typed));
     let mut cover = cover_file(10);
     load_into_editor(&mut harness, "cover.asset", &mut cover);
+    let page_bytes = harness.app().page_bytes(AssetKind::Cover);
 
     harness.app().save_all_to_console();
     harness
@@ -409,7 +420,7 @@ fn save_all_to_console_uploads_only_kinds_with_content() {
 
     assert_eq!(
         console.file("/Game/Data/GameData/4d5307e6_0000001a/GC4d5307e6.asset"),
-        Some(cover.to_bytes())
+        Some(page_bytes)
     );
     for kind in [
         AssetKind::Background,
@@ -592,4 +603,218 @@ fn opening_and_dropping_files_during_a_download_is_refused() {
     assert_eq!(harness.queued_jobs(), 0);
     assert_eq!(harness.app().modal(), None);
     assert!(!harness.app().locks().editor);
+}
+
+#[test]
+fn multi_kind_source_uploads_only_the_loaded_page() {
+    let (mut harness, console) = harness_with_empty_console();
+    console.add_dir(&asset_folder(&halo()));
+    let mut source = cover_file(10);
+    source.replace_kind(AssetKind::Background, &background_file());
+    load_into_editor(&mut harness, "both.asset", &mut source);
+    select_halo(&mut harness);
+    let page_bytes = harness.app().page_bytes(AssetKind::Cover);
+
+    harness
+        .app()
+        .upload_current(KindChoice::One(AssetKind::Cover));
+    harness.run_jobs();
+
+    let bytes = console
+        .file(&console_path(&halo(), AssetKind::Cover))
+        .expect("the cover was uploaded");
+    assert_eq!(bytes, page_bytes);
+    assert!(!harness.app().pages().background.has_content());
+    assert!(
+        AssetFile::parse(&bytes)
+            .unwrap()
+            .get(AssetSlot::Background)
+            .is_none()
+    );
+}
+
+#[test]
+fn source_with_a_removed_entry_uploads_the_page_bytes() {
+    let (mut harness, console) = harness_with_empty_console();
+    console.add_dir(&asset_folder(&halo()));
+    let mut source = icon_banner_file();
+    source.set(AssetSlot::Icon, None);
+    load_into_editor(&mut harness, "banner-only.asset", &mut source);
+    select_halo(&mut harness);
+    let page_bytes = harness.app().page_bytes(AssetKind::IconBanner);
+
+    harness
+        .app()
+        .upload_current(KindChoice::One(AssetKind::IconBanner));
+    harness.run_jobs();
+
+    let bytes = console
+        .file(&console_path(&halo(), AssetKind::IconBanner))
+        .expect("the icon & banner were uploaded");
+    assert_eq!(bytes, page_bytes);
+    let uploaded = AssetFile::parse(&bytes).unwrap();
+    assert!(uploaded.get(AssetSlot::Icon).is_none());
+    assert!(uploaded.get(AssetSlot::Banner).is_some());
+}
+
+#[test]
+fn partial_upload_failure_names_what_was_sent() {
+    let (mut harness, console) = harness_with_empty_console();
+    console.add_dir(&asset_folder(&halo()));
+    load_into_editor(&mut harness, "cover.asset", &mut cover_file(10));
+    load_into_editor(&mut harness, "background.asset", &mut background_file());
+    select_halo(&mut harness);
+    let uploading = Cell::new(0);
+
+    harness.app().save_all_to_console();
+    harness
+        .app()
+        .edit_modal_field(ModalField::UploadTitleId, "4D5307E6");
+    harness
+        .app()
+        .edit_modal_field(ModalField::UploadDatabaseId, "00000012");
+    harness.app().answer_modal(ModalAnswer::Accept);
+    harness.run_jobs_with(|_, stage| {
+        let OutcomeStage::Progress(Progress::Console {
+            status: ConsoleStatus::Uploading { .. },
+            ..
+        }) = stage
+        else {
+            return;
+        };
+        uploading.set(uploading.get() + 1);
+        if uploading.get() == 2 {
+            console.refuse_data_connections();
+        }
+    });
+
+    let status = harness.app().status();
+    assert_eq!(status.severity, Severity::Error);
+    assert!(
+        status.text.starts_with("Could not upload background: "),
+        "{}",
+        status.text
+    );
+    assert!(
+        status.text.ends_with(". Already sent: cover"),
+        "{}",
+        status.text
+    );
+}
+
+#[test]
+fn partial_download_failure_names_what_was_loaded() {
+    let (mut harness, console) = harness_with_empty_console();
+    put_on_console(&console, AssetKind::Cover, &mut cover_file(10));
+    put_on_console(&console, AssetKind::Background, &mut background_file());
+    select_halo(&mut harness);
+    let downloading = Cell::new(0);
+
+    harness.app().download(KindChoice::All);
+    harness.run_jobs_with(|_, stage| {
+        let OutcomeStage::Progress(Progress::Console {
+            status: ConsoleStatus::Downloading { .. },
+            ..
+        }) = stage
+        else {
+            return;
+        };
+        downloading.set(downloading.get() + 1);
+        if downloading.get() == 2 {
+            console.refuse_data_connections();
+        }
+    });
+
+    let status = harness.app().status();
+    assert_eq!(status.severity, Severity::Error);
+    assert!(
+        status.text.starts_with("Could not download background: "),
+        "{}",
+        status.text
+    );
+    assert!(
+        status.text.ends_with(". Already loaded: cover"),
+        "{}",
+        status.text
+    );
+    assert!(harness.app().pages().cover.has_content());
+}
+
+#[test]
+fn saving_an_empty_editor_to_the_console_says_there_is_nothing_to_upload() {
+    let (mut harness, console) = harness_with_empty_console();
+    console.add_dir(&asset_folder(&halo()));
+    select_halo(&mut harness);
+
+    harness.app().save_all_to_console();
+    harness.app().answer_modal(ModalAnswer::Accept);
+    harness.run_jobs();
+
+    assert_eq!(harness.app().status().text, NOTHING_TO_UPLOAD_TEXT);
+    assert_eq!(harness.app().status().severity, Severity::Info);
+    for kind in AssetKind::ALL {
+        assert_eq!(console.file(&console_path(&halo(), kind)), None);
+    }
+}
+
+#[test]
+fn per_type_upload_of_an_empty_page_asks_first() {
+    let (mut harness, console) = harness_with_empty_console();
+    console.add_dir(&asset_folder(&halo()));
+    select_halo(&mut harness);
+
+    harness
+        .app()
+        .upload_current(KindChoice::One(AssetKind::Background));
+    let text = confirm_text(&mut harness, EMPTY_UPLOAD_TITLE);
+    assert_eq!(
+        text,
+        "Background is empty in the editor. Uploading replaces it on the console with an empty asset, which removes it."
+    );
+    harness.app().answer_modal(ModalAnswer::Cancel);
+    harness.run_jobs();
+    assert_eq!(
+        console.file(&console_path(&halo(), AssetKind::Background)),
+        None
+    );
+
+    harness
+        .app()
+        .upload_current(KindChoice::One(AssetKind::Background));
+    harness.app().answer_modal(ModalAnswer::Accept);
+    harness.run_jobs();
+    assert_eq!(
+        console.file(&console_path(&halo(), AssetKind::Background)),
+        Some(empty_asset_bytes())
+    );
+}
+
+#[test]
+fn a_transfer_clears_the_unreachable_mark_so_presence_is_rechecked() {
+    let typical = typical_db_path();
+    let content_db = std::fs::read(&typical).expect("the sample database is readable");
+    let console = FakeConsole::with_aurora_layout(FakeConsoleConfig::default(), &content_db);
+    let mut harness = AppHarness::new();
+    harness.with_console(&console);
+    let game = read_content_db(&typical).unwrap().remove(0);
+    console.add_dir(&asset_folder(&game.ids));
+    harness.app().refresh_games();
+    harness.run_jobs();
+    harness.app().set_current_game(Some(CurrentGame {
+        title: game.title_name.clone(),
+        ids: game.ids.clone(),
+    }));
+    load_into_editor(&mut harness, "cover.asset", &mut cover_file(10));
+    let gate = harness.app().console().presence_gate().clone();
+    gate.mark_unreachable(gate.current());
+
+    harness
+        .app()
+        .upload_current(KindChoice::One(AssetKind::Cover));
+    harness.run_jobs();
+
+    let PresenceCell::Known(presence) = harness.app().console().table.presence(&game.ids) else {
+        panic!("the presence check was skipped");
+    };
+    assert!(presence.cover);
 }
