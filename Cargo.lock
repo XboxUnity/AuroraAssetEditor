@@ -965,7 +965,9 @@ dependencies = [
 name = "test-servers"
 version = "0.1.0"
 dependencies = [
+ "serde",
  "suppaftp",
+ "toml",
 ]
 
 [[package]]

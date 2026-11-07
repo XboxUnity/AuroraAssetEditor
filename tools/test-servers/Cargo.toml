@@ -5,5 +5,9 @@ edition.workspace = true
 rust-version.workspace = true
 publish = false
 
+[dependencies]
+serde = { version = "1.0.229", features = ["derive"] }
+toml = "1.2.1"
+
 [dev-dependencies]
 suppaftp = "12.2.1"
