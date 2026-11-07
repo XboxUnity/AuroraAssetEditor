@@ -33,7 +33,7 @@ impl fmt::Display for LoadProblem {
             LoadProblem::Read(error) => write!(f, "the file could not be read: {error}"),
             LoadProblem::Asset(error) => error.fmt(f),
             LoadProblem::Fsd(error) => error.fmt(f),
-            LoadProblem::NoAssets => f.write_str("the file does not contain any assets"),
+            LoadProblem::NoAssets => f.write_str("doesn't contain any assets"),
         }
     }
 }

@@ -24,11 +24,15 @@ pub const NOT_ENOUGH_SPACE_TITLE: &str = "Not enough space";
 pub const NOT_ENOUGH_SPACE_TEXT: &str = "Not enough space to fit all screenshots, please clear current screenshots and load the FSD asset again...";
 const LOAD_PROBLEMS_FOOTER: &str = "Details are in error.log.";
 const ASSET_TYPE_COUNT: usize = 5;
+pub const BUSY_TEXT: &str = "Busy, try again when the current work finishes";
 const STATUS_SEPARATOR: &str = " · ";
 
 impl App {
     /// The Open menu's "Open asset files…".
     pub fn open_files_with_dialog(&mut self) {
+        if self.refuse_while_busy() {
+            return;
+        }
         let request = OpenRequest {
             title: OPEN_DIALOG_TITLE.to_owned(),
             filters: asset_open_filters(),
@@ -41,7 +45,7 @@ impl App {
 
     /// Loads files given on the command line or dropped on the window. Their content decides what they are.
     pub fn open_paths(&mut self, paths: Vec<PathBuf>) {
-        if paths.is_empty() {
+        if paths.is_empty() || self.refuse_while_busy() {
             return;
         }
         let compression = if self.environment.settings.use_compression {
@@ -56,8 +60,20 @@ impl App {
 
     /// The Open menu's "New asset set": empty pages, the current game stays.
     pub fn new_asset_set(&mut self) {
+        if self.refuse_while_busy() {
+            return;
+        }
         self.pages.reset();
         self.status = StatusLine::ready();
+    }
+
+    /// The old busy indicator blocked all input while a load ran; here the request is refused and says so.
+    fn refuse_while_busy(&mut self) -> bool {
+        if !self.locks().editor {
+            return false;
+        }
+        self.status = StatusLine::info(BUSY_TEXT);
+        true
     }
 
     pub(super) fn apply_loaded(&mut self, loaded: LoadedFiles) {
@@ -65,17 +81,19 @@ impl App {
         let mut unread_images = Vec::new();
         let mut last_loaded = None;
         for file in loaded.files {
-            let path = match file {
+            let (path, contributed) = match file {
                 LoadedFile::Asset { path, decoded } => {
                     self.apply_asset(&path, *decoded, &mut unread_images);
-                    path
+                    (path, true)
                 }
                 LoadedFile::Fsd { path, images } => {
-                    self.apply_fsd(&path, *images, &mut unread_images);
-                    path
+                    let received_any = self.apply_fsd(&path, *images, &mut unread_images);
+                    (path, received_any)
                 }
             };
-            last_loaded = Some(file_name(&path));
+            if contributed {
+                last_loaded = Some(file_name(&path));
+            }
         }
         if let Some(name) = last_loaded {
             let present = self.pages.present_types();
@@ -97,7 +115,13 @@ impl App {
         self.page = Page::of_kind(kind);
     }
 
-    fn apply_fsd(&mut self, path: &Path, images: FsdImages, unread_images: &mut Vec<String>) {
+    /// Whether any image reached a page.
+    fn apply_fsd(
+        &mut self,
+        path: &Path,
+        images: FsdImages,
+        unread_images: &mut Vec<String>,
+    ) -> bool {
         for (entry, error) in &images.unreadable {
             self.note_unread_image(path, entry, error, unread_images);
         }
@@ -151,6 +175,7 @@ impl App {
                 text: NOT_ENOUGH_SPACE_TEXT.to_owned(),
             });
         }
+        received.any()
     }
 
     /// Logs the entry and adds its line to the dialog's text.
@@ -182,8 +207,9 @@ impl App {
         });
     }
 
-    /// Every problem is logged. Files without assets each get their own dialog; the rest share one.
+    /// Every problem is logged and listed in one dialog. A single empty file gets the "No assets" dialog instead.
     fn report_load_problems(&mut self, problems: Vec<FileProblem>) {
+        let only_problem = problems.len() == 1;
         let mut lines = Vec::new();
         for FileProblem { path, problem } in problems {
             let context = format!("Could not load {}", path.display());
@@ -192,7 +218,7 @@ impl App {
             }
             let file = file_name(&path);
             match problem {
-                LoadProblem::NoAssets => self.modals.push(Modal::Message {
+                LoadProblem::NoAssets if only_problem => self.modals.push(Modal::Message {
                     title: NO_ASSETS_TITLE.to_owned(),
                     text: format!("{file} doesn't contain any assets."),
                 }),
@@ -229,6 +255,10 @@ impl FsdReceived {
         };
         pages.get_mut(kind).set_prepared(slot, image);
         self.kinds.push(kind);
+    }
+
+    fn any(&self) -> bool {
+        !self.kinds.is_empty()
     }
 
     /// The first page that received an image, in sidebar order (`AssetKind::ALL` follows it).

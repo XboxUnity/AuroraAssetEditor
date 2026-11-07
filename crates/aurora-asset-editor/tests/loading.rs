@@ -146,22 +146,10 @@ fn open_dialog_uses_old_title_and_prefix_filters() {
         vec![DialogRequest::OpenFiles(OpenRequest {
             title: "Select Asset(s) to load".to_owned(),
             filters: vec![
-                filter(
-                    "Game Cover/Boxart Asset File(defaultFilename) (GC*.asset)",
-                    "GC*.asset"
-                ),
-                filter(
-                    "Background Asset File(defaultFilename) (BK*.asset)",
-                    "BK*.asset"
-                ),
-                filter(
-                    "Icon/Banner Asset File(defaultFilename) (GL*.asset)",
-                    "GL*.asset"
-                ),
-                filter(
-                    "Screenshot Asset File(defaultFilename) (SS*.asset)",
-                    "SS*.asset"
-                ),
+                filter("Game Cover/Boxart Asset File (GC*.asset)", "GC*.asset"),
+                filter("Background Asset File (BK*.asset)", "BK*.asset"),
+                filter("Icon/Banner Asset File (GL*.asset)", "GL*.asset"),
+                filter("Screenshot Asset File (SS*.asset)", "SS*.asset"),
                 filter("Aurora Asset Files (*.asset)", "*.asset"),
                 filter("FSD Assets Files (*.assets)", "*.assets"),
                 filter("All Files(*)", "*"),
@@ -313,7 +301,7 @@ fn asset_without_entries_reports_no_assets() {
     assert!(
         harness
             .error_log_text()
-            .contains("the file does not contain any assets")
+            .contains("doesn't contain any assets")
     );
 }
 
@@ -773,4 +761,98 @@ fn non_ascii_paths_load() {
         harness.app().status(),
         &StatusLine::info("Loaded カバー.asset · 1 of 5 asset types present")
     );
+}
+
+#[test]
+fn several_empty_files_share_one_dialog() {
+    let folder = TempDir::new().unwrap();
+    let empty = AssetFile::new().to_bytes();
+    let first = write(&folder, "GC1.asset", &empty);
+    let second = write(&folder, "BK1.asset", &empty);
+    let mut harness = AppHarness::new();
+
+    load(&mut harness, &[&first, &second]);
+
+    let app = harness.app();
+    assert_eq!(
+        app.modal(),
+        Some(&message(
+            "Could not load files",
+            "GC1.asset: doesn't contain any assets
+BK1.asset: doesn't contain any assets
+
+Details are in error.log."
+        ))
+    );
+    app.answer_modal(ModalAnswer::Accept);
+    assert_eq!(app.modal(), None);
+}
+
+#[test]
+fn fsd_with_only_unreadable_images_does_not_report_loaded() {
+    let folder = TempDir::new().unwrap();
+    let fsd = FsdBuilder::new().entry(COVER, b"not an image").build();
+    let path = write(&folder, "game.assets", &fsd);
+    let mut harness = AppHarness::new();
+
+    load(&mut harness, &[&path]);
+
+    let app = harness.app();
+    assert_eq!(app.status(), &StatusLine::ready());
+    assert_eq!(app.page(), Page::Cover);
+    assert_eq!(app.pages().present_types(), 0);
+    assert!(matches!(
+        app.modal(),
+        Some(Modal::Message { title, .. }) if title == "Some images could not be read"
+    ));
+}
+
+#[test]
+fn new_asset_set_during_a_load_is_refused() {
+    let folder = TempDir::new().unwrap();
+    let path = write(
+        &folder,
+        "GC1.asset",
+        &asset_bytes(&[(AssetSlot::Cover, RED)]),
+    );
+    let mut harness = AppHarness::new();
+    harness.app().open_paths(vec![path]);
+
+    harness.app().new_asset_set();
+    assert_eq!(
+        harness.app().status(),
+        &StatusLine::info("Busy, try again when the current work finishes")
+    );
+    harness.run_jobs();
+
+    assert_eq!(pixels(harness.app(), AssetSlot::Cover), solid(8, 8, RED));
+}
+
+#[test]
+fn opening_during_a_load_is_refused() {
+    let folder = TempDir::new().unwrap();
+    let first = write(
+        &folder,
+        "GC1.asset",
+        &asset_bytes(&[(AssetSlot::Cover, RED)]),
+    );
+    let second = write(
+        &folder,
+        "BK1.asset",
+        &asset_bytes(&[(AssetSlot::Background, GREEN)]),
+    );
+    let mut harness = AppHarness::new();
+    harness.app().open_paths(vec![first]);
+
+    harness.app().open_paths(vec![second]);
+    harness.app().open_files_with_dialog();
+    assert_eq!(harness.queued_jobs(), 1);
+    assert_eq!(
+        harness.app().status(),
+        &StatusLine::info("Busy, try again when the current work finishes")
+    );
+    harness.run_jobs();
+
+    assert!(is_empty(harness.app(), AssetSlot::Background));
+    assert!(harness.dialogs().requests().is_empty());
 }
