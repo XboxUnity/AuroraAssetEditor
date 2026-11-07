@@ -109,7 +109,7 @@ impl ConsoleConnection {
             .map_err(protocol_error(format!("upload {name}")))
     }
 
-    /// Lines are split like the old `ReadLine`. A listing longer than `limit` bytes is an error.
+    /// Splits the listing into lines at each line feed. A listing longer than `limit` bytes is an error.
     fn read_listing(
         &mut self,
         verb: &str,
@@ -188,7 +188,7 @@ impl ConsoleConnection {
             self.features = features_from_reply(&reply);
         }
         if self.features.utf8 {
-            // The old client ignored the answer too.
+            // Aurora advertises UTF8 but answers 502; the reply does not matter, so it is not checked.
             self.execute("OPTS UTF8 ON")?;
         }
         Ok(())
