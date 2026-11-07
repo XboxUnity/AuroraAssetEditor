@@ -104,16 +104,20 @@ fn parse_entry_line(line: &str) -> Option<ListingEntry> {
     })
 }
 
-/// `type=file;size=2048;modify=20261107120000; Content.db`
+/// `type=file;size=2048;modify=20261107120000; Content.db`. The facts end at the first `; `, so a
+/// name that looks like a fact is never read as one.
 fn parse_mlsd_line(line: &str) -> Option<ListingEntry> {
-    let entry_type = group(&MLSD_TYPE_FACT.captures(line)?, "value")?.to_ascii_lowercase();
+    let (facts_end, name) = line
+        .split_once(MLSD_NAME_SEPARATOR)
+        .map(|(facts, name)| (facts.len() + 1, name))?;
+    let facts = &line[..facts_end];
+    let entry_type = group(&MLSD_TYPE_FACT.captures(facts)?, "value")?.to_ascii_lowercase();
     if !MLSD_ENTRY_TYPES.contains(&entry_type.as_str()) {
         return None;
     }
-    let (_, name) = line.split_once(MLSD_NAME_SEPARATOR)?;
     let size = MLSD_SIZE_FACT
-        .captures(line)
-        .and_then(|facts| group(&facts, "value"))
+        .captures(facts)
+        .and_then(|fact| group(&fact, "value"))
         .and_then(parse_size);
     Some(ListingEntry {
         name: name.to_owned(),
@@ -184,6 +188,7 @@ fn group<'line>(captures: &Captures<'line>, name: &str) -> Option<&'line str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ftp::terminated_lines;
 
     fn parse(lines: &[&str]) -> Vec<ListingEntry> {
         let lines: Vec<String> = lines.iter().map(|line| line.to_string()).collect();
@@ -195,6 +200,11 @@ mod tests {
             name: name.to_owned(),
             size,
         }
+    }
+
+    fn parse_body(body: &str) -> Vec<ListingEntry> {
+        let lines: Vec<String> = terminated_lines(body.as_bytes()).collect();
+        parse_listing(&lines)
     }
 
     #[test]
@@ -319,23 +329,6 @@ mod tests {
         assert_eq!(find_entry(&entries, "Content.db"), Some(&entries[0]));
         assert_eq!(find_entry(&entries, "Other.db"), None);
     }
-}
-
-#[cfg(test)]
-mod rule_tests {
-    use super::*;
-
-    fn parse(lines: &[&str]) -> Vec<ListingEntry> {
-        let lines: Vec<String> = lines.iter().map(|line| line.to_string()).collect();
-        parse_listing(&lines)
-    }
-
-    fn entry(name: &str, size: Option<u64>) -> ListingEntry {
-        ListingEntry {
-            name: name.to_owned(),
-            size,
-        }
-    }
 
     #[test]
     fn every_listing_pattern_compiles() {
@@ -433,6 +426,18 @@ mod rule_tests {
     }
 
     #[test]
+    fn mlsd_facts_are_read_from_the_facts_part_only() {
+        assert_eq!(
+            parse(&[
+                "type=file; size=3;x",
+                "type=file;size=7; type=dir;y",
+                "size=3; type=file;x",
+            ]),
+            [entry("size=3;x", None), entry("type=dir;y", Some(7))]
+        );
+    }
+
+    #[test]
     fn mlsd_and_dos_accept_an_empty_name() {
         assert_eq!(parse(&["type=file; "]), [entry("", None)]);
         assert_eq!(
@@ -467,24 +472,6 @@ mod rule_tests {
         let entries = [entry("Ärger.asset", Some(1))];
         assert_eq!(find_entry(&entries, "äRGER.ASSET"), None);
         assert_eq!(find_entry(&entries, "Ärger.ASSET"), Some(&entries[0]));
-    }
-}
-
-#[cfg(test)]
-mod aurora_tests {
-    use super::*;
-    use crate::ftp::terminated_lines;
-
-    fn entry(name: &str, size: Option<u64>) -> ListingEntry {
-        ListingEntry {
-            name: name.to_owned(),
-            size,
-        }
-    }
-
-    fn parse_body(body: &str) -> Vec<ListingEntry> {
-        let lines: Vec<String> = terminated_lines(body.as_bytes()).collect();
-        parse_listing(&lines)
     }
 
     #[test]
