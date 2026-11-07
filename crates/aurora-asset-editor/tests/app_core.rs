@@ -7,10 +7,11 @@ use aurora_asset_editor::app::{
     StartupProblem, StartupSettings,
 };
 use aurora_asset_editor::dialogs::{Modal, ModalQueue};
+use aurora_asset_editor::jobs::{ConsoleJobKind, FailedJob, JobOutcome, JobPanic};
 use aurora_asset_editor::settings::{APP_SETTINGS_FILE, ThemeChoice, WindowGeometry};
 use aurora_asset_editor::status::{ActiveWork, ConsoleActivity, Locks, Severity, StatusLine};
 use aurora_asset_editor::text::filter_hex_input;
-use aurora_console::{GameIds, HexId};
+use aurora_console::{FtpSettings, GameIds, HexId};
 use editor_test_support::AppHarness;
 
 fn halo_3() -> CurrentGame {
@@ -424,4 +425,50 @@ fn hex_input_filter_matches_old_box() {
     assert_eq!(filter_hex_input("123456789"), "12345678");
     assert_eq!(filter_hex_input("4d5307e6"), "4d5307e6");
     assert_eq!(filter_hex_input(""), "");
+}
+
+fn job_panic(message: &'static str) -> JobPanic {
+    JobPanic::from_payload(&message)
+}
+
+#[test]
+fn panicked_load_releases_the_editor_and_is_shown() {
+    let mut harness = AppHarness::new();
+    harness.app().open_paths(vec!["halo 3.asset".into()]);
+    assert!(harness.app().locks().editor);
+
+    harness.app().on_job_outcome(JobOutcome::Failed {
+        job: FailedJob::Load,
+        panic: job_panic("index out of bounds"),
+    });
+
+    assert_eq!(harness.app().locks(), Locks::default());
+    let text = "Loading files stopped because of an internal error: index out of bounds";
+    assert_eq!(harness.app().status(), &StatusLine::error(text));
+    let log = harness.error_log_text();
+    assert!(log.contains(text), "{log}");
+}
+
+#[test]
+fn panicked_console_job_releases_the_console_actions() {
+    let mut harness = AppHarness::new();
+    harness.with_ftp_settings(FtpSettings {
+        host: "192.168.1.20".to_owned(),
+        ..FtpSettings::default()
+    });
+    harness.app().refresh_games();
+    assert!(harness.app().locks().console_actions);
+
+    harness.app().on_job_outcome(JobOutcome::Failed {
+        job: FailedJob::ConsoleAction(ConsoleJobKind::Refresh),
+        panic: job_panic("session out of step"),
+    });
+
+    assert_eq!(harness.app().locks(), Locks::default());
+    assert_eq!(
+        harness.app().status(),
+        &StatusLine::error(
+            "Refreshing the game list stopped because of an internal error: session out of step"
+        )
+    );
 }

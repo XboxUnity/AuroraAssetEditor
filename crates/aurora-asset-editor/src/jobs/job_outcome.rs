@@ -2,7 +2,7 @@ use aurora_console::ConsoleStatus;
 
 use crate::files::LoadedFiles;
 
-use super::{ConsoleJobKind, ConsoleOutcome, ImportResult, OnlineOutcome};
+use super::{ConsoleJobKind, ConsoleOutcome, FailedJob, ImportResult, JobPanic, OnlineOutcome};
 
 /// What a job hands back to the UI thread: its result, or progress while it runs.
 #[derive(Debug)]
@@ -12,6 +12,11 @@ pub enum JobOutcome {
     Console(ConsoleOutcome),
     Online(OnlineOutcome),
     Progress(Progress),
+    /// The job panicked; the worker goes on with a fresh executor.
+    Failed {
+        job: FailedJob,
+        panic: JobPanic,
+    },
 }
 
 /// What a running job reports before it is done.

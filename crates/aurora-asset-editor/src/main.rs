@@ -95,7 +95,7 @@ fn run(
     let (outcomes, outcome_receiver) = async_channel::unbounded();
     let timeouts = Timeouts::default();
     let online = OnlineClient::new(Endpoints::live(), DEFAULT_TIMEOUT);
-    let runner = ThreadRunner::new(|| JobWorkers::new(timeouts, online.clone()), outcomes)?;
+    let runner = ThreadRunner::new(move || JobWorkers::new(timeouts, online.clone()), outcomes)?;
     let environment = AppEnvironment {
         config_dir,
         settings: startup.settings,

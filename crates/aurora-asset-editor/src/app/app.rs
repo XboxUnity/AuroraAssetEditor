@@ -219,6 +219,7 @@ impl App {
                 total,
                 title,
             }) => self.apply_bulk_progress(position, total, &title),
+            JobOutcome::Failed { job, panic } => self.apply_failed_job(&job, &panic),
         }
     }
 

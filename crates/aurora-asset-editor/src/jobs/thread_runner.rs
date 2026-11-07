@@ -6,7 +6,9 @@ use std::thread::{self, JoinHandle};
 
 use async_channel::{SendError, Sender};
 
-use super::{Job, JobExecutor, JobOutcome, JobPriority, JobRunner, ProgressSink};
+use super::{
+    FailedJob, Job, JobExecutor, JobOutcome, JobPanic, JobPriority, JobRunner, ProgressSink,
+};
 
 const LOAD_THREAD: &str = "load and import";
 // One thread, so the app holds one FTP session at a time: Aurora allows few sessions and serves them slowly.
@@ -21,11 +23,12 @@ pub struct ThreadRunner {
 }
 
 impl ThreadRunner {
-    /// Each thread gets its own executor from `make_executor`.
+    /// Each thread gets its own executor from `make_executor`, and a fresh one after a job panics.
     pub fn new<E: JobExecutor>(
-        make_executor: impl Fn() -> E,
+        make_executor: impl Fn() -> E + Send + Sync + 'static,
         outcomes: Sender<JobOutcome>,
     ) -> io::Result<ThreadRunner> {
+        let make_executor: Arc<dyn Fn() -> E + Send + Sync> = Arc::new(make_executor);
         let queues = Arc::new(RunnerQueues::default());
         let mut runner = ThreadRunner {
             queues: Arc::clone(&queues),
@@ -37,12 +40,12 @@ impl ThreadRunner {
             (ONLINE_THREAD, QueueId::Online),
         ];
         for (name, queue_id) in threads {
-            let executor = make_executor();
+            let make_executor = Arc::clone(&make_executor);
             let queues = Arc::clone(&queues);
             let outcomes = outcomes.clone();
             let thread = thread::Builder::new()
                 .name(format!("{name} worker"))
-                .spawn(move || work(executor, queues.queue(queue_id), &outcomes))?;
+                .spawn(move || work(&*make_executor, queues.queue(queue_id), &outcomes))?;
             runner.threads.push(thread);
         }
         Ok(runner)
@@ -95,16 +98,34 @@ impl JobRunner for JobSubmitter {
     }
 }
 
-fn work<E: JobExecutor>(mut executor: E, queue: &JobQueue, outcomes: &Sender<JobOutcome>) {
+fn work<E: JobExecutor>(
+    make_executor: &(dyn Fn() -> E + Send + Sync),
+    queue: &JobQueue,
+    outcomes: &Sender<JobOutcome>,
+) {
     let progress: ProgressSink = {
         let outcomes = outcomes.clone();
         Arc::new(move |outcome| send(&outcomes, outcome))
     };
+    let mut executor = make_executor();
     while let Some(job) = queue.next() {
-        // The panic hook has logged the panic; the thread goes on with the next job.
+        let failed_job = FailedJob::of(&job);
         match panic::catch_unwind(AssertUnwindSafe(|| executor.execute(job, &progress))) {
             Ok(outcome) => send(outcomes, outcome),
-            Err(_panic) => log::error!("A job on the {} thread panicked", thread_name()),
+            Err(payload) => {
+                // The panic hook has logged the panic. The executor may hold an FTP session that is out of
+                // step with the server, so the next job gets a fresh one.
+                log::error!("A job on the {} thread panicked", thread_name());
+                executor = make_executor();
+                let panic = JobPanic::from_payload(payload.as_ref());
+                send(
+                    outcomes,
+                    JobOutcome::Failed {
+                        job: failed_job,
+                        panic,
+                    },
+                );
+            }
         }
     }
 }

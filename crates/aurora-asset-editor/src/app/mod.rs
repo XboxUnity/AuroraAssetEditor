@@ -12,6 +12,7 @@ mod current_game;
 mod current_game_actions;
 mod file_actions;
 mod image_actions;
+mod job_failure_actions;
 mod kind_choice;
 mod menu;
 mod menu_action;
@@ -36,6 +37,7 @@ pub use console_transfer_actions::{
 };
 pub use current_game::CurrentGame;
 pub use file_actions::BUSY_TEXT;
+pub use job_failure_actions::JOB_STOPPED_TEXT;
 pub use kind_choice::KindChoice;
 pub use menu::Menu;
 pub use menu_action::MenuAction;

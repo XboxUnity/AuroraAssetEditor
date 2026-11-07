@@ -300,12 +300,16 @@ impl App {
         }
     }
 
-    fn finish_download(&mut self) {
+    pub(super) fn finish_download(&mut self) {
         self.active_work.online_downloads = self.active_work.online_downloads.saturating_sub(1);
     }
 
     /// The tile at `index`, when `generation` is still the current search.
-    fn current_tile_mut(&mut self, generation: u64, index: usize) -> Option<&mut ResultTile> {
+    pub(super) fn current_tile_mut(
+        &mut self,
+        generation: u64,
+        index: usize,
+    ) -> Option<&mut ResultTile> {
         if !self.online.is_current(generation) {
             return None;
         }
