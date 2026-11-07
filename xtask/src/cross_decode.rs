@@ -13,6 +13,8 @@ use crate::synthetic;
 
 const CROSS_DIRECTORY: &str = "cross";
 const BYTES_PER_PIXEL: usize = 4;
+const INPUT_EXTENSIONS: [&str; 1] = ["png"];
+const CROSS_EXTENSIONS: [&str; 4] = ["webp", "jpg", "jpeg", "gif"];
 
 /// Synthetic source image, sample file name, and the size it is resized to.
 const WEBP_SAMPLE: (&str, &str, u32, u32) = ("alphagrad", "webp_lossless_256.webp", 256, 256);
@@ -63,21 +65,31 @@ pub fn write_samples() -> Result<()> {
     Ok(())
 }
 
-fn default_inputs(paths: &Paths) -> Result<Vec<PathBuf>> {
-    let mut inputs = Vec::new();
-    for directory in [paths.inputs(), cross_directory(paths)] {
-        let mut files = Vec::new();
-        for entry in std::fs::read_dir(&directory)
-            .with_context(|| format!("cannot read {}", directory.display()))?
-        {
-            let path = entry?.path();
-            if path.is_file() {
-                files.push(path);
-            }
+fn files_with_extensions(directory: &Path, extensions: &[&str]) -> Result<Vec<PathBuf>> {
+    let mut files = Vec::new();
+    for entry in std::fs::read_dir(directory)
+        .with_context(|| format!("cannot read {}", directory.display()))?
+    {
+        let path = entry?.path();
+        let matches_extension = path.extension().is_some_and(|extension| {
+            extensions
+                .iter()
+                .any(|wanted| extension.eq_ignore_ascii_case(wanted))
+        });
+        if path.is_file() && matches_extension {
+            files.push(path);
         }
-        files.sort();
-        inputs.extend(files);
     }
+    files.sort();
+    Ok(files)
+}
+
+fn default_inputs(paths: &Paths) -> Result<Vec<PathBuf>> {
+    let mut inputs = files_with_extensions(&paths.inputs(), &INPUT_EXTENSIONS)?;
+    inputs.extend(files_with_extensions(
+        &cross_directory(paths),
+        &CROSS_EXTENSIONS,
+    )?);
     Ok(inputs)
 }
 
@@ -90,6 +102,9 @@ fn dll_decode(
     let header_path = work_dir.join("cross.header");
     let video_path = work_dir.join("cross.video");
     let decoded_path = work_dir.join("cross.bgra");
+    if decoded_path.exists() {
+        std::fs::remove_file(&decoded_path)?;
+    }
     std::fs::write(&header_path, texture.header.to_bytes())?;
     std::fs::write(&video_path, &texture.data)?;
     let report = golden::run_harness(
@@ -174,6 +189,7 @@ pub fn run(files: &[PathBuf]) -> Result<()> {
     } else {
         files.to_vec()
     };
+    ensure!(!inputs.is_empty(), "cross-decode found no images to check");
     let work_dir = tempfile::tempdir()?;
     let work_path = golden::absolute(work_dir.path())?;
 

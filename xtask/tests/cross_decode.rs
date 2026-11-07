@@ -16,6 +16,13 @@ fn rust_encodings_decode_identically_with_the_dll() {
         "cross-decode failed: {}\n{stdout}\n{stderr}",
         output.status
     );
+    let image_count: usize = stdout
+        .split(" images, ")
+        .next()
+        .and_then(|prefix| prefix.rsplit(' ').next())
+        .and_then(|count| count.parse().ok())
+        .unwrap_or_else(|| panic!("no image count in summary: {stdout}"));
+    assert!(image_count > 0, "no images were checked: {stdout}");
     assert!(
         stdout.contains(", 0 mismatches"),
         "unexpected summary: {stdout}"

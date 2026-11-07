@@ -217,7 +217,7 @@ pub(crate) fn bgra_to_rgba(bgra: &[u8]) -> Vec<u8> {
     rgba
 }
 
-pub(crate) fn rgba_to_argb(rgba: &[u8]) -> Vec<u8> {
+fn rgba_to_argb(rgba: &[u8]) -> Vec<u8> {
     let mut argb = Vec::with_capacity(rgba.len());
     for pixel in rgba.as_chunks::<BYTES_PER_PIXEL>().0.iter() {
         argb.extend_from_slice(&[pixel[3], pixel[0], pixel[1], pixel[2]]);
