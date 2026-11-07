@@ -275,6 +275,86 @@ fn failed_save_keeps_the_form_and_says_why() {
     );
 }
 
+fn save_connection_to(harness: &mut AppHarness, host: &str, port: u16) {
+    harness.app().edit_connection();
+    type_into_form(harness, host, &port.to_string());
+    harness.app().answer_modal(ModalAnswer::Accept);
+}
+
+#[test]
+fn new_connection_settings_clear_the_old_consoles_games() {
+    let (mut harness, console) = harness_with_console();
+    refreshed(&mut harness);
+    harness.app().select_game(0);
+    let current = harness.app().current_game().cloned();
+    assert!(current.is_some());
+    let first = typical_games()[0].ids.clone();
+    assert_ne!(
+        harness.app().console().table.presence(&first),
+        PresenceCell::Unknown
+    );
+    let generation = harness.app().console().refresh_generation();
+
+    save_connection_to(&mut harness, "127.0.0.1", console.port());
+    assert_eq!(
+        harness.app().console().table.visible().len(),
+        3,
+        "the same settings keep the table"
+    );
+
+    save_connection_to(&mut harness, "127.0.0.2", console.port());
+    let app = harness.app();
+    assert!(app.console().table.visible().is_empty());
+    assert_eq!(app.console().table.presence(&first), PresenceCell::Unknown);
+    assert!(app.console().refresh_generation() > generation);
+    assert_eq!(app.console().link, ConsoleLink::Unknown);
+    assert_eq!(
+        app.current_game().cloned(),
+        current,
+        "the editor's game stays"
+    );
+}
+
+#[test]
+fn testing_new_settings_clears_the_old_consoles_games() {
+    let (mut harness, console) = harness_with_console();
+    refreshed(&mut harness);
+
+    harness.app().edit_connection();
+    type_into_form(&mut harness, "127.0.0.2", &console.port().to_string());
+    harness.app().test_connection();
+
+    assert!(harness.app().console().table.visible().is_empty());
+}
+
+#[test]
+fn a_refresh_for_replaced_settings_lands_nowhere() {
+    let (mut harness, console) = harness_with_console();
+    harness.app().refresh_games();
+    save_connection_to(&mut harness, "127.0.0.2", console.port());
+
+    let links = std::cell::RefCell::new(Vec::new());
+    harness.run_jobs_with(|app, _| links.borrow_mut().push(app.console().link.clone()));
+
+    let app = harness.app();
+    assert!(app.console().table.visible().is_empty());
+    assert!(!app.locks().console_actions, "the console is free again");
+    assert_eq!(app.status().text, "Ready");
+    assert!(
+        links
+            .borrow()
+            .iter()
+            .all(|link| *link == ConsoleLink::Unknown),
+        "the old console's answer never marks the new one: {links:?}"
+    );
+    drop(app);
+    assert_eq!(
+        harness.queued_jobs(),
+        0,
+        "no presence checks for the old games"
+    );
+}
+
 #[test]
 fn refresh_without_settings_shows_message() {
     let mut harness = AppHarness::new();

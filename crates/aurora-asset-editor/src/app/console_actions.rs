@@ -187,7 +187,11 @@ impl App {
             return;
         }
         let text = status.to_string();
-        if let ConsoleStatus::AuroraFound { revision } = status {
+        let replaced_console =
+            kind == ConsoleJobKind::Refresh && self.console.running_refresh_is_stale();
+        if let ConsoleStatus::AuroraFound { revision } = status
+            && !replaced_console
+        {
             self.console.link = connected_link(revision);
         }
         if kind == ConsoleJobKind::Bulk {
@@ -229,17 +233,30 @@ impl App {
         }
     }
 
+    /// Only new connection settings make a refresh stale (a refresh waits for the console to be free), so a
+    /// stale one still held the console until now.
     fn apply_refreshed(&mut self, generation: u64, result: Result<GameListing, ConsoleError>) {
+        self.active_work.console = None;
+        self.console.finish_refresh();
         if generation != self.console.refresh_generation() {
             if let Err(error) = &result {
                 self.log_superseded(SUPERSEDED_REFRESH_FAILED, error);
             }
+            self.end_refresh_status();
             return;
         }
-        self.active_work.console = None;
         match result {
             Ok(listing) => self.apply_listing(listing),
             Err(error) => self.apply_refresh_failure(&error),
+        }
+    }
+
+    /// The status line stops saying a refresh runs; anything shown since stays.
+    fn end_refresh_status(&mut self) {
+        if self.status.text == REFRESHING_TEXT {
+            self.status = StatusLine::ready();
+        } else {
+            self.status.progress = None;
         }
     }
 

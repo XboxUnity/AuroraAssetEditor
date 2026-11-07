@@ -15,6 +15,8 @@ pub struct ConsoleState {
     pub table: GameTable,
     pub last_refresh: Option<DateTime<Local>>,
     presence_gate: PresenceGate,
+    /// The generation of the refresh that is running, if one is.
+    running_refresh: Option<u64>,
     /// The stop flag of the bulk run in progress.
     bulk_stop: Option<Arc<AtomicBool>>,
 }
@@ -32,6 +34,7 @@ impl ConsoleState {
             table: GameTable::default(),
             last_refresh: None,
             presence_gate: PresenceGate::default(),
+            running_refresh: None,
             bulk_stop: None,
         }
     }
@@ -46,7 +49,19 @@ impl ConsoleState {
     }
 
     pub(crate) fn start_refresh(&mut self) -> u64 {
-        self.presence_gate.start_refresh()
+        let generation = self.presence_gate.start_refresh();
+        self.running_refresh = Some(generation);
+        generation
+    }
+
+    pub(crate) fn finish_refresh(&mut self) {
+        self.running_refresh = None;
+    }
+
+    /// A refresh runs for settings that were replaced since it started.
+    pub(crate) fn running_refresh_is_stale(&self) -> bool {
+        self.running_refresh
+            .is_some_and(|generation| generation != self.refresh_generation())
     }
 
     /// Makes the flag that stops the bulk run that is about to start.
@@ -66,12 +81,17 @@ impl ConsoleState {
         self.bulk_stop = None;
     }
 
-    /// Different settings say nothing about the link until they are tried.
+    /// Different settings say nothing about the link until they are tried, and the games listed so far
+    /// belong to the old console: the table empties, and the refresh and presence checks still running for
+    /// the old settings become stale.
     pub(crate) fn use_settings(&mut self, settings: FtpSettings) {
         if self.settings.as_ref() == Some(&settings) {
             return;
         }
         self.settings = Some(settings);
         self.link = ConsoleLink::Unknown;
+        self.table.clear();
+        self.last_refresh = None;
+        self.presence_gate.start_refresh();
     }
 }

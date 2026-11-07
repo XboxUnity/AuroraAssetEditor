@@ -25,8 +25,14 @@ impl App {
             }
             FailedJob::ConsoleAction(kind) => {
                 self.active_work.console = None;
-                if *kind == ConsoleJobKind::Bulk {
-                    self.console.finish_bulk_run();
+                match kind {
+                    ConsoleJobKind::Bulk => self.console.finish_bulk_run(),
+                    ConsoleJobKind::Refresh => self.console.finish_refresh(),
+                    ConsoleJobKind::Test
+                    | ConsoleJobKind::Presence
+                    | ConsoleJobKind::Download
+                    | ConsoleJobKind::Upload
+                    | ConsoleJobKind::Remove => {}
                 }
             }
             FailedJob::PresenceCheck { generation, ids } => {
