@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::cell::{RefCell, RefMut};
 use std::io;
 use std::panic::{self, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
@@ -69,7 +69,8 @@ struct Setup {
 }
 
 struct Running {
-    app: App,
+    /// Shared with a connected view (`share_app`).
+    app: Rc<RefCell<App>>,
     workers: JobWorkers,
 }
 
@@ -128,8 +129,9 @@ impl AppHarness {
         }
     }
 
-    pub fn app(&mut self) -> &mut App {
-        &mut self.running().app
+    /// The app, borrowed until the returned guard is dropped.
+    pub fn app(&mut self) -> RefMut<'_, App> {
+        self.running().app.borrow_mut()
     }
 
     pub fn config_dir(&self) -> &Path {
@@ -229,15 +231,9 @@ impl AppHarness {
         }
     }
 
-    /// Moves the app out for a view that shares it (`MainWindowView::connect`). `app()` and the job runs
-    /// are not available afterwards; the fake services' handles still are.
+    /// The app for a view that shares it (`MainWindowView::connect`); `app()` and the job runs keep working.
     pub fn share_app(&mut self) -> Rc<RefCell<App>> {
-        self.running();
-        let running = self
-            .running
-            .take()
-            .expect("running() has just built the app");
-        Rc::new(RefCell::new(running.app))
+        Rc::clone(&self.running().app)
     }
 
     fn setup(&mut self, method: &str) -> &mut Setup {
@@ -253,7 +249,7 @@ impl AppHarness {
                 .take()
                 .expect("the setup is kept until the app is built");
             Running {
-                app: App::new(setup.environment),
+                app: Rc::new(RefCell::new(App::new(setup.environment))),
                 workers: JobWorkers::new(Timeouts::default(), setup.online),
             }
         })
@@ -309,15 +305,17 @@ fn run_job(running: &mut Running, job: Job, hook: &mut impl FnMut(&mut App, Outc
                         panic!("a job reports only progress through its sink: {outcome:?}");
                     };
                     let stage = OutcomeStage::Progress(progress.clone());
+                    let mut app = app.borrow_mut();
                     app.on_job_outcome(outcome);
-                    hook(app, stage);
+                    hook(&mut app, stage);
                     resume
                         .send(())
                         .expect("the job waits for its progress to be applied");
                 }
                 WorkerMessage::Finished(Ok(outcome)) => {
+                    let mut app = app.borrow_mut();
                     app.on_job_outcome(outcome);
-                    hook(app, OutcomeStage::Final);
+                    hook(&mut app, OutcomeStage::Final);
                     break;
                 }
                 WorkerMessage::Finished(Err(panic_payload)) => panic::resume_unwind(panic_payload),

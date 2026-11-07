@@ -129,7 +129,7 @@ fn download_cover_loads_and_opens_cover_page() {
     harness.app().download(KindChoice::One(AssetKind::Cover));
     harness.run_jobs();
 
-    let app = harness.app();
+    let app = &mut *harness.app();
     assert_eq!(app.page(), Page::Cover);
     let expected = decode(cover.get(AssetSlot::Cover).unwrap()).unwrap();
     assert_eq!(
@@ -148,7 +148,7 @@ fn missing_console_asset_shows_message() {
     harness.app().download(KindChoice::One(AssetKind::Cover));
     harness.run_jobs();
 
-    let app = harness.app();
+    let app = &mut *harness.app();
     assert_eq!(app.status().text, "No cover asset on console");
     assert_eq!(app.status().severity, Severity::Info);
     assert!(!app.pages().cover.has_content());
@@ -169,7 +169,7 @@ fn empty_console_asset_counts_as_missing() {
     harness.app().download(KindChoice::One(AssetKind::Cover));
     harness.run_jobs();
 
-    let app = harness.app();
+    let app = &mut *harness.app();
     assert_eq!(app.status().text, "No cover asset on console");
     assert!(app.pages().cover.has_content());
     assert_eq!(app.page(), Page::Console);
@@ -196,7 +196,7 @@ fn download_all_runs_gc_bk_gl_ss_and_skips_missing() {
             format!("GL{title_id}.asset"),
         ]
     );
-    let app = harness.app();
+    let app = &mut *harness.app();
     assert_eq!(
         app.status().text,
         "Downloaded cover, background and icon & banner from the console · No screenshots asset on console"
@@ -222,7 +222,7 @@ fn download_all_stops_at_first_error() {
         !retrieved_files(&console).contains(&format!("GL{title_id}.asset")),
         "the icon & banner file was requested after the failure"
     );
-    let app = harness.app();
+    let app = &mut *harness.app();
     assert_eq!(app.status().severity, Severity::Error);
     assert!(
         app.status()
@@ -438,12 +438,14 @@ fn upload_target_dialog_rules() {
     select_halo(&mut harness);
 
     harness.app().save_all_to_console();
-    let Some(Modal::UploadTarget { title, form }) = harness.app().modal() else {
+    let app = harness.app();
+    let Some(Modal::UploadTarget { title, form }) = app.modal() else {
         panic!("expected the upload target dialog");
     };
     assert_eq!(title, UPLOAD_TARGET_TITLE);
     assert_eq!(form.title_id, "4D5307E6");
     assert_eq!(form.database_id, "00000012");
+    drop(app);
 
     harness
         .app()
@@ -451,12 +453,14 @@ fn upload_target_dialog_rules() {
     harness
         .app()
         .edit_modal_field(ModalField::UploadDatabaseId, "123456789");
-    let Some(Modal::UploadTarget { form, .. }) = harness.app().modal() else {
+    let app = harness.app();
+    let Some(Modal::UploadTarget { form, .. }) = app.modal() else {
         panic!("expected the upload target dialog");
     };
     assert_eq!(form.title_id, "4D53");
     assert_eq!(form.database_id, "12345678");
     assert!(!form.is_valid());
+    drop(app);
 
     harness.app().answer_modal(ModalAnswer::Accept);
     assert!(matches!(
@@ -480,7 +484,7 @@ fn connection_failure_shows_old_message() {
     harness.app().download(KindChoice::All);
     harness.run_jobs();
 
-    let Some(Modal::Message { title, text }) = harness.app().modal() else {
+    let Some(Modal::Message { title, text }) = harness.app().modal().cloned() else {
         panic!("expected a message dialog");
     };
     assert_eq!(title, CONNECTION_FAILED_TITLE);
@@ -499,7 +503,7 @@ fn missing_folder_upload_is_shown() {
         .upload_current(KindChoice::One(AssetKind::Cover));
     harness.run_jobs();
 
-    let app = harness.app();
+    let app = &mut *harness.app();
     assert_eq!(app.modal(), None);
     assert_eq!(app.status().severity, Severity::Error);
     assert!(
@@ -688,7 +692,7 @@ fn partial_upload_failure_names_what_was_sent() {
         }
     });
 
-    let status = harness.app().status();
+    let status = harness.app().status().clone();
     assert_eq!(status.severity, Severity::Error);
     assert!(
         status.text.starts_with("Could not upload background: "),
@@ -725,7 +729,7 @@ fn partial_download_failure_names_what_was_loaded() {
         }
     });
 
-    let status = harness.app().status();
+    let status = harness.app().status().clone();
     assert_eq!(status.severity, Severity::Error);
     assert!(
         status.text.starts_with("Could not download background: "),

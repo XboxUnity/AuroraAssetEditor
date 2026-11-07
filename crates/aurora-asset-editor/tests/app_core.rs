@@ -155,7 +155,8 @@ fn locks_follow_active_work() {
 #[test]
 fn starts_on_cover_with_ready_status() {
     let mut harness = AppHarness::new();
-    let app = harness.app();
+    let mut app_guard = harness.app();
+    let app = &mut *app_guard;
 
     assert_eq!(app.page(), Page::Cover);
     assert_eq!(
@@ -169,6 +170,7 @@ fn starts_on_cover_with_ready_status() {
     assert_eq!(app.modal(), None);
     assert_eq!(app.current_game(), None);
     assert_eq!(app.locks(), Locks::default());
+    drop(app_guard);
     assert_eq!(harness.error_log_text(), "");
 }
 

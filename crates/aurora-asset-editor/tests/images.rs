@@ -117,7 +117,7 @@ fn replace_stretches_to_target_when_auto_resize_on() {
 
     replace(&mut harness, AssetSlot::Cover, &path);
 
-    let app = harness.app();
+    let app = &mut *harness.app();
     assert_eq!(pixels(app, AssetSlot::Cover).dimensions(), (900, 600));
     let (width, height, _) = texture(app, AssetSlot::Cover);
     assert_eq!((width, height), (900, 600));
@@ -131,7 +131,7 @@ fn replace_keeps_size_when_auto_resize_off() {
 
     replace(&mut harness, AssetSlot::Cover, &path);
 
-    let app = harness.app();
+    let app = &mut *harness.app();
     assert_eq!(pixels(app, AssetSlot::Cover), solid(100, 50, RED));
     let (width, height, _) = texture(app, AssetSlot::Cover);
     assert_eq!((width, height), (100, 50));
@@ -146,7 +146,7 @@ fn image_at_target_size_passes_through_untouched() {
     replace(&mut harness, AssetSlot::Cover, &path);
 
     assert_eq!(
-        pixels(harness.app(), AssetSlot::Cover),
+        pixels(&harness.app(), AssetSlot::Cover),
         solid(900, 600, BLUE)
     );
 }
@@ -161,23 +161,23 @@ fn compression_applies_when_image_is_loaded() {
     harness.app().set_use_compression(true);
     replace(&mut harness, AssetSlot::Icon, &first);
     assert_eq!(
-        texture(harness.app(), AssetSlot::Icon).2,
+        texture(&harness.app(), AssetSlot::Icon).2,
         TextureFormat::LinearDxt4
     );
 
     harness.app().set_use_compression(false);
     assert_eq!(
-        texture(harness.app(), AssetSlot::Icon).2,
+        texture(&harness.app(), AssetSlot::Icon).2,
         TextureFormat::LinearDxt4
     );
 
     replace(&mut harness, AssetSlot::Banner, &second);
     assert_eq!(
-        texture(harness.app(), AssetSlot::Banner).2,
+        texture(&harness.app(), AssetSlot::Banner).2,
         TextureFormat::LinearArgb8888
     );
     assert_eq!(
-        texture(harness.app(), AssetSlot::Icon).2,
+        texture(&harness.app(), AssetSlot::Icon).2,
         TextureFormat::LinearDxt4
     );
 }
@@ -188,14 +188,15 @@ fn failed_image_load_keeps_existing_image() {
     let mut harness = harness_with_resize(false);
     let good = png(&folder, "good.png", 20, 10, RED);
     replace(&mut harness, AssetSlot::Cover, &good);
-    let before_texture = texture(harness.app(), AssetSlot::Cover);
+    let before_texture = texture(&harness.app(), AssetSlot::Cover);
     let before_revision = harness.app().pages().cover.revision(AssetSlot::Cover);
 
     let broken = folder.path().join("broken.png");
     fs::write(&broken, b"this is not an image").unwrap();
     replace(&mut harness, AssetSlot::Cover, &broken);
 
-    let app = harness.app();
+    let mut app_guard = harness.app();
+    let app = &mut *app_guard;
     assert_eq!(message_title(app), "Could not use image");
     assert!(
         message_text(app).starts_with("There was an error while trying to process broken.png: "),
@@ -208,6 +209,7 @@ fn failed_image_load_keeps_existing_image() {
         app.pages().cover.revision(AssetSlot::Cover),
         before_revision
     );
+    drop(app_guard);
     assert!(harness.error_log_text().contains("broken.png"));
 }
 
@@ -221,7 +223,8 @@ fn oversized_image_with_auto_resize_off_is_rejected() {
 
     replace(&mut harness, AssetSlot::Background, &wide);
 
-    let app = harness.app();
+    let mut app_guard = harness.app();
+    let app = &mut *app_guard;
     assert_eq!(message_title(app), "Could not use image");
     assert!(
         message_text(app).contains("image size 9000x10 is outside the supported range"),
@@ -229,6 +232,7 @@ fn oversized_image_with_auto_resize_off_is_rejected() {
         message_text(app)
     );
     assert_eq!(pixels(app, AssetSlot::Background), solid(20, 10, RED));
+    drop(app_guard);
     assert!(harness.error_log_text().contains("wide.png"));
 }
 
@@ -243,7 +247,7 @@ fn dropping_a_folder_is_reported() {
     assert_eq!(harness.queued_jobs(), 1);
     harness.run_jobs();
 
-    let app = harness.app();
+    let app = &mut *harness.app();
     assert_eq!(message_title(app), "Could not load files");
     assert_eq!(
         message_text(app),
@@ -345,7 +349,7 @@ fn add_fills_free_slots_in_order() {
 
     add(&mut harness, &new_files);
 
-    let app = harness.app();
+    let app = &mut *harness.app();
     assert_eq!(pixels(app, shot(2)), solid(9, 9, RED));
     assert_eq!(pixels(app, shot(4)), solid(10, 10, GREEN));
     assert_eq!(pixels(app, shot(5)), solid(11, 11, BLUE));
@@ -373,7 +377,7 @@ fn adding_more_screenshots_than_free_slots_warns_once() {
     ];
     add(&mut harness, &extra);
 
-    let app = harness.app();
+    let app = &mut *harness.app();
     assert_eq!(message_title(app), "No space left");
     assert_eq!(
         message_text(app),
@@ -393,7 +397,7 @@ fn replace_screenshot_targets_selected_slot() {
 
     replace(&mut harness, shot(4), &path);
 
-    let app = harness.app();
+    let app = &mut *harness.app();
     assert_eq!(pixels(app, shot(4)), solid(8, 8, RED));
     assert_eq!(app.pages().screenshots.screenshot_count(), 1);
     assert_eq!(app.selected_screenshot(), number(4));
@@ -407,11 +411,11 @@ fn replace_on_an_empty_selected_slot_works() {
     let second = png(&folder, "second.png", 9, 9, GREEN);
     replace(&mut harness, shot(1), &first);
     harness.app().select_screenshot(number(2));
-    assert!(is_empty(harness.app(), shot(2)));
+    assert!(is_empty(&harness.app(), shot(2)));
 
     replace(&mut harness, shot(2), &second);
 
-    let app = harness.app();
+    let app = &mut *harness.app();
     assert_eq!(pixels(app, shot(2)), solid(9, 9, GREEN));
     assert_eq!(pixels(app, shot(1)), solid(8, 8, RED));
     assert_eq!(app.selected_screenshot(), number(2));
@@ -444,7 +448,7 @@ fn only_the_last_image_dropped_on_cover_is_imported() {
     drop_files(&mut harness, &[first, broken]);
     harness.run_jobs();
 
-    let app = harness.app();
+    let app = &mut *harness.app();
     assert_eq!(message_title(app), "Could not use image");
     assert_eq!(pixels(app, AssetSlot::Cover), solid(8, 8, RED));
 }
@@ -462,7 +466,7 @@ fn banner_answer_imports_the_file_as_banner() {
         .answer_modal(ModalAnswer::Choice(ChoiceId::Banner));
     harness.run_jobs();
 
-    let app = harness.app();
+    let app = &mut *harness.app();
     assert_eq!(pixels(app, AssetSlot::Banner), solid(420, 96, GREEN));
     assert!(is_empty(app, AssetSlot::Icon));
 }
@@ -495,7 +499,8 @@ fn answer_the_dialog_does_not_offer_keeps_it_open_and_is_reported() {
         .app()
         .answer_modal(ModalAnswer::Choice(ChoiceId::Replace));
 
-    let app = harness.app();
+    let mut app_guard = harness.app();
+    let app = &mut *app_guard;
     assert_eq!(app.modal().cloned(), before);
     assert_eq!(app.status().severity, Severity::Error);
     assert!(
@@ -505,6 +510,7 @@ fn answer_the_dialog_does_not_offer_keeps_it_open_and_is_reported() {
         "{}",
         app.status().text
     );
+    drop(app_guard);
     assert!(harness.error_log_text().contains("no Replace button"));
     assert_eq!(harness.queued_jobs(), 0);
 }
@@ -521,7 +527,7 @@ fn remove_image_empties_slot_without_confirmation() {
     harness.app().remove_image(AssetSlot::Cover);
     harness.app().remove_image(AssetSlot::Icon);
 
-    let app = harness.app();
+    let app = &mut *harness.app();
     assert!(app.modal().is_none());
     assert!(is_empty(app, AssetSlot::Cover));
     assert!(app.pages().cover.texture_header(AssetSlot::Cover).is_none());
@@ -542,7 +548,7 @@ fn moving_a_screenshot_moves_its_bytes() {
 
     harness.app().move_screenshot(number(1), number(3));
 
-    let app = harness.app();
+    let app = &mut *harness.app();
     assert_eq!(pixels(app, shot(1)), solid(10, 10, GREEN));
     assert_eq!(pixels(app, shot(2)), solid(12, 12, BLUE));
     assert_eq!(pixels(app, shot(3)), solid(8, 8, RED));
@@ -562,12 +568,12 @@ fn image_import_runs_as_a_job() {
     harness.app().replace_image(AssetSlot::Cover);
 
     assert_eq!(harness.queued_jobs(), 1);
-    assert!(is_empty(harness.app(), AssetSlot::Cover));
+    assert!(is_empty(&harness.app(), AssetSlot::Cover));
     assert!(harness.app().locks().editor);
 
     harness.run_jobs();
 
-    assert_eq!(pixels(harness.app(), AssetSlot::Cover), solid(8, 8, RED));
+    assert_eq!(pixels(&harness.app(), AssetSlot::Cover), solid(8, 8, RED));
     assert!(!harness.app().locks().editor);
 }
 
@@ -583,7 +589,7 @@ fn dropping_image_on_cover_replaces_it() {
     harness.run_jobs();
 
     assert_eq!(
-        pixels(harness.app(), AssetSlot::Cover).dimensions(),
+        pixels(&harness.app(), AssetSlot::Cover).dimensions(),
         (900, 600)
     );
 }
@@ -598,7 +604,8 @@ fn dropping_on_icon_banner_asks_per_file() {
 
     drop_files(&mut harness, &[first.clone(), second.clone()]);
 
-    let app = harness.app();
+    let mut app_guard = harness.app();
+    let app = &mut *app_guard;
     assert_eq!(
         app.modal(),
         Some(&Modal::Choice {
@@ -621,9 +628,10 @@ fn dropping_on_icon_banner_asks_per_file() {
     ));
     app.answer_modal(ModalAnswer::Cancel);
     assert!(app.modal().is_none());
+    drop(app_guard);
     harness.run_jobs();
 
-    let app = harness.app();
+    let app = &mut *harness.app();
     assert_eq!(pixels(app, AssetSlot::Icon), solid(64, 64, RED));
     assert!(is_empty(app, AssetSlot::Banner));
 }
@@ -643,7 +651,8 @@ fn dropping_screenshots_asks_once_and_fills_free_slots() {
 
     drop_files(&mut harness, &dropped);
 
-    let app = harness.app();
+    let mut app_guard = harness.app();
+    let app = &mut *app_guard;
     match app.modal() {
         Some(Modal::Choice {
             title,
@@ -668,9 +677,10 @@ fn dropping_screenshots_asks_once_and_fills_free_slots() {
     }
     app.answer_modal(ModalAnswer::Choice(ChoiceId::Replace));
     assert!(app.modal().is_none());
+    drop(app_guard);
     harness.run_jobs();
 
-    let app = harness.app();
+    let app = &mut *harness.app();
     assert_eq!(pixels(app, shot(1)), solid(9, 9, GREEN));
     assert_eq!(pixels(app, shot(2)), solid(10, 10, BLUE));
     assert_eq!(pixels(app, shot(3)), solid(11, 11, BLUE));
@@ -695,7 +705,7 @@ fn answering_add_puts_all_dropped_screenshots_in_free_slots() {
         .answer_modal(ModalAnswer::Choice(ChoiceId::AddToFreeSlots));
     harness.run_jobs();
 
-    let app = harness.app();
+    let app = &mut *harness.app();
     assert_eq!(pixels(app, shot(1)), solid(8, 8, RED));
     assert_eq!(app.pages().screenshots.revision(shot(1)), revision);
     assert_eq!(pixels(app, shot(2)), solid(9, 9, GREEN));
@@ -737,7 +747,7 @@ fn dropping_on_empty_selected_slot_does_not_ask() {
     assert!(harness.app().modal().is_none());
     harness.run_jobs();
 
-    let app = harness.app();
+    let app = &mut *harness.app();
     assert_eq!(pixels(app, shot(3)), solid(9, 9, GREEN));
     assert_eq!(pixels(app, shot(1)), solid(10, 10, BLUE));
     assert_eq!(app.pages().screenshots.screenshot_count(), 2);
@@ -753,7 +763,8 @@ fn images_dropped_on_online_or_console_are_ignored_with_note() {
 
         drop_files(&mut harness, std::slice::from_ref(&path));
 
-        let app = harness.app();
+        let mut app_guard = harness.app();
+        let app = &mut *app_guard;
         assert_eq!(
             *app.status(),
             StatusLine::info(
@@ -762,6 +773,7 @@ fn images_dropped_on_online_or_console_are_ignored_with_note() {
         );
         assert_eq!(app.status().severity, Severity::Info);
         assert!(app.modal().is_none());
+        drop(app_guard);
         assert_eq!(harness.queued_jobs(), 0);
     }
 }
@@ -794,7 +806,7 @@ fn asset_files_dropped_on_any_page_load() {
         drop_files(&mut harness, &[asset.clone(), image.clone()]);
         harness.run_jobs();
 
-        let app = harness.app();
+        let app = &mut *harness.app();
         assert!(!is_empty(app, AssetSlot::Cover), "{page:?}");
         assert_eq!(app.page(), Page::Cover);
         match page {
@@ -833,7 +845,7 @@ fn drop_during_import_is_refused() {
         StatusLine::info("Busy, try again when the current work finishes")
     );
     harness.run_jobs();
-    assert_eq!(pixels(harness.app(), AssetSlot::Cover), solid(8, 8, RED));
+    assert_eq!(pixels(&harness.app(), AssetSlot::Cover), solid(8, 8, RED));
 }
 
 #[test]

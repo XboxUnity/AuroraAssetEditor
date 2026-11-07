@@ -117,7 +117,7 @@ fn listing_route(title_id: &str, covers: &[Cover]) -> Route {
 }
 
 fn search_for(harness: &mut AppHarness, title_id: &str) {
-    let app = harness.app();
+    let app = &mut *harness.app();
     app.edit_search_text(title_id);
     app.search_online();
 }
@@ -154,7 +154,7 @@ fn tile_is_loaded(image: &TileImage) -> bool {
 #[test]
 fn title_id_mode_filters_input() {
     let mut harness = AppHarness::new();
-    let app = harness.app();
+    let app = &mut *harness.app();
 
     app.edit_search_text("4d53-07e6zz9");
     assert_eq!(app.online().title_id_text, "4d5307e6");
@@ -170,7 +170,7 @@ fn title_id_mode_filters_input() {
 #[test]
 fn keywords_mode_keeps_free_text() {
     let mut harness = AppHarness::new();
-    let app = harness.app();
+    let app = &mut *harness.app();
     app.edit_search_text("4D5307E6");
 
     app.set_search_mode(SearchMode::Keywords);
@@ -184,7 +184,7 @@ fn keywords_mode_keeps_free_text() {
 #[test]
 fn prefill_updates_title_id_text_only() {
     let mut harness = AppHarness::new();
-    let app = harness.app();
+    let app = &mut *harness.app();
     app.set_search_mode(SearchMode::Keywords);
     app.edit_search_text("halo 3");
 
@@ -204,7 +204,7 @@ fn prefill_updates_title_id_text_only() {
 #[test]
 fn archive_source_forces_title_id_mode() {
     let mut harness = AppHarness::new();
-    let app = harness.app();
+    let app = &mut *harness.app();
     app.set_search_mode(SearchMode::Keywords);
     assert_eq!(app.online().mode, SearchMode::Keywords);
 
@@ -347,7 +347,7 @@ fn search_error_is_shown_and_logged() {
 
     harness.run_jobs();
 
-    let status = harness.app().status();
+    let status = harness.app().status().clone();
     assert_eq!(status.severity, Severity::Error);
     assert!(
         status.text.starts_with(&format!("{SEARCH_FAILED}: ")),
@@ -403,14 +403,15 @@ fn stale_search_results_are_dropped() {
     });
 
     assert_eq!(still_searching_after_first.get(), Some(true));
-    let labels: Vec<&str> = harness
-        .app()
+    let app = harness.app();
+    let labels: Vec<&str> = app
         .online()
         .results
         .iter()
         .map(|tile| tile.result.label.as_str())
         .collect();
     assert_eq!(labels, [label("Other")]);
+    drop(app);
     assert_eq!(
         harness.app().status().text,
         format!("1 result for {SECOND_TITLE}")
@@ -452,7 +453,8 @@ fn thumbnails_load_lazily_and_failures_show_on_tile() {
 
     harness.run_jobs();
 
-    let tiles = &harness.app().online().results;
+    let app = harness.app();
+    let tiles = &app.online().results;
     assert!(
         matches!(&tiles[0].thumbnail, TileImage::Loaded { pixels, .. } if pixels.dimensions() == (12, 8))
     );
@@ -461,6 +463,7 @@ fn thumbnails_load_lazily_and_failures_show_on_tile() {
         matches!(&tiles[2].thumbnail, TileImage::Loaded { pixels, .. } if pixels.dimensions() == (6, 4))
     );
     assert_eq!(requests_to(&server, "/image/bare.png"), 1);
+    drop(app);
     let log = harness.error_log_text();
     assert!(log.contains(&label("Broken")), "{log}");
     assert!(!log.contains(&label("Fine")), "{log}");
@@ -477,10 +480,12 @@ fn selecting_jumps_ahead_of_waiting_thumbnails() {
     assert_eq!(harness.app().status().text, "Downloading cover…".to_owned());
     assert!(harness.run_next_job());
 
-    let tiles = &harness.app().online().results;
+    let app = harness.app();
+    let tiles = &app.online().results;
     assert!(tile_is_loaded(&tiles[1].full));
     assert!(matches!(tiles[0].thumbnail, TileImage::Pending));
     assert!(matches!(tiles[1].thumbnail, TileImage::Pending));
+    drop(app);
     assert_eq!(
         harness.app().status().text,
         format!("2 results for {FIRST_TITLE}")
@@ -548,13 +553,15 @@ fn stale_full_image_is_ignored() {
     harness.app().select_result(1);
     harness.run_jobs();
 
-    let online = harness.app().online();
+    let app_guard = harness.app();
+    let online = app_guard.online();
     assert!(matches!(online.results[0].full, TileImage::Pending));
     assert!(tile_is_loaded(&online.results[1].full));
     assert_eq!(online.selected, Some(1));
     let shown = online.selected_tile().expect("tile 1 is selected");
     assert_eq!(shown.result.label, label("Two"));
     assert_eq!(requests_to(&server, "/image/one.png"), 1);
+    drop(app_guard);
     assert_eq!(harness.error_log_text(), "");
 }
 
@@ -574,8 +581,8 @@ fn use_as_cover_does_not_resize() {
     assert_eq!(harness.app().status().text, IMPORTING_COVER_TEXT);
     harness.run_jobs();
 
-    let header = harness
-        .app()
+    let app_guard = harness.app();
+    let header = app_guard
         .pages()
         .cover
         .texture_header(AssetSlot::Cover)
@@ -585,6 +592,7 @@ fn use_as_cover_does_not_resize() {
         (COVER_WIDTH, COVER_HEIGHT)
     );
     assert_eq!(header.format(), TextureFormat::LinearArgb8888);
+    drop(app_guard);
     assert_eq!(harness.app().page(), Page::Online);
     assert_eq!(
         harness.app().status().text,
@@ -595,8 +603,8 @@ fn use_as_cover_does_not_resize() {
     harness.app().use_result_as_cover();
     harness.run_jobs();
 
-    let header = harness
-        .app()
+    let app_guard = harness.app();
+    let header = app_guard
         .pages()
         .cover
         .texture_header(AssetSlot::Cover)
@@ -606,6 +614,7 @@ fn use_as_cover_does_not_resize() {
         (COVER_WIDTH, COVER_HEIGHT)
     );
     assert_eq!(header.format(), TextureFormat::LinearDxt4);
+    drop(app_guard);
     assert_eq!(harness.error_log_text(), "");
 }
 
@@ -690,7 +699,7 @@ fn use_as_cover_that_fails_to_encode_does_not_claim_success() {
     assert_eq!(harness.app().status().text, IMPORTING_COVER_TEXT);
     harness.run_jobs();
 
-    let status = harness.app().status();
+    let status = harness.app().status().clone();
     assert_eq!(status.severity, Severity::Error);
     assert_eq!(status.text, "Could not set the cover from XboxUnity result");
     match harness.app().modal() {
@@ -723,10 +732,12 @@ fn selecting_zero_one_zero_applies_only_the_selected_tile() {
     harness.app().select_result(0);
     harness.run_jobs();
 
-    let online = harness.app().online();
+    let app_guard = harness.app();
+    let online = app_guard.online();
     assert_eq!(online.selected, Some(0));
     assert!(tile_is_loaded(&online.results[0].full));
     assert!(matches!(online.results[1].full, TileImage::Pending));
+    drop(app_guard);
     assert_eq!(
         harness.app().status().text,
         format!("2 results for {FIRST_TITLE}")
@@ -777,7 +788,8 @@ fn recorded_results_load_their_thumbnails_from_the_local_server() {
 
     harness.run_jobs();
 
-    let tiles = &harness.app().online().results;
+    let app = harness.app();
+    let tiles = &app.online().results;
     assert!(tile_is_loaded(&tiles[0].thumbnail));
     assert_eq!(requests_to(&server, "/api/boxartsm/225"), 1);
 }

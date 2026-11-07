@@ -52,7 +52,7 @@ fn form(harness: &mut AppHarness) -> ConnectionForm {
 }
 
 fn type_into_form(harness: &mut AppHarness, host: &str, port: &str) {
-    let app = harness.app();
+    let app = &mut *harness.app();
     app.edit_modal_field(ModalField::Host, host);
     app.edit_modal_field(ModalField::Port, port);
 }
@@ -82,7 +82,7 @@ fn game(title: &str, title_id: &str, database_id: i64, disc: u32) -> Game {
 
 /// Fills the table as a refresh would, without a console.
 fn show_games(harness: &mut AppHarness, games: Vec<Game>) {
-    let app = harness.app();
+    let app = &mut *harness.app();
     app.refresh_games();
     let generation = app.console().refresh_generation();
     app.on_job_outcome(JobOutcome::Console(ConsoleOutcome::Refreshed {
@@ -328,7 +328,7 @@ fn refresh_connection_failure_shows_dialog() {
     harness.app().refresh_games();
     harness.run_jobs();
 
-    let Some(Modal::Message { title, text }) = harness.app().modal() else {
+    let Some(Modal::Message { title, text }) = harness.app().modal().cloned() else {
         panic!("expected a message dialog");
     };
     assert_eq!(title, CONNECTION_FAILED_TITLE);
@@ -350,7 +350,7 @@ fn refresh_failure_after_connecting_goes_to_status_line() {
     refreshed(&mut harness);
 
     assert_eq!(harness.app().modal(), None);
-    let status = harness.app().status();
+    let status = harness.app().status().clone();
     assert_eq!(status.severity, Severity::Error);
     assert!(status.text.starts_with("Could not refresh the game list: "));
     assert!(
@@ -514,7 +514,11 @@ fn selecting_a_game_sets_current_game_and_online_title_id() {
 
     harness.app().select_game(2);
 
-    let current = harness.app().current_game().expect("a game is selected");
+    let current = harness
+        .app()
+        .current_game()
+        .cloned()
+        .expect("a game is selected");
     assert_eq!(current.title, "banana");
     assert_eq!(current.ids.title_id.as_str(), "4D5307E6");
     assert_eq!(current.ids.database_id.as_str(), "00000001");
@@ -602,7 +606,8 @@ fn presence_from_previous_refresh_is_ignored() {
         icon_banner: true,
         screenshots: true,
     };
-    let app = harness.app();
+    let mut app_guard = harness.app();
+    let app = &mut *app_guard;
     app.on_job_outcome(JobOutcome::Console(ConsoleOutcome::Presence {
         generation: stale_generation,
         ids: games[1].ids.clone(),
@@ -622,6 +627,7 @@ fn presence_from_previous_refresh_is_ignored() {
         app.console().table.presence(&games[2].ids),
         PresenceCell::Unknown
     );
+    drop(app_guard);
     assert!(harness.error_log_text().contains("reply 530"));
     harness.run_jobs();
     assert_eq!(
@@ -872,7 +878,8 @@ fn presence_checks_run_for_a_hand_built_generation_zero_refresh() {
     let (mut harness, _console) = harness_with_console();
     let games = typical_games();
     let first = games[0].ids.clone();
-    let app = harness.app();
+    let mut app_guard = harness.app();
+    let app = &mut *app_guard;
     let generation = app.console().refresh_generation();
     assert_eq!(generation, 0);
     app.on_job_outcome(JobOutcome::Console(ConsoleOutcome::Refreshed {
@@ -883,6 +890,7 @@ fn presence_checks_run_for_a_hand_built_generation_zero_refresh() {
         }),
     }));
 
+    drop(app_guard);
     harness.run_jobs();
 
     assert!(matches!(

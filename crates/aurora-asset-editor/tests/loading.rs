@@ -177,7 +177,7 @@ fn picked_files_are_loaded() {
     harness.app().open_files_with_dialog();
     harness.run_jobs();
 
-    assert_eq!(pixels(harness.app(), AssetSlot::Cover), solid(8, 8, RED));
+    assert_eq!(pixels(&harness.app(), AssetSlot::Cover), solid(8, 8, RED));
 }
 
 #[test]
@@ -215,7 +215,7 @@ fn asset_opens_page_by_priority() {
 
     load(&mut harness, &[&path]);
 
-    let app = harness.app();
+    let app = &mut *harness.app();
     assert_eq!(app.page(), Page::Cover);
     assert_eq!(pixels(app, AssetSlot::Cover), solid(8, 8, RED));
     assert!(is_empty(app, AssetSlot::Background));
@@ -230,7 +230,7 @@ fn asset_with_background_and_screenshots_opens_background() {
 
     load(&mut harness, &[&path]);
 
-    let app = harness.app();
+    let app = &mut *harness.app();
     assert_eq!(app.page(), Page::Background);
     assert!(is_empty(app, shot(1)));
 }
@@ -244,7 +244,7 @@ fn asset_with_screenshots_and_icon_opens_screenshots() {
 
     load(&mut harness, &[&path]);
 
-    let app = harness.app();
+    let app = &mut *harness.app();
     assert_eq!(app.page(), Page::Screenshots);
     assert!(is_empty(app, AssetSlot::Icon));
 }
@@ -258,7 +258,7 @@ fn asset_with_only_icon_banner_opens_icon_banner_page() {
 
     load(&mut harness, &[&path]);
 
-    let app = harness.app();
+    let app = &mut *harness.app();
     assert_eq!(app.page(), Page::IconBanner);
     assert_eq!(pixels(app, AssetSlot::Icon), solid(8, 8, RED));
     assert_eq!(pixels(app, AssetSlot::Banner), solid(8, 8, BLUE));
@@ -275,7 +275,7 @@ fn asset_load_copies_all_twenty_screenshots() {
 
     load(&mut harness, &[&path]);
 
-    let app = harness.app();
+    let app = &mut *harness.app();
     assert_eq!(app.pages().screenshots.screenshot_count(), 20);
     for (slot, color) in colors {
         assert_eq!(pixels(app, slot), solid(8, 8, color), "{slot:?}");
@@ -320,7 +320,8 @@ fn undecodable_entry_is_dropped_and_reported() {
 
     load(&mut harness, &[&path]);
 
-    let app = harness.app();
+    let mut app_guard = harness.app();
+    let app = &mut *app_guard;
     assert!(matches!(reason, DecodeError::TruncatedData { .. }));
     assert!(is_empty(app, shot(2)));
     assert_eq!(pixels(app, shot(3)), solid(8, 8, GREEN));
@@ -334,6 +335,7 @@ fn undecodable_entry_is_dropped_and_reported() {
             )
         ))
     );
+    drop(app_guard);
     assert!(
         harness
             .error_log_text()
@@ -352,7 +354,7 @@ fn unsupported_entry_is_kept_and_labelled() {
 
     load(&mut harness, &[&path]);
 
-    let app = harness.app();
+    let app = &mut *harness.app();
     assert!(matches!(
         app.pages().cover.preview(AssetSlot::Cover),
         SlotPreview::Unsupported(TextureFormat::Unsupported { .. })
@@ -386,7 +388,7 @@ fn fsd_loads_every_type_into_free_slots() {
 
     load(&mut harness, &[&fsd]);
 
-    let app = harness.app();
+    let app = &mut *harness.app();
     assert_eq!(pixels(app, AssetSlot::Cover), solid(100, 50, RED));
     assert_eq!(pixels(app, AssetSlot::Background), solid(30, 20, GREEN));
     assert_eq!(pixels(app, AssetSlot::Icon), solid(16, 16, BLUE));
@@ -407,7 +409,7 @@ fn fsd_without_screenshots_is_not_reported_empty() {
 
     load(&mut harness, &[&path]);
 
-    let app = harness.app();
+    let app = &mut *harness.app();
     assert_eq!(app.modal(), None);
     assert_eq!(pixels(app, AssetSlot::Cover), solid(10, 10, RED));
     assert_eq!(
@@ -443,7 +445,10 @@ fn fsd_non_dds_images_decode() {
 
     load(&mut harness, &[&path]);
 
-    assert_eq!(pixels(harness.app(), AssetSlot::Cover), solid(12, 8, color));
+    assert_eq!(
+        pixels(&harness.app(), AssetSlot::Cover),
+        solid(12, 8, color)
+    );
 }
 
 #[test]
@@ -456,14 +461,10 @@ fn fsd_images_are_not_resized() {
 
     load(&mut harness, &[&path]);
 
-    let cover = pixels(harness.app(), AssetSlot::Cover);
+    let cover = pixels(&harness.app(), AssetSlot::Cover);
     assert_eq!(cover.dimensions(), (100, 50));
-    let header = harness
-        .app()
-        .pages()
-        .cover
-        .texture_header(AssetSlot::Cover)
-        .unwrap();
+    let app = harness.app();
+    let header = app.pages().cover.texture_header(AssetSlot::Cover).unwrap();
     assert_eq!((header.width(), header.height()), (100, 50));
 }
 
@@ -501,7 +502,7 @@ fn fsd_unreadable_image_is_left_out_and_reported() {
 
     load(&mut harness, &[&path]);
 
-    let app = harness.app();
+    let app = &mut *harness.app();
     assert!(is_empty(app, AssetSlot::Cover));
     assert_eq!(pixels(app, AssetSlot::Background), solid(10, 10, GREEN));
     assert_eq!(app.page(), Page::Background);
@@ -531,7 +532,7 @@ fn fsd_not_enough_space_fills_then_warns() {
 
     load(&mut harness, &[&fsd]);
 
-    let app = harness.app();
+    let app = &mut *harness.app();
     assert_eq!(app.pages().screenshots.screenshot_count(), 20);
     assert_eq!(pixels(app, shot(20)), solid(20, 12, RED));
     assert_eq!(
@@ -570,7 +571,7 @@ fn command_line_loads_every_file_by_magic() {
 
     load(&mut harness, &[&asset, &fsd]);
 
-    let app = harness.app();
+    let app = &mut *harness.app();
     assert_eq!(app.modal(), None);
     assert_eq!(pixels(app, AssetSlot::Background), solid(30, 20, GREEN));
     assert_eq!(pixels(app, AssetSlot::Cover), solid(100, 50, RED));
@@ -668,7 +669,7 @@ fn load_problems_share_one_dialog() {
 
     load(&mut harness, &[&bad, &good, &missing]);
 
-    let app = harness.app();
+    let app = &mut *harness.app();
     assert_eq!(
         app.modal(),
         Some(&message(
@@ -692,7 +693,7 @@ fn new_asset_set_resets_pages_and_keeps_game() {
 
     harness.app().new_asset_set();
 
-    let app = harness.app();
+    let app = &mut *harness.app();
     assert!(is_empty(app, AssetSlot::Cover));
     assert_eq!(app.pages().present_types(), 0);
     assert_eq!(app.current_game(), Some(&halo_3()));
@@ -756,7 +757,7 @@ fn non_ascii_paths_load() {
 
     load(&mut harness, &[&path]);
 
-    assert_eq!(pixels(harness.app(), AssetSlot::Cover), solid(8, 8, RED));
+    assert_eq!(pixels(&harness.app(), AssetSlot::Cover), solid(8, 8, RED));
     assert_eq!(
         harness.app().status(),
         &StatusLine::info("Loaded カバー.asset · 1 of 5 asset types present")
@@ -773,7 +774,7 @@ fn several_empty_files_share_one_dialog() {
 
     load(&mut harness, &[&first, &second]);
 
-    let app = harness.app();
+    let app = &mut *harness.app();
     assert_eq!(
         app.modal(),
         Some(&message(
@@ -797,7 +798,7 @@ fn fsd_with_only_unreadable_images_does_not_report_loaded() {
 
     load(&mut harness, &[&path]);
 
-    let app = harness.app();
+    let app = &mut *harness.app();
     assert_eq!(app.status(), &StatusLine::ready());
     assert_eq!(app.page(), Page::Cover);
     assert_eq!(app.pages().present_types(), 0);
@@ -825,7 +826,7 @@ fn new_asset_set_during_a_load_is_refused() {
     );
     harness.run_jobs();
 
-    assert_eq!(pixels(harness.app(), AssetSlot::Cover), solid(8, 8, RED));
+    assert_eq!(pixels(&harness.app(), AssetSlot::Cover), solid(8, 8, RED));
 }
 
 #[test]
@@ -853,6 +854,6 @@ fn opening_during_a_load_is_refused() {
     );
     harness.run_jobs();
 
-    assert!(is_empty(harness.app(), AssetSlot::Background));
+    assert!(is_empty(&harness.app(), AssetSlot::Background));
     assert!(harness.dialogs().requests().is_empty());
 }

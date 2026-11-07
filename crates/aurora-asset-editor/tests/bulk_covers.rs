@@ -53,7 +53,7 @@ fn delta() -> Game {
 
 /// Leaves Fable II and Halo 3 in the table, in title order.
 fn show_two_games(harness: &mut AppHarness) {
-    let app = harness.app();
+    let app = &mut *harness.app();
     app.set_game_filter("l", "");
     app.sort_games(GameColumn::Title);
 }
@@ -159,7 +159,7 @@ fn all_cover_routes(failing: &[&str]) -> Vec<Route> {
 }
 
 fn start_bulk(harness: &mut AppHarness) {
-    let app = harness.app();
+    let app = &mut *harness.app();
     app.open_bulk_actions();
     app.answer_modal(ModalAnswer::Accept);
 }
@@ -216,7 +216,7 @@ fn bulk_with_empty_list_shows_old_message() {
 #[test]
 fn bulk_dialog_defaults() {
     let mut fixture = fixture();
-    let app = fixture.harness.app();
+    let app = &mut *fixture.harness.app();
 
     app.open_bulk_actions();
 
@@ -258,7 +258,7 @@ fn bulk_runs_on_filtered_list_in_view_order() {
         vec![cover_name(&echo()), cover_name(&foxtrot()),]
     );
     assert!(uploaded_cover(&fixture.console, &delta()).is_none());
-    let app = fixture.harness.app();
+    let app = &mut *fixture.harness.app();
     for uploaded in [echo(), foxtrot()] {
         match app.console().table.presence(&uploaded.ids) {
             PresenceCell::Known(presence) => assert!(presence.cover),
@@ -525,7 +525,8 @@ fn bulk_when_console_refuses_connections_shows_connection_failed() {
 #[test]
 fn bulk_without_console_settings_says_so() {
     let mut harness = AppHarness::new();
-    let app = harness.app();
+    let mut app_guard = harness.app();
+    let app = &mut *app_guard;
     let generation = app.console().refresh_generation();
     app.on_job_outcome(JobOutcome::Console(ConsoleOutcome::Refreshed {
         generation,
@@ -535,9 +536,10 @@ fn bulk_without_console_settings_says_so() {
         }),
     }));
 
+    drop(app_guard);
     harness.app().open_bulk_actions();
 
-    let app = harness.app();
+    let app = &mut *harness.app();
     assert!(app.modal().is_none());
     assert_eq!(app.status().text, NO_CONSOLE_TEXT);
 }

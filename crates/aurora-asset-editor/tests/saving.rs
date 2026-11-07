@@ -239,7 +239,8 @@ fn saving_screenshots_compacts_without_reencoding() {
     );
     assert!(saved.get(shot(3)).is_none());
     assert!(saved.get(shot(5)).is_none());
-    let screenshots = &harness.app().pages().screenshots;
+    let app = harness.app();
+    let screenshots = &app.pages().screenshots;
     assert!(matches!(
         screenshots.preview(shot(1)),
         SlotPreview::Pixels(_)
@@ -319,7 +320,7 @@ fn save_all_title_id_prompt_rules() {
     harness.app().set_current_game(Some(halo_3()));
 
     harness.app().save_all_locally();
-    assert_eq!(title_id_text(harness.app()), "4D5307E6");
+    assert_eq!(title_id_text(&harness.app()), "4D5307E6");
     match harness.app().modal() {
         Some(Modal::TitleId { title, label, .. }) => {
             assert_eq!(title, "Save all assets");
@@ -331,11 +332,11 @@ fn save_all_title_id_prompt_rules() {
     harness
         .app()
         .edit_modal_field(ModalField::TitleId, "4d53-07e6x");
-    assert_eq!(title_id_text(harness.app()), "4d5307e6");
+    assert_eq!(title_id_text(&harness.app()), "4d5307e6");
 
     harness.app().edit_modal_field(ModalField::TitleId, "4d5");
     harness.app().answer_modal(ModalAnswer::Accept);
-    assert_eq!(title_id_text(harness.app()), "4d5");
+    assert_eq!(title_id_text(&harness.app()), "4d5");
     assert!(harness.dialogs().requests().is_empty());
 
     harness
@@ -367,7 +368,7 @@ fn save_all_prompt_cancel_and_empty_prefill() {
     let mut harness = AppHarness::new();
 
     harness.app().save_all_locally();
-    assert_eq!(title_id_text(harness.app()), "");
+    assert_eq!(title_id_text(&harness.app()), "");
     harness.app().answer_modal(ModalAnswer::Cancel);
 
     assert_eq!(harness.app().modal(), None);
@@ -387,7 +388,7 @@ fn save_failure_is_shown_and_logged() {
 
     save_all(&mut harness, target.path());
 
-    let (title, text) = message(harness.app());
+    let (title, text) = message(&harness.app());
     assert_eq!(title, "Could not save");
     assert!(
         text.starts_with("There was an error while saving GC4D5307E6.asset: "),
@@ -402,7 +403,7 @@ fn save_failure_is_shown_and_logged() {
     fs::create_dir(target.path().join("BK4D5307E6.asset")).unwrap();
     save_all(&mut harness, target.path());
 
-    let (title, text) = message(harness.app());
+    let (title, text) = message(&harness.app());
     assert_eq!(title, "Could not save");
     assert!(
         text.starts_with("There was an error while saving BK4D5307E6.asset: "),
@@ -427,7 +428,7 @@ fn per_type_save_failure_is_shown_and_logged() {
     harness.dialogs().push_save(target);
     harness.app().save_kind(AssetKind::Cover);
 
-    let (title, text) = message(harness.app());
+    let (title, text) = message(&harness.app());
     assert_eq!(title, "Could not save");
     assert!(text.starts_with("There was an error while saving GC4D5307E6.asset: "));
     assert!(harness.error_log_text().contains("Could not save"));
@@ -575,7 +576,7 @@ fn export_failure_is_shown_and_logged() {
     harness.dialogs().push_save(target);
     harness.app().export_image(AssetSlot::Cover);
 
-    let (title, text) = message(harness.app());
+    let (title, text) = message(&harness.app());
     assert_eq!(title, "Could not save");
     assert!(text.starts_with("There was an error while saving cover.png: "));
     assert!(harness.error_log_text().contains("Could not save"));
@@ -588,7 +589,7 @@ fn dialog_failure_on_save_is_shown() {
 
     harness.app().save_kind(AssetKind::Cover);
 
-    let (title, text) = message(harness.app());
+    let (title, text) = message(&harness.app());
     assert_eq!(title, "Could not open the file dialog");
     assert!(text.contains("no portal"), "{text}");
 }

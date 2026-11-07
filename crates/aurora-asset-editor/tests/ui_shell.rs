@@ -189,6 +189,26 @@ fn sidebar_shows_screenshot_count_when_above_zero() {
 }
 
 #[test]
+fn a_job_run_after_the_view_is_connected_updates_the_view() {
+    let mut harness = AppHarness::new();
+    let shell = Shell::start(&mut harness);
+    assert_eq!(shell.model().get_screenshot_count(), 0);
+
+    load_three_screenshots(&mut harness);
+    shell.render();
+
+    assert_eq!(shell.model().get_screenshot_count(), 3);
+    assert_eq!(shell.model().get_page(), aurora_ui::PageId::Screenshots);
+    assert_eq!(
+        shell
+            .element("StatusLine::status-text")
+            .accessible_label()
+            .as_deref(),
+        Some("Loaded SS4D5307E6.asset · 1 of 5 asset types present")
+    );
+}
+
+#[test]
 fn sidebar_click_switches_page() {
     let mut harness = AppHarness::new();
     let shell = Shell::start(&mut harness);
