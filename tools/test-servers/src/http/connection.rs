@@ -103,6 +103,7 @@ fn wait_for_peer_to_leave(shared: &Shared, reader: &mut BufReader<&TcpStream>) {
             Ok(0) => return,
             Ok(_) => {}
             Err(error) if is_read_timeout(&error) && !shared.is_stopping() => {}
+            Err(error) if is_read_timeout(&error) => return,
             Err(error) => {
                 eprintln!("recorded http: waiting for the client failed: {error}");
                 return;

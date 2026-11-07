@@ -467,6 +467,8 @@ fn bulk_stops_when_console_is_gone() {
         BulkOutcome::Failed(BulkFailure::Console(_))
     ));
     assert!(matches!(report.stopped, Some(BulkStop::ConsoleGone(_))));
+    assert_eq!(report.total, 3);
+    assert_eq!(report.summary().not_handled, 2);
     assert_eq!(provider.calls, [FIRST_TITLE]);
 }
 
