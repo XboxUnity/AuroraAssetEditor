@@ -33,6 +33,8 @@ const ARGB_BIT_COUNT: u32 = 32;
 const DXT1_BLOCK_BYTES: usize = 8;
 const DXT5_BLOCK_BYTES: usize = 16;
 const OPAQUE: u8 = u8::MAX;
+/// DXT5 color is stored as it is; only the DLL's DXT4 decode divides it by alpha.
+const WITHOUT_ALPHA_DIVIDE: bool = false;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DdsError {
@@ -83,7 +85,7 @@ pub fn decode(bytes: &[u8]) -> Result<RgbaImage, DdsError> {
             decode_bc1_block(&block_array(block))
         })?,
         Format::Dxt5 => decode_blocks(pixels, width, height, DXT5_BLOCK_BYTES, |block| {
-            decode_bc3_block(&block_array(block), false)
+            decode_bc3_block(&block_array(block), WITHOUT_ALPHA_DIVIDE)
         })?,
         Format::Argb8888 => decode_bgra(pixels, width, height, Alpha::Stored)?,
         Format::Xrgb8888 => decode_bgra(pixels, width, height, Alpha::Opaque)?,
