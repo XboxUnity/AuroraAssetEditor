@@ -116,6 +116,10 @@ disassembled. `dds::decode` returns the top mip level, as the DLL does. It refus
 taller than `MAX_DIMENSION` (8192), the most an `.asset` texture can hold, which bounds the memory a
 decode allocates; the DLL's own limit was not probed.
 
+`FsdFile::parse` treats an entry as DDS when it starts with `DDS `. The old app tested
+`data[0] == 'D' || data[1] == 'D' || data[1] == 'S'`, which no PNG, JPEG or GIF file passes
+either, so both send the same image files down each path.
+
 What the DLL does with each format:
 
 - **DXT1 and DXT5:** the same block decode as `ConvertAssetToImage` (the arithmetic above): DXT5
