@@ -11,6 +11,15 @@ import { DialogText } from "dialog_text.slint";
 export component BulkDialog inherits DialogFrame {
     title: DialogModel.title;
 
+    first-has-focus: replace-check.has-focus;
+    last-has-focus: cancel-button.has-focus;
+    focus-first => {
+        replace-check.focus();
+    }
+    focus-last => {
+        cancel-button.focus();
+    }
+
     init => {
         self.take-focus();
     }

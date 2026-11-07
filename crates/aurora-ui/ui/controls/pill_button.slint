@@ -13,17 +13,15 @@ export component PillButton inherits Rectangle {
     in property <bool> compact;
     // Reachable with Tab; Space or Return clicks it then. Dialog buttons use it.
     in property <bool> focusable;
+    out property <bool> has-focus: keys.has-focus;
     callback clicked();
-
-    public function focus-button() {
-        keys.focus();
-    }
 
     property <bool> accent-look: accent && enabled;
     property <bool> danger-look: danger && enabled;
     property <color> foreground: danger-look ? Theme.danger-text : accent-look ? Theme.accent-text : enabled ? Theme.pill-text : Theme.disabled-button-text;
 
     horizontal-stretch: 0;
+    forward-focus: keys;
     height: compact ? self.preferred-height : Theme.pill-height;
     border-radius: Theme.pill-radius;
     background: danger-look ? Theme.danger : accent-look ? Theme.accent : enabled ? Theme.pill-background : Theme.disabled-button-background;

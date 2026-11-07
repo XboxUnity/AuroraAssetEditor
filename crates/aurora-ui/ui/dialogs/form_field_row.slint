@@ -6,10 +6,12 @@ export component FormFieldRow inherits HorizontalLayout {
     in property <string> label;
     in property <string> value;
     in property <InputType> input-type: InputType.text;
+    out property <bool> has-focus: field.has-focus;
     callback edited(string);
     callback accepted();
 
     spacing: Theme.dialog-row-gap;
+    forward-focus: field;
 
     public function focus-and-select-all() {
         field.focus-and-select-all();

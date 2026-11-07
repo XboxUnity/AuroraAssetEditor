@@ -1,18 +1,33 @@
 import { Theme } from "../theme/theme.slint";
 
 // A dialog's message. Above the card's limit it scrolls, so a long list of failed files keeps the buttons on
-// screen.
-export component DialogText inherits Flickable {
+// screen; a thumb in the card's right padding shows where the visible part lies.
+export component DialogText inherits Rectangle {
     in property <string> text;
 
-    height: min(body.preferred-height, Theme.dialog-text-max-height);
-    content-width: self.width;
-    content-height: body.preferred-height;
+    property <length> full-height: body.preferred-height;
+    property <bool> overflows: full-height > Theme.dialog-text-max-height;
 
-    body := Text {
-        width: root.width;
-        text: root.text;
-        color: Theme.text;
-        wrap: word-wrap;
+    height: min(full-height, Theme.dialog-text-max-height);
+
+    scroller := Flickable {
+        content-width: self.width;
+        content-height: root.full-height;
+
+        body := Text {
+            width: scroller.width;
+            text: root.text;
+            color: Theme.text;
+            wrap: word-wrap;
+        }
+    }
+
+    if overflows: scroll-thumb := Rectangle {
+        x: root.width + Theme.scroll-indicator-gap;
+        y: -scroller.content-y * root.height / root.full-height;
+        width: Theme.scroll-indicator-width;
+        height: root.height * root.height / root.full-height;
+        border-radius: self.width / 2;
+        background: Theme.text-muted;
     }
 }

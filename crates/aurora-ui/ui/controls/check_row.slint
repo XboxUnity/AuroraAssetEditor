@@ -5,10 +5,12 @@ import { Icon } from "icon.slint";
 export component CheckRow inherits Rectangle {
     in property <string> text;
     in property <bool> checked;
+    out property <bool> has-focus: keys.has-focus;
     callback toggled(bool);
 
     height: Theme.pill-height;
     horizontal-stretch: 0;
+    forward-focus: keys;
     accessible-role: checkbox;
     accessible-label: text;
     accessible-checkable: true;

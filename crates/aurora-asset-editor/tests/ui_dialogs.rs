@@ -1,19 +1,22 @@
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
+use aurora_asset::{AssetSlot, ScreenshotNumber};
 use aurora_asset_editor::app::{App, CurrentGame, KindChoice, Page};
 use aurora_asset_editor::dialogs::Modal;
+use aurora_asset_editor::editor::SlotPreview;
 use aurora_asset_editor::jobs::{ConsoleOutcome, JobOutcome};
 use aurora_asset_editor::settings::ThemeChoice;
 use aurora_asset_editor::view::MainWindowView;
 use aurora_console::{ConsoleError, FtpSettings, Game, GameIds, GameListing, HexId};
+use aurora_online::CoverSource;
 use aurora_ui::{DialogKind, DialogModel, MainWindow};
 use editor_test_support::{AppHarness, HeadlessUi};
-use i_slint_backend_testing::ElementHandle;
+use i_slint_backend_testing::{AccessibleRole, ElementHandle};
 use image::{Rgba, RgbaImage};
 use slint::platform::{Key, PointerEventButton, WindowEvent};
-use slint::{ComponentHandle, Model, SharedString};
+use slint::{ComponentHandle, LogicalPosition, Model, ModelRc, SharedString, VecModel};
 use tempfile::TempDir;
 use test_servers::{FakeConsole, FakeConsoleConfig};
 
@@ -31,6 +34,11 @@ const BUTTON_PROBE_INSET: f32 = 3.0;
 const DANGER: [u8; 3] = [0xdc, 0x26, 0x26];
 const ACCENT: [u8; 3] = [0x3b, 0x82, 0xf6];
 const COLOUR_TOLERANCE: i16 = 3;
+const LONG_MESSAGE_FILES: usize = 40;
+const DIALOG_TEXT_MAX_HEIGHT: f32 = 320.0;
+const PASSWORD: &str = "secret-word";
+/// IP Address, Port, Username, Password, Test Connection, Save, Cancel.
+const CONNECTION_FOCUS_STOPS: usize = 7;
 
 struct Ui {
     ui: HeadlessUi,
@@ -490,4 +498,338 @@ fn dialogs_render_in_both_themes() {
             }
         }
     }
+}
+
+fn text_input(ui: &Ui, label: &str) -> ElementHandle {
+    ElementHandle::find_by_accessible_label(ui.view.window(), label)
+        .find(|element| element.accessible_role() == Some(AccessibleRole::TextInput))
+        .unwrap_or_else(|| panic!("the {label} box is on screen"))
+}
+
+fn is_empty(app: &App, slot: AssetSlot) -> bool {
+    let document = match slot {
+        AssetSlot::Icon | AssetSlot::Banner => &app.pages().icon_banner,
+        _ => &app.pages().screenshots,
+    };
+    *document.preview(slot) == SlotPreview::Empty
+}
+
+fn shot(position: u8) -> AssetSlot {
+    AssetSlot::Screenshot(ScreenshotNumber::new(position).expect("a screenshot number"))
+}
+
+fn two_games() -> Vec<Game> {
+    vec![
+        game("Halo 3", HALO_TITLE_ID, 18),
+        game("Fable", "4D5307E7", 19),
+    ]
+}
+
+#[test]
+fn focus_stays_inside_an_open_dialog() {
+    let mut harness = console_harness(ThemeChoice::Dark);
+    let ui = Ui::start(&mut harness);
+    ui.act(|app| {
+        app.show_page(Page::Console);
+        show_games(app, two_games());
+        app.edit_connection();
+    });
+
+    for _ in 0..CONNECTION_FOCUS_STOPS {
+        ui.press(Key::Tab);
+    }
+    ui.type_text("9");
+    assert_eq!(
+        ui.fields()[0],
+        "9",
+        "Tab wrapped around to the IP Address box"
+    );
+
+    for _ in 0..3 * CONNECTION_FOCUS_STOPS {
+        ui.press(Key::Tab);
+        ui.press(Key::DownArrow);
+    }
+    assert!(
+        ui.app.borrow().current_game().is_none(),
+        "the game table never got the keys"
+    );
+
+    // Three whole rounds end on the IP Address box again; Shift+Tab from there wraps to the end.
+    ui.press(Key::Backtab);
+    let cancel = ui.button_edge_colour("ConnectionDialog::cancel-button");
+    assert_close(
+        cancel,
+        ACCENT,
+        COLOUR_TOLERANCE,
+        "Shift+Tab wraps to Cancel",
+    );
+    ui.press(Key::Return);
+    assert_eq!(ui.app.borrow().modal(), None, "Return clicked Cancel");
+}
+
+#[test]
+fn bulk_text_names_one_game_in_the_singular() {
+    let (_harness, ui) = open_flow(&FLOWS[6], ThemeChoice::Dark);
+    assert_eq!(
+        ui.dialog().get_text(),
+        "Uploads a random cover from the source for the 1 game in the list if it has no cover on the console. Covers are not resized."
+    );
+
+    let mut harness = console_harness(ThemeChoice::Dark);
+    let ui = Ui::start(&mut harness);
+    ui.act(|app| {
+        show_games(app, two_games());
+        app.open_bulk_actions();
+    });
+    assert_eq!(
+        ui.dialog().get_text(),
+        "Uploads a random cover from the source for each of the 2 games in the list that has no cover on the console. Covers are not resized."
+    );
+}
+
+#[test]
+fn long_message_caps_its_height_and_scrolls() {
+    let mut harness = console_harness(ThemeChoice::Dark);
+    let ui = Ui::start(&mut harness);
+    let missing = (0..LONG_MESSAGE_FILES)
+        .map(|number| PathBuf::from(format!("missing-{number}.asset")))
+        .collect();
+    ui.act(|app| app.open_paths(missing));
+    harness.run_jobs();
+    ui.render();
+    keep_snapshot(&ui.snapshot(), "dialogs-dark-long-message");
+
+    let scroller = ui.element("DialogText::scroller");
+    assert_eq!(scroller.size().height, DIALOG_TEXT_MAX_HEIGHT);
+    let thumb_top = ui.element("DialogText::scroll-thumb").absolute_position().y;
+
+    let (position, size) = (scroller.absolute_position(), scroller.size());
+    ui.view
+        .window()
+        .window()
+        .dispatch_event(WindowEvent::PointerScrolled {
+            position: LogicalPosition::new(
+                position.x + size.width / 2.0,
+                position.y + size.height / 2.0,
+            ),
+            delta_x: 0.0,
+            delta_y: -100.0,
+        });
+    ui.render();
+    let scrolled_top = ui.element("DialogText::scroll-thumb").absolute_position().y;
+    assert!(
+        scrolled_top > thumb_top,
+        "the wheel scrolls the text and the thumb follows: {thumb_top} -> {scrolled_top}"
+    );
+
+    let (_harness, short) = open_flow(&FLOWS[0], ThemeChoice::Dark);
+    assert!(
+        ElementHandle::find_by_element_id(short.view.window(), "DialogText::scroll-thumb")
+            .next()
+            .is_none(),
+        "a short message draws no thumb"
+    );
+}
+
+#[test]
+fn password_box_is_masked_and_not_read_out() {
+    let mut harness = AppHarness::new();
+    harness.with_ftp_settings(FtpSettings {
+        host: "192.168.1.50".to_owned(),
+        port: "21".to_owned(),
+        username: PASSWORD.to_owned(),
+        password: PASSWORD.to_owned(),
+    });
+    let ui = Ui::start(&mut harness);
+    ui.act(|app| app.edit_connection());
+
+    let password = text_input(&ui, "Password:");
+    let username = text_input(&ui, "Username:");
+    assert_eq!(password.accessible_value().unwrap_or_default(), "");
+    assert_eq!(username.accessible_value().unwrap_or_default(), PASSWORD);
+    let readers = ElementHandle::find_by_element_id(ui.view.window(), "TextField::input")
+        .filter(|element| element.accessible_value().as_deref() == Some(PASSWORD))
+        .count();
+    assert_eq!(
+        readers, 1,
+        "of the inputs holding the text, only the Username one reads it out"
+    );
+
+    let snapshot = ui.snapshot();
+    let crop = |element: &ElementHandle| {
+        let (position, size) = (element.absolute_position(), element.size());
+        image::imageops::crop_imm(
+            &snapshot,
+            position.x as u32,
+            position.y as u32,
+            size.width as u32,
+            size.height as u32,
+        )
+        .to_image()
+    };
+    assert_ne!(
+        crop(&username),
+        crop(&password),
+        "the same text is drawn masked in the Password box"
+    );
+}
+
+#[test]
+fn choice_buttons_answer_with_their_choice() {
+    let folder = TempDir::new().expect("a temporary folder");
+    let mut harness = console_harness(ThemeChoice::Dark);
+    let ui = Ui::start(&mut harness);
+    ui.act(|app| {
+        app.show_page(Page::IconBanner);
+        app.files_dropped(vec![png(folder.path(), "icon.png")]);
+    });
+    ui.click("ChoiceDialog::first-choice-button");
+    harness.run_jobs();
+    assert!(
+        !is_empty(&ui.app.borrow(), AssetSlot::Icon),
+        "Icon took the file"
+    );
+    assert!(is_empty(&ui.app.borrow(), AssetSlot::Banner));
+
+    ui.act(|app| app.files_dropped(vec![png(folder.path(), "banner.png")]));
+    ui.click("ChoiceDialog::second-choice-button");
+    harness.run_jobs();
+    assert!(
+        !is_empty(&ui.app.borrow(), AssetSlot::Banner),
+        "Banner took the file"
+    );
+
+    ui.act(|app| app.show_page(Page::Screenshots));
+    harness
+        .dialogs()
+        .push_files(vec![png(folder.path(), "first.png")]);
+    ui.act(|app| app.replace_image(shot(1)));
+    harness.run_jobs();
+    ui.act(|app| app.files_dropped(vec![png(folder.path(), "second.png")]));
+    assert_eq!(ui.dialog().get_kind(), DialogKind::Choice);
+    ui.click("ChoiceDialog::second-choice-button");
+    harness.run_jobs();
+    assert!(
+        !is_empty(&ui.app.borrow(), shot(2)),
+        "Add to free slots put the file in slot 2"
+    );
+}
+
+#[test]
+fn connection_boxes_edit_their_fields_and_save_writes_them() {
+    let (harness, ui) = open_flow(&FLOWS[5], ThemeChoice::Dark);
+    let typed = [
+        ("IP Address:", "10.0.0.2"),
+        ("Port:", "2121"),
+        ("Username:", "aurora"),
+        ("Password:", "hunter"),
+    ];
+    for (index, (_, text)) in typed.iter().enumerate() {
+        if index > 0 {
+            // Tab into the next box selects its text, so typing replaces it.
+            ui.press(Key::Tab);
+        }
+        ui.type_text(text);
+    }
+    match ui.app.borrow().modal() {
+        Some(Modal::Connection { form }) => {
+            assert_eq!(form.host, "10.0.0.2");
+            assert_eq!(form.port, "2121");
+            assert_eq!(form.username, "aurora");
+            assert_eq!(form.password, "hunter");
+        }
+        other => panic!("expected the connection dialog, got {other:?}"),
+    }
+    assert_eq!(ui.fields(), typed.map(|(_, text)| text));
+    for (label, text) in &typed[..3] {
+        assert_eq!(
+            text_input(&ui, label)
+                .accessible_value()
+                .unwrap_or_default(),
+            *text
+        );
+    }
+
+    ui.click("ConnectionDialog::save-button");
+    assert_eq!(ui.app.borrow().modal(), None, "Save closes the dialog");
+    let saved = std::fs::read_to_string(harness.config_dir().join("ftp.json"))
+        .expect("Save writes ftp.json");
+    assert!(
+        saved.contains("10.0.0.2") && saved.contains("hunter"),
+        "{saved}"
+    );
+}
+
+#[test]
+fn bulk_controls_reach_the_form_and_start_runs() {
+    let (harness, ui) = open_flow(&FLOWS[6], ThemeChoice::Dark);
+    ElementHandle::find_by_accessible_label(ui.view.window(), "Internet Archive")
+        .last()
+        .expect("the source switch is on screen")
+        .mock_single_click(PointerEventButton::Left);
+    ui.labelled("Replace existing covers")
+        .expect("the check box is on screen")
+        .mock_single_click(PointerEventButton::Left);
+    match ui.app.borrow().modal() {
+        Some(Modal::Bulk { form }) => {
+            assert_eq!(form.source, CoverSource::InternetArchive);
+            assert!(form.replace_existing);
+        }
+        other => panic!("expected the bulk dialog, got {other:?}"),
+    }
+    assert_eq!(ui.dialog().get_bulk_source_index(), 1);
+    assert!(ui.dialog().get_bulk_replace());
+
+    let queued = harness.queued_jobs();
+    ui.click("BulkDialog::start-button");
+    assert_eq!(ui.app.borrow().modal(), None, "Start closes the dialog");
+    assert_eq!(harness.queued_jobs(), queued + 1, "Start queues the run");
+}
+
+#[test]
+fn escape_cancels_every_dialog() {
+    for flow in [&FLOWS[0], &FLOWS[3], &FLOWS[5], &FLOWS[6]] {
+        let (_harness, ui) = open_flow(flow, ThemeChoice::Dark);
+        ui.press(Key::Escape);
+        assert_eq!(ui.app.borrow().modal(), None, "Escape closes {}", flow.name);
+    }
+}
+
+/// The frame's own guard, without an App behind the model.
+#[test]
+fn frame_return_accepts_only_while_accept_is_enabled() {
+    let headless = HeadlessUi::new();
+    let window = MainWindow::new().expect("the main window builds on the testing backend");
+    headless.show(window.window());
+    let accepted = Rc::new(Cell::new(0));
+    let dialog = window.global::<DialogModel>();
+    let counter = Rc::clone(&accepted);
+    dialog.on_accept(move || counter.set(counter.get() + 1));
+    dialog.set_fields(ModelRc::new(VecModel::from(vec![SharedString::from(
+        "4D5",
+    )])));
+    dialog.set_accept_enabled(false);
+    dialog.set_kind(DialogKind::TitleId);
+    // The first render creates the dialog, which puts the focus in its box.
+    headless.snapshot(window.window());
+    let press = |key: Key| {
+        let text = SharedString::from(key);
+        window
+            .window()
+            .dispatch_event(WindowEvent::KeyPressed { text: text.clone() });
+        window
+            .window()
+            .dispatch_event(WindowEvent::KeyReleased { text });
+    };
+
+    press(Key::Return);
+    assert_eq!(
+        accepted.get(),
+        0,
+        "Return is ignored while accept is disabled"
+    );
+
+    dialog.set_accept_enabled(true);
+    press(Key::Return);
+    assert_eq!(accepted.get(), 1, "Return accepts once it is enabled");
 }

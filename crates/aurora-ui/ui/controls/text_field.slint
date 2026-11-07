@@ -12,12 +12,6 @@ export component TextField inherits Rectangle {
     callback accepted();
 
     forward-focus: input;
-
-    // A dialog's first box takes the focus with its text selected, so typing replaces the prefill.
-    public function focus-and-select-all() {
-        input.focus();
-        input.select-all();
-    }
     height: Theme.pill-height;
     border-radius: Theme.pill-radius;
     border-width: Theme.border-width;
@@ -25,9 +19,16 @@ export component TextField inherits Rectangle {
     background: Theme.field-background;
     opacity: enabled ? 1 : Theme.disabled-opacity;
     accessible-role: text-input;
-    accessible-value: value;
+    // A password is never read out.
+    accessible-value: input-type == InputType.password ? "" : value;
     accessible-placeholder-text: placeholder;
     accessible-enabled: enabled;
+
+    // A dialog's first box takes the focus with its text selected, so typing replaces the prefill.
+    public function focus-and-select-all() {
+        input.focus();
+        input.select-all();
+    }
 
     changed value => {
         if input.text != value {
@@ -57,6 +58,7 @@ export component TextField inherits Rectangle {
             enabled: enabled;
             single-line: true;
             input-type: root.input-type;
+            accessible-value: root.input-type == InputType.password ? "" : self.text;
             color: Theme.text;
             selection-background-color: Theme.chip-background;
             selection-foreground-color: Theme.chip-text;

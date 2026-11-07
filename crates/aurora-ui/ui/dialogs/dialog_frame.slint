@@ -2,10 +2,15 @@ import { Theme } from "../theme/theme.slint";
 import { DialogModel } from "../model/dialog_model.slint";
 
 // The dimmed backdrop and the card every dialog sits on. Return accepts while the dialog allows it and Escape
-// cancels, wherever the focus is inside the card.
+// cancels, wherever the focus is inside the card. Tab and Shift+Tab wrap around inside the card, so the page
+// below never gets the focus: each dialog names its first and last focusable element.
 export component DialogFrame inherits Rectangle {
     in property <string> title;
     in property <length> card-width: Theme.dialog-width;
+    in property <bool> first-has-focus;
+    in property <bool> last-has-focus;
+    callback focus-first();
+    callback focus-last();
 
     background: Theme.dialog-backdrop;
 
@@ -30,6 +35,17 @@ export component DialogFrame inherits Rectangle {
         width: root.card-width;
         height: card.preferred-height;
         focus-on-tab-navigation: false;
+        capture-key-pressed(event) => {
+            if event.text == Key.Tab && !event.modifiers.shift && (root.last-has-focus || self.has-focus) {
+                root.focus-first();
+                return accept;
+            }
+            if (event.text == Key.Backtab || (event.text == Key.Tab && event.modifiers.shift)) && (root.first-has-focus || self.has-focus) {
+                root.focus-last();
+                return accept;
+            }
+            reject
+        }
         key-pressed(event) => {
             if event.text == Key.Escape {
                 DialogModel.cancel();

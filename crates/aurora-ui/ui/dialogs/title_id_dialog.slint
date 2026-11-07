@@ -8,6 +8,15 @@ import { DialogFrame } from "dialog_frame.slint";
 export component TitleIdDialog inherits DialogFrame {
     title: DialogModel.title;
 
+    first-has-focus: title-id-field.has-focus;
+    last-has-focus: cancel-button.has-focus;
+    focus-first => {
+        title-id-field.focus-and-select-all();
+    }
+    focus-last => {
+        cancel-button.focus();
+    }
+
     init => {
         title-id-field.focus-and-select-all();
     }

@@ -8,6 +8,15 @@ import { DialogText } from "dialog_text.slint";
 export component MessageDialog inherits DialogFrame {
     title: DialogModel.title;
 
+    first-has-focus: ok-button.has-focus;
+    last-has-focus: ok-button.has-focus;
+    focus-first => {
+        ok-button.focus();
+    }
+    focus-last => {
+        ok-button.focus();
+    }
+
     init => {
         self.take-focus();
     }

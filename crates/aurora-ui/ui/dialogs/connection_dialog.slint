@@ -9,6 +9,15 @@ export component ConnectionDialog inherits DialogFrame {
     title: DialogModel.title;
     card-width: Theme.connection-dialog-width;
 
+    first-has-focus: host-row.has-focus;
+    last-has-focus: cancel-button.has-focus;
+    focus-first => {
+        host-row.focus-and-select-all();
+    }
+    focus-last => {
+        cancel-button.focus();
+    }
+
     init => {
         host-row.focus-and-select-all();
     }

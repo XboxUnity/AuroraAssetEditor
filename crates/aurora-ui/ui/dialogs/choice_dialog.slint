@@ -5,8 +5,18 @@ import { DialogFrame } from "dialog_frame.slint";
 import { DialogText } from "dialog_text.slint";
 
 // A question with one button per choice, and Cancel. Return cancels too, since no choice is the default.
+// The app offers two choices at most; the buttons are written out, not repeated, so the first one can take
+// the focus when Tab wraps around.
 export component ChoiceDialog inherits DialogFrame {
     title: DialogModel.title;
+    first-has-focus: first-choice-button.has-focus;
+    last-has-focus: cancel-button.has-focus;
+    focus-first => {
+        first-choice-button.focus();
+    }
+    focus-last => {
+        cancel-button.focus();
+    }
 
     init => {
         self.take-focus();
@@ -20,11 +30,19 @@ export component ChoiceDialog inherits DialogFrame {
         alignment: end;
         spacing: Theme.dialog-button-gap;
 
-        for choice[index] in DialogModel.choices: PillButton {
-            text: choice.label;
+        first-choice-button := PillButton {
+            text: DialogModel.choices[0].label;
             focusable: true;
             clicked => {
-                DialogModel.choose(index);
+                DialogModel.choose(0);
+            }
+        }
+
+        if DialogModel.choices.length > 1: second-choice-button := PillButton {
+            text: DialogModel.choices[1].label;
+            focusable: true;
+            clicked => {
+                DialogModel.choose(1);
             }
         }
 

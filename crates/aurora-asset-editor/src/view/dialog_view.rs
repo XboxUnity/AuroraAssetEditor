@@ -11,6 +11,9 @@ use crate::status::Severity;
 
 use super::shell_view::{Refresh, action_runner};
 
+/// The choice dialog draws a button for each of the app's choices, at most two (Icon or Banner, Replace or
+/// Add to free slots).
+const CHOICE_BUTTONS: usize = 2;
 const CONNECTION_TITLE: &str = "Console connection";
 const BULK_TITLE: &str = "Bulk actions";
 const BULK_SOURCES: [CoverSource; 2] = [CoverSource::XboxUnity, CoverSource::InternetArchive];
@@ -127,18 +130,26 @@ impl DialogContent {
                 text,
                 choices,
                 ..
-            } => DialogContent {
-                kind: DialogKind::Choice,
-                title: title.clone(),
-                text: text.clone(),
-                choices: choices
-                    .iter()
-                    .map(|(_, label)| ChoiceView {
-                        label: label.into(),
-                    })
-                    .collect(),
-                ..shown
-            },
+            } => {
+                if choices.len() > CHOICE_BUTTONS {
+                    log::error!(
+                        "A choice dialog offers {} choices; it has buttons for {CHOICE_BUTTONS}",
+                        choices.len()
+                    );
+                }
+                DialogContent {
+                    kind: DialogKind::Choice,
+                    title: title.clone(),
+                    text: text.clone(),
+                    choices: choices
+                        .iter()
+                        .map(|(_, label)| ChoiceView {
+                            label: label.into(),
+                        })
+                        .collect(),
+                    ..shown
+                }
+            }
             Modal::TitleId { title, label, form } => DialogContent {
                 kind: DialogKind::TitleId,
                 title: title.clone(),
@@ -201,14 +212,21 @@ impl DialogContent {
         DialogContent {
             kind: DialogKind::Bulk,
             title: BULK_TITLE.to_owned(),
-            text: format!(
-                "Uploads a random cover from the source for each of the {} games in the list that has no cover on the console. Covers are not resized.",
-                form.game_count
-            ),
+            text: bulk_text(form.game_count),
             bulk_source_index: i32::try_from(source_index).unwrap_or_default(),
             bulk_replace: form.replace_existing,
             ..shown
         }
+    }
+}
+
+fn bulk_text(game_count: usize) -> String {
+    if game_count == 1 {
+        "Uploads a random cover from the source for the 1 game in the list if it has no cover on the console. Covers are not resized.".to_owned()
+    } else {
+        format!(
+            "Uploads a random cover from the source for each of the {game_count} games in the list that has no cover on the console. Covers are not resized."
+        )
     }
 }
 

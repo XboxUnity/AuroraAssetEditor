@@ -8,6 +8,15 @@ import { FormFieldRow } from "form_field_row.slint";
 export component UploadTargetDialog inherits DialogFrame {
     title: DialogModel.title;
 
+    first-has-focus: title-id-row.has-focus;
+    last-has-focus: cancel-button.has-focus;
+    focus-first => {
+        title-id-row.focus-and-select-all();
+    }
+    focus-last => {
+        cancel-button.focus();
+    }
+
     init => {
         title-id-row.focus-and-select-all();
     }
