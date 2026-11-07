@@ -42,7 +42,7 @@ impl ReferenceMode {
 
 /// A value that is not valid Unicode is read lossily: as a mode it can never equal "update", so
 /// it is reported as an unknown mode; as a screen filter it matches no screen name, so the run
-/// checks nothing and fails; and for `CI` any value at all counts.
+/// checks nothing and fails; and as `CI` it is never empty, so it counts as set.
 pub(super) fn read_variable(name: &str) -> Option<String> {
     env::var_os(name).map(|value| value.to_string_lossy().into_owned())
 }
