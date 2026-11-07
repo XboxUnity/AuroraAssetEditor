@@ -1,3 +1,4 @@
+mod bulk_form;
 mod choice_id;
 mod confirmed_action;
 mod connection_form;
@@ -8,6 +9,7 @@ mod title_id_form;
 mod unoffered_choice;
 mod upload_target_form;
 
+pub use bulk_form::BulkForm;
 pub use choice_id::ChoiceId;
 pub use confirmed_action::ConfirmedAction;
 pub use connection_form::ConnectionForm;

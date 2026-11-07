@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use super::{ConnectionForm, Modal};
+use super::{BulkForm, ConnectionForm, Modal};
 
 /// Modals waiting to be shown. Only the oldest is on screen; the next appears when it closes.
 #[derive(Debug, Default)]
@@ -33,7 +33,21 @@ impl ModalQueue {
             | Modal::Choice { .. }
             | Modal::TitleId { .. }
             | Modal::UploadTarget { .. }
-            | Modal::Confirm { .. } => None,
+            | Modal::Confirm { .. }
+            | Modal::Bulk { .. } => None,
+        })
+    }
+
+    /// The bulk form, wherever it waits in the queue.
+    pub fn bulk_form_mut(&mut self) -> Option<&mut BulkForm> {
+        self.waiting.iter_mut().find_map(|modal| match modal {
+            Modal::Bulk { form } => Some(form),
+            Modal::Message { .. }
+            | Modal::Choice { .. }
+            | Modal::TitleId { .. }
+            | Modal::UploadTarget { .. }
+            | Modal::Confirm { .. }
+            | Modal::Connection { .. } => None,
         })
     }
 

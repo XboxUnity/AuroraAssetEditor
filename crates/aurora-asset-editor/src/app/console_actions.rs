@@ -151,11 +151,13 @@ impl App {
             }
             ConsoleOutcome::Uploaded(report) => self.apply_uploaded(report),
             ConsoleOutcome::Removed(report) => self.apply_removed(report),
+            ConsoleOutcome::Bulk(result) => self.apply_bulk(result),
         }
     }
 
     /// Shows what the client reports while a job the user started runs. Presence checks report the same
-    /// statuses in the background; they are not progress of anything the user is waiting for.
+    /// statuses in the background; they are not progress of anything the user is waiting for. A bulk run
+    /// shows its own progress, which the client's reports would replace.
     pub(super) fn apply_console_status(&mut self, kind: ConsoleJobKind, status: &ConsoleStatus) {
         if kind == ConsoleJobKind::Presence {
             return;
@@ -163,6 +165,9 @@ impl App {
         let text = status.to_string();
         if let ConsoleStatus::AuroraFound { revision } = status {
             self.console.link = connected_link(revision);
+        }
+        if kind == ConsoleJobKind::Bulk {
+            return;
         }
         if kind == ConsoleJobKind::Test
             && let Some(form) = self.modals.connection_form_mut()

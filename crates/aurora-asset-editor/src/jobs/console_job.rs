@@ -1,9 +1,14 @@
+use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
+
 use crate::console::PresenceGate;
 
 use aurora_asset::AssetKind;
 use aurora_console::{
-    AssetPresence, AuroraRevision, ConsoleError, FtpSettings, GameIds, GameListing,
+    AssetPresence, AuroraRevision, BulkError, BulkOptions, BulkReport, ConsoleError, FtpSettings,
+    Game, GameIds, GameListing,
 };
+use aurora_online::CoverSource;
 
 use super::{AfterDownload, AssetUpload, KindDownload, TransferReport};
 
@@ -43,6 +48,17 @@ pub enum ConsoleJob {
         ids: GameIds,
         kinds: Vec<AssetKind>,
     },
+    /// Uploads a random online cover to each game that has none.
+    Bulk(BulkRequest),
+}
+
+/// A bulk cover run: the games in the order they are handled, and the flag that stops it before the next game.
+#[derive(Debug)]
+pub struct BulkRequest {
+    pub games: Vec<Game>,
+    pub options: BulkOptions,
+    pub source: CoverSource,
+    pub stop: Arc<AtomicBool>,
 }
 
 /// Which kind of console job a progress report belongs to.
@@ -54,6 +70,7 @@ pub enum ConsoleJobKind {
     Download,
     Upload,
     Remove,
+    Bulk,
 }
 
 impl ConsoleJob {
@@ -65,6 +82,7 @@ impl ConsoleJob {
             ConsoleJob::Download { .. } => ConsoleJobKind::Download,
             ConsoleJob::Upload { .. } => ConsoleJobKind::Upload,
             ConsoleJob::Remove { .. } => ConsoleJobKind::Remove,
+            ConsoleJob::Bulk(_) => ConsoleJobKind::Bulk,
         }
     }
 }
@@ -95,4 +113,5 @@ pub enum ConsoleOutcome {
     },
     Uploaded(TransferReport),
     Removed(TransferReport),
+    Bulk(Result<BulkReport, BulkError>),
 }

@@ -16,7 +16,7 @@ mod transfer_report;
 
 pub use after_download::AfterDownload;
 pub use asset_upload::AssetUpload;
-pub use console_job::{ConsoleJob, ConsoleJobKind, ConsoleOutcome, ConsoleRequest};
+pub use console_job::{BulkRequest, ConsoleJob, ConsoleJobKind, ConsoleOutcome, ConsoleRequest};
 pub use console_worker::ConsoleWorker;
 pub use import_failure::ImportFailure;
 pub use import_job::{ImageSource, ImportJob, ImportRequest, ImportResult};

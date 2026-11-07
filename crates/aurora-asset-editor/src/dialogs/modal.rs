@@ -1,5 +1,6 @@
 use super::{
-    ChoiceId, ConfirmedAction, ConnectionForm, PendingChoice, TitleIdForm, UploadTargetForm,
+    BulkForm, ChoiceId, ConfirmedAction, ConnectionForm, PendingChoice, TitleIdForm,
+    UploadTargetForm,
 };
 
 /// A dialog the app shows over the window.
@@ -40,12 +41,16 @@ pub enum Modal {
     Connection {
         form: ConnectionForm,
     },
+    /// Bulk covers: Start (accept) and Cancel.
+    Bulk {
+        form: BulkForm,
+    },
 }
 
 /// How the user closed a modal.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ModalAnswer {
-    /// OK of a form, the confirm button of a `Confirm`, Save of the connection form; cancels a `Choice`,
+    /// OK of a form, the confirm button of a `Confirm`, Save of the connection form, Start of the bulk form; cancels a `Choice`,
     /// which has no accept button of its own.
     Accept,
     Cancel,

@@ -9,7 +9,6 @@ use super::{ConsoleWorker, Job, JobOutcome, ProgressSink, ProgressSlot};
 /// `running_job_progress`, which `execute` points at the sink of the job it runs.
 pub struct JobWorkers {
     console: ConsoleWorker,
-    #[expect(dead_code, reason = "read once online jobs exist")]
     online: OnlineClient,
     running_job_progress: ProgressSlot,
 }
@@ -33,7 +32,7 @@ impl JobWorkers {
         match job {
             Job::Load(load) => JobOutcome::Loaded(load.run()),
             Job::Import(import) => JobOutcome::Imported(import.run()),
-            Job::Console(request) => JobOutcome::Console(self.console.run(request)),
+            Job::Console(request) => JobOutcome::Console(self.console.run(request, &self.online)),
         }
     }
 }

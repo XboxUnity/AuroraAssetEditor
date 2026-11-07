@@ -20,4 +20,11 @@ pub enum Progress {
         kind: ConsoleJobKind,
         status: ConsoleStatus,
     },
+    /// A bulk cover run is about to handle a game.
+    Bulk {
+        /// Counts from 1.
+        position: usize,
+        total: usize,
+        title: String,
+    },
 }

@@ -110,6 +110,8 @@ impl App {
         };
         match (modal, answer) {
             (Modal::Message { .. } | Modal::Connection { .. }, _) => {}
+            (Modal::Bulk { form }, ModalAnswer::Accept) => self.start_bulk(&form),
+            (Modal::Bulk { .. }, ModalAnswer::Cancel | ModalAnswer::Choice(_)) => {}
             (Modal::UploadTarget { form, .. }, ModalAnswer::Accept) => {
                 self.save_all_to_console_for_form(&form);
             }
@@ -152,7 +154,8 @@ impl App {
             | Modal::TitleId { .. }
             | Modal::UploadTarget { .. }
             | Modal::Confirm { .. }
-            | Modal::Connection { .. } => false,
+            | Modal::Connection { .. }
+            | Modal::Bulk { .. } => false,
         };
         if offered {
             None
@@ -190,6 +193,11 @@ impl App {
             JobOutcome::Progress(Progress::Console { kind, status }) => {
                 self.apply_console_status(kind, &status);
             }
+            JobOutcome::Progress(Progress::Bulk {
+                position,
+                total,
+                title,
+            }) => self.apply_bulk_progress(position, total, &title),
         }
     }
 

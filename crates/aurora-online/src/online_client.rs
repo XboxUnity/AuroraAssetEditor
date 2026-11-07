@@ -15,7 +15,9 @@ pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(100);
 
 const NOT_FOUND: u16 = 404;
 
-/// Finds and downloads covers. Every request is attempted once; failures are returned.
+/// Finds and downloads covers. Every request is attempted once; failures are returned. A clone shares the
+/// connection pool of the original.
+#[derive(Clone)]
 pub struct OnlineClient {
     endpoints: Endpoints,
     agent: Agent,

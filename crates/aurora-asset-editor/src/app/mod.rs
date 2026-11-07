@@ -4,6 +4,7 @@
 )]
 mod app;
 mod app_environment;
+mod bulk_actions;
 mod console_actions;
 mod console_transfer_actions;
 mod current_game;
@@ -18,6 +19,7 @@ mod startup_settings;
 
 pub use app::{App, DIALOG_FAILED_TITLE, LOG_WRITE_FAILED};
 pub use app_environment::{AppEnvironment, StartupProblem};
+pub use bulk_actions::{BULK_FINISHED_TITLE, BULK_TITLE, NO_ASSETS_TEXT};
 pub use console_actions::{
     CONNECTION_FAILED_TITLE, NO_CONSOLE_TEXT, REFRESHING_TEXT, TEMP_FILE_NOTE,
 };

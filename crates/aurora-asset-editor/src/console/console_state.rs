@@ -1,3 +1,6 @@
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use aurora_console::FtpSettings;
 use chrono::{DateTime, Local};
 
@@ -12,6 +15,8 @@ pub struct ConsoleState {
     pub table: GameTable,
     pub last_refresh: Option<DateTime<Local>>,
     presence_gate: PresenceGate,
+    /// The stop flag of the bulk run in progress.
+    bulk_stop: Option<Arc<AtomicBool>>,
 }
 
 impl ConsoleState {
@@ -27,6 +32,7 @@ impl ConsoleState {
             table: GameTable::default(),
             last_refresh: None,
             presence_gate: PresenceGate::default(),
+            bulk_stop: None,
         }
     }
 
@@ -41,6 +47,23 @@ impl ConsoleState {
 
     pub(crate) fn start_refresh(&mut self) -> u64 {
         self.presence_gate.start_refresh()
+    }
+
+    /// Makes the flag that stops the bulk run that is about to start.
+    pub(crate) fn start_bulk_run(&mut self) -> Arc<AtomicBool> {
+        let stop = Arc::new(AtomicBool::new(false));
+        self.bulk_stop = Some(Arc::clone(&stop));
+        stop
+    }
+
+    pub(crate) fn request_bulk_stop(&self) {
+        if let Some(stop) = &self.bulk_stop {
+            stop.store(true, Ordering::SeqCst);
+        }
+    }
+
+    pub(crate) fn finish_bulk_run(&mut self) {
+        self.bulk_stop = None;
     }
 
     /// Different settings say nothing about the link until they are tried.

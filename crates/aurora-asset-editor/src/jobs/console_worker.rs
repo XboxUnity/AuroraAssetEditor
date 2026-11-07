@@ -1,14 +1,20 @@
+use std::ops::ControlFlow;
+use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex, PoisonError};
 
 use aurora_asset::AssetKind;
-use aurora_console::{ConsoleClient, ConsoleStatus, FtpSettings, GameIds, Timeouts};
+use aurora_console::{
+    BulkError, BulkReport, ConsoleClient, ConsoleStatus, FtpSettings, GameIds, Timeouts,
+    run_bulk_covers,
+};
+use aurora_online::OnlineClient;
 
-use crate::console::is_connection_failure;
+use crate::console::{OnlineCoverProvider, is_connection_failure};
 use crate::editor::decode_kind;
 
 use super::{
-    ConsoleJob, ConsoleJobKind, ConsoleOutcome, ConsoleRequest, JobOutcome, KindDownload, Progress,
-    ProgressSlot, TransferReport,
+    BulkRequest, ConsoleJob, ConsoleJobKind, ConsoleOutcome, ConsoleRequest, JobOutcome,
+    KindDownload, Progress, ProgressSlot, TransferReport,
 };
 
 /// Runs console jobs on one `ConsoleClient`, which stays connected between them and is replaced when a
@@ -31,11 +37,13 @@ impl ConsoleWorker {
         }
     }
 
-    pub fn run(&mut self, request: ConsoleRequest) -> ConsoleOutcome {
+    /// `online` is cloned for the jobs that fetch from the internet.
+    pub fn run(&mut self, request: ConsoleRequest, online: &OnlineClient) -> ConsoleOutcome {
         *self
             .running_job_kind
             .lock()
             .unwrap_or_else(PoisonError::into_inner) = request.job.kind();
+        let progress = self.running_job_progress.clone();
         let client = self.client_for(request.settings);
         match request.job {
             ConsoleJob::Test => ConsoleOutcome::Tested(client.test_connection()),
@@ -89,6 +97,9 @@ impl ConsoleWorker {
                 }
                 ConsoleOutcome::Removed(report)
             }
+            ConsoleJob::Bulk(bulk) => {
+                ConsoleOutcome::Bulk(run_bulk(client, online, &progress, bulk))
+            }
         }
     }
 
@@ -113,6 +124,34 @@ impl ConsoleWorker {
             }));
         })
     }
+}
+
+/// The stop flag is read before each game's progress is reported, so Stop ends the run before the game
+/// that is next.
+fn run_bulk(
+    client: &mut ConsoleClient,
+    online: &OnlineClient,
+    progress: &ProgressSlot,
+    request: BulkRequest,
+) -> Result<BulkReport, BulkError> {
+    let BulkRequest {
+        games,
+        options,
+        source,
+        stop,
+    } = request;
+    let mut provider = OnlineCoverProvider::new(online.clone(), source, fastrand::Rng::new());
+    run_bulk_covers(client, &games, &mut provider, options, |bulk_progress| {
+        if stop.load(Ordering::SeqCst) {
+            return ControlFlow::Break(());
+        }
+        progress.send(JobOutcome::Progress(Progress::Bulk {
+            position: bulk_progress.position,
+            total: bulk_progress.total,
+            title: bulk_progress.game.title_name.clone(),
+        }));
+        ControlFlow::Continue(())
+    })
 }
 
 /// A file without entries of its kind counts as missing, like one that is not there (U9).
