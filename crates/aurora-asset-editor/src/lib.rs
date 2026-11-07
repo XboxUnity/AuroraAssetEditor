@@ -2,6 +2,7 @@
 
 pub mod about;
 pub mod app;
+pub mod console;
 pub mod dialogs;
 pub mod editor;
 pub mod files;

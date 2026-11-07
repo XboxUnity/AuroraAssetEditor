@@ -3,9 +3,10 @@ use std::path::{Path, PathBuf};
 
 use aurora_asset::ScreenshotNumber;
 
+use crate::console::ConsoleState;
 use crate::dialogs::{Modal, ModalAnswer, ModalField, ModalQueue, UnofferedChoice};
 use crate::editor::EditorPages;
-use crate::jobs::JobOutcome;
+use crate::jobs::{JobOutcome, Progress};
 use crate::logging::error_chain;
 use crate::platform::{DialogError, OpenRequest, SaveRequest};
 use crate::settings::AppSettings;
@@ -27,6 +28,7 @@ pub struct App {
     pub(super) page: Page,
     pub(super) pages: EditorPages,
     pub(super) current_game: Option<CurrentGame>,
+    pub(super) console: ConsoleState,
     pub(super) status: StatusLine,
     pub(super) active_work: ActiveWork,
     pub(super) modals: ModalQueue,
@@ -39,6 +41,7 @@ impl App {
         let startup_problems = std::mem::take(&mut environment.startup_problems);
         let settings = std::mem::take(&mut environment.settings);
         let keep_settings_file = environment.keep_settings_file;
+        let console = ConsoleState::new(environment.ftp_settings.take());
         let mut app = App {
             environment,
             settings,
@@ -46,6 +49,7 @@ impl App {
             page: Page::Cover,
             pages: EditorPages::new(),
             current_game: None,
+            console,
             status: StatusLine::ready(),
             active_work: ActiveWork::default(),
             modals: ModalQueue::new(),
@@ -95,11 +99,17 @@ impl App {
         if self.title_id_not_ready(answer) {
             return;
         }
+        if answer == ModalAnswer::Accept
+            && matches!(self.modals.current(), Some(Modal::Connection { .. }))
+        {
+            self.save_connection();
+            return;
+        }
         let Some(modal) = self.modals.close_current() else {
             return;
         };
         match (modal, answer) {
-            (Modal::Message { .. }, _) => {}
+            (Modal::Message { .. } | Modal::Connection { .. }, _) => {}
             (Modal::TitleId { form, .. }, ModalAnswer::Accept) => self.save_all_for_form(&form),
             (Modal::TitleId { .. }, ModalAnswer::Cancel | ModalAnswer::Choice(_)) => {}
             (Modal::Choice { pending, .. }, ModalAnswer::Choice(choice)) => {
@@ -128,7 +138,7 @@ impl App {
         };
         let offered = match self.modals.current()? {
             Modal::Choice { choices, .. } => choices.iter().any(|(offered, _)| *offered == id),
-            Modal::Message { .. } | Modal::TitleId { .. } => false,
+            Modal::Message { .. } | Modal::TitleId { .. } | Modal::Connection { .. } => false,
         };
         if offered {
             None
@@ -138,12 +148,17 @@ impl App {
     }
 
     pub fn edit_modal_field(&mut self, field: ModalField, text: &str) {
-        let Some(Modal::TitleId { form, .. }) = self.modals.current_mut() else {
-            log::warn!("{field:?} was edited while its dialog is not on screen");
-            return;
-        };
-        match field {
-            ModalField::TitleId => form.edit(text),
+        match (self.modals.current_mut(), field) {
+            (Some(Modal::TitleId { form, .. }), ModalField::TitleId) => form.edit(text),
+            (Some(Modal::Connection { form }), ModalField::Host) => form.host = text.to_owned(),
+            (Some(Modal::Connection { form }), ModalField::Port) => form.port = text.to_owned(),
+            (Some(Modal::Connection { form }), ModalField::Username) => {
+                form.username = text.to_owned();
+            }
+            (Some(Modal::Connection { form }), ModalField::Password) => {
+                form.password = text.to_owned();
+            }
+            _ => log::warn!("{field:?} was edited while its dialog is not on screen"),
         }
     }
 
@@ -151,6 +166,8 @@ impl App {
         match outcome {
             JobOutcome::Loaded(loaded) => self.apply_loaded(loaded),
             JobOutcome::Imported(results) => self.apply_imported(results),
+            JobOutcome::Console(outcome) => self.apply_console_outcome(outcome),
+            JobOutcome::Progress(Progress::Console(status)) => self.apply_console_status(&status),
         }
     }
 
@@ -254,7 +271,7 @@ impl App {
             .map(|log_error| format!("{LOG_WRITE_FAILED}: {log_error}"))
     }
 
-    fn set_error_status(&mut self, text: String, log_failure: Option<String>) {
+    pub(super) fn set_error_status(&mut self, text: String, log_failure: Option<String>) {
         let text = match log_failure {
             Some(log_failure) => format!("{text}{STATUS_SEPARATOR}{log_failure}"),
             None => text,

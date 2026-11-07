@@ -1,28 +1,26 @@
-use std::sync::{Arc, Mutex, PoisonError};
-
 use aurora_console::Timeouts;
 use aurora_online::OnlineClient;
 
-use super::{Job, JobOutcome, ProgressSink};
+use super::{ConsoleWorker, Job, JobOutcome, ProgressSink, ProgressSlot};
 
 /// Runs jobs on a worker thread; each worker thread owns one.
 ///
 /// A `ConsoleClient` takes its status callback once, when it is built, so the callback forwards into
 /// `running_job_progress`, which `execute` points at the sink of the job it runs.
 pub struct JobWorkers {
-    #[expect(dead_code, reason = "read once console jobs exist")]
-    timeouts: Timeouts,
+    console: ConsoleWorker,
     #[expect(dead_code, reason = "read once online jobs exist")]
     online: OnlineClient,
-    running_job_progress: Arc<Mutex<Option<ProgressSink>>>,
+    running_job_progress: ProgressSlot,
 }
 
 impl JobWorkers {
     pub fn new(timeouts: Timeouts, online: OnlineClient) -> JobWorkers {
+        let running_job_progress = ProgressSlot::new();
         JobWorkers {
-            timeouts,
+            console: ConsoleWorker::new(timeouts, running_job_progress.clone()),
             online,
-            running_job_progress: Arc::new(Mutex::new(None)),
+            running_job_progress,
         }
     }
 
@@ -35,35 +33,27 @@ impl JobWorkers {
         match job {
             Job::Load(load) => JobOutcome::Loaded(load.run()),
             Job::Import(import) => JobOutcome::Imported(import.run()),
+            Job::Console(request) => JobOutcome::Console(self.console.run(request)),
         }
     }
 }
 
 /// Points `running_job_progress` at one job's sink, and clears it when the job ends, even by a panic.
 struct ProgressForwarding {
-    slot: Arc<Mutex<Option<ProgressSink>>>,
+    slot: ProgressSlot,
 }
 
 impl ProgressForwarding {
-    fn start(
-        slot: &Arc<Mutex<Option<ProgressSink>>>,
-        progress: &ProgressSink,
-    ) -> ProgressForwarding {
-        set_slot(slot, Some(Arc::clone(progress)));
-        ProgressForwarding {
-            slot: Arc::clone(slot),
-        }
+    fn start(slot: &ProgressSlot, progress: &ProgressSink) -> ProgressForwarding {
+        slot.set(Some(ProgressSink::clone(progress)));
+        ProgressForwarding { slot: slot.clone() }
     }
 }
 
 impl Drop for ProgressForwarding {
     fn drop(&mut self) {
-        set_slot(&self.slot, None);
+        self.slot.set(None);
     }
-}
-
-fn set_slot(slot: &Mutex<Option<ProgressSink>>, progress: Option<ProgressSink>) {
-    *slot.lock().unwrap_or_else(PoisonError::into_inner) = progress;
 }
 
 #[cfg(test)]

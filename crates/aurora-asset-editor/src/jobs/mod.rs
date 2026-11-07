@@ -1,3 +1,5 @@
+mod console_job;
+mod console_worker;
 mod import_failure;
 mod import_job;
 mod job;
@@ -6,12 +8,16 @@ mod job_runner;
 mod job_workers;
 mod load_job;
 mod progress_sink;
+mod progress_slot;
 
+pub use console_job::{ConsoleJob, ConsoleOutcome, ConsoleRequest};
+pub use console_worker::ConsoleWorker;
 pub use import_failure::ImportFailure;
 pub use import_job::{ImageSource, ImportJob, ImportRequest, ImportResult};
 pub use job::{Job, JobPriority};
-pub use job_outcome::JobOutcome;
+pub use job_outcome::{JobOutcome, Progress};
 pub use job_runner::JobRunner;
 pub use job_workers::JobWorkers;
 pub use load_job::LoadJob;
 pub use progress_sink::ProgressSink;
+pub use progress_slot::ProgressSlot;

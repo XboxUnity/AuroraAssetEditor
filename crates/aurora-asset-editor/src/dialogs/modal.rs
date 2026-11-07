@@ -1,4 +1,4 @@
-use super::{ChoiceId, PendingChoice, TitleIdForm};
+use super::{ChoiceId, ConnectionForm, PendingChoice, TitleIdForm};
 
 /// A dialog the app shows over the window.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -20,12 +20,16 @@ pub enum Modal {
         label: String,
         form: TitleIdForm,
     },
+    /// The console connection: Test Connection, Save and Cancel.
+    Connection {
+        form: ConnectionForm,
+    },
 }
 
 /// How the user closed a modal.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ModalAnswer {
-    /// OK of a form; cancels a `Choice`, which has no accept button of its own.
+    /// OK of a form, Save of the connection form; cancels a `Choice`, which has no accept button of its own.
     Accept,
     Cancel,
     Choice(ChoiceId),
@@ -35,4 +39,8 @@ pub enum ModalAnswer {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ModalField {
     TitleId,
+    Host,
+    Port,
+    Username,
+    Password,
 }

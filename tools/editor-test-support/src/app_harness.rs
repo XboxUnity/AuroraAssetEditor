@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use aurora_asset_editor::about::BuildInfo;
 use aurora_asset_editor::app::{App, AppEnvironment, StartupProblem, StartupSettings};
-use aurora_asset_editor::jobs::{Job, JobOutcome, JobWorkers, ProgressSink};
+use aurora_asset_editor::jobs::{Job, JobOutcome, JobWorkers, Progress, ProgressSink};
 use aurora_asset_editor::logging::{ERROR_LOG_FILE, ErrorLog};
 use aurora_asset_editor::settings::{AppSettings, ThemeChoice};
 use aurora_console::{FtpSettings, Timeouts};
@@ -40,11 +40,11 @@ pub fn test_build_info() -> BuildInfo {
     }
 }
 
-/// When a `run_jobs_with` hook is called: after a progress outcome (the job waits meanwhile) or after the
-/// job's final outcome.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// When a `run_jobs_with` hook is called: after a progress outcome, with the progress (the job waits
+/// meanwhile), or after the job's final outcome.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OutcomeStage {
-    Progress,
+    Progress(Progress),
     Final,
 }
 
@@ -123,11 +123,16 @@ impl AppHarness {
 
     /// FTP settings for `console` on 127.0.0.1, with the fake console's default credentials.
     pub fn with_console(&mut self, console: &FakeConsole) {
-        self.setup("with_console").environment.ftp_settings = Some(FtpSettings {
+        self.with_ftp_settings(FtpSettings {
             host: FAKE_CONSOLE_HOST.to_owned(),
             port: console.port().to_string(),
             ..FtpSettings::default()
         });
+    }
+
+    /// Starts the app with `settings` as if `ftp.json` held them.
+    pub fn with_ftp_settings(&mut self, settings: FtpSettings) {
+        self.setup("with_ftp_settings").environment.ftp_settings = Some(settings);
     }
 
     pub fn with_online(&mut self, endpoints: Endpoints) {
@@ -261,8 +266,12 @@ fn run_job(running: &mut Running, job: Job, hook: &mut impl FnMut(&mut App, Outc
                 .expect("the worker sends Finished before it ends");
             match message {
                 WorkerMessage::Progress(outcome) => {
+                    let JobOutcome::Progress(progress) = &outcome else {
+                        panic!("a job reports only progress through its sink: {outcome:?}");
+                    };
+                    let stage = OutcomeStage::Progress(progress.clone());
                     app.on_job_outcome(outcome);
-                    hook(app, OutcomeStage::Progress);
+                    hook(app, stage);
                     resume
                         .send(())
                         .expect("the job waits for its progress to be applied");
