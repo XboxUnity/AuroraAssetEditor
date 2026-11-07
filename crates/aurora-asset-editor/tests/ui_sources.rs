@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::rc::Rc;
 
 use aurora_asset::{AssetKind, AssetSlot, Compression, ScreenshotNumber};
-use aurora_asset_editor::app::{App, Menu, NO_CONSOLE_TEXT, Page, SELECT_A_GAME_REASON};
+use aurora_asset_editor::app::{App, BUSY_TEXT, Menu, NO_CONSOLE_TEXT, Page, SELECT_A_GAME_REASON};
 use aurora_asset_editor::console::{GameColumn, PresenceCell};
 use aurora_asset_editor::dialogs::ModalAnswer;
 use aurora_asset_editor::jobs::{ConsoleOutcome, JobOutcome};
@@ -356,6 +356,40 @@ fn use_as_cover_from_the_panel_sets_the_cover() {
         .map(|header| (header.width(), header.height()));
     assert_eq!(size, Some((FULL_WIDTH, FULL_HEIGHT)), "never resized");
     assert_eq!(harness.app().page(), Page::Online);
+}
+
+#[test]
+fn search_is_disabled_while_searching_any_source() {
+    let server = online_server();
+    for source in [CoverSource::XboxUnity, CoverSource::InternetArchive] {
+        let mut harness = online_harness(&server, ThemeChoice::Dark);
+        harness.app().set_online_source(source);
+        let ui = Ui::start(&mut harness);
+        ui.click("TextField::input");
+        ui.ui.type_text(ui.view.window().window(), RESULTS_TITLE);
+        assert!(ui.enabled("OnlinePage::search-button"), "{source:?}");
+
+        ui.click("OnlinePage::search-button");
+        ui.render();
+        assert_eq!(harness.queued_jobs(), 1, "{source:?}: one search");
+        assert!(!ui.enabled("OnlinePage::search-button"), "{source:?}");
+
+        ui.click("OnlinePage::search-button");
+        ui.press(Key::Return);
+        ui.act(|app| app.search_online());
+        assert_eq!(
+            harness.queued_jobs(),
+            1,
+            "{source:?}: the button, Enter and the action add no search"
+        );
+        assert_eq!(harness.app().status().text, BUSY_TEXT, "{source:?}");
+
+        harness.run_jobs();
+        ui.render();
+        assert!(ui.enabled("OnlinePage::search-button"), "{source:?}");
+        ui.press(Key::Return);
+        assert_eq!(harness.queued_jobs(), 1, "{source:?}: Enter searches again");
+    }
 }
 
 #[test]

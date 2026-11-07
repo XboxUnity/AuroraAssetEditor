@@ -1,26 +1,24 @@
-use std::cell::Cell;
 use std::io::Cursor;
 use std::path::PathBuf;
 use std::time::Duration;
 
 use aurora_asset::{AssetSlot, RgbaImage, TextureFormat};
 use aurora_asset_editor::app::{
-    ENTER_KEYWORDS_TEXT, ENTER_TITLE_ID_TEXT, IMAGE_FAILED_TEXT, IMPORTING_COVER_TEXT, Page,
-    SAVE_RESULT_DEFAULT_NAME, SAVE_RESULT_TITLE, SEARCH_FAILED,
+    BUSY_TEXT, ENTER_KEYWORDS_TEXT, ENTER_TITLE_ID_TEXT, IMAGE_FAILED_TEXT, IMPORTING_COVER_TEXT,
+    Page, SAVE_RESULT_DEFAULT_NAME, SAVE_RESULT_TITLE, SEARCH_FAILED,
 };
 use aurora_asset_editor::dialogs::Modal;
 use aurora_asset_editor::online::{SearchMode, TileImage};
 use aurora_asset_editor::status::Severity;
 use aurora_console::{GameIds, HexId};
 use aurora_online::{CoverQuery, CoverSource, Endpoints, OnlineClient, TitleId};
-use editor_test_support::{AppHarness, DialogRequest, OutcomeStage};
+use editor_test_support::{AppHarness, DialogRequest};
 use tempfile::TempDir;
 use test_servers::{RecordedHttp, Route, RouteBehaviour};
 
 const ARCHIVE_PATH: &str = "/download/xboxunity-covers-fulldump_202311/xboxunity-covers-fulldump/";
 const ONLINE_TIMEOUT: Duration = Duration::from_secs(5);
 const HALO_3: &str = "4D5307E6";
-const EMPTY_TITLE: &str = "0000A000";
 const FIRST_TITLE: &str = "0000A001";
 const SECOND_TITLE: &str = "0000A002";
 const ERROR_TITLE: &str = "0000A500";
@@ -363,46 +361,20 @@ fn search_error_is_shown_and_logged() {
 }
 
 #[test]
-fn search_is_disabled_while_searching_any_source() {
-    for source in [CoverSource::XboxUnity, CoverSource::InternetArchive] {
-        let server = server_with(vec![listing_route(EMPTY_TITLE, &[])]);
-        let mut harness = harness_for(&server);
-        harness.app().set_online_source(source);
-        assert!(!harness.app().locks().online_search);
-
-        search_for(&mut harness, EMPTY_TITLE);
-        assert!(harness.app().locks().online_search, "{source:?}");
-
-        harness.run_jobs();
-        assert!(!harness.app().locks().online_search, "{source:?}");
-        assert_eq!(
-            harness.app().status().text,
-            format!("0 results for {EMPTY_TITLE}")
-        );
-    }
-}
-
-#[test]
-fn stale_search_results_are_dropped() {
+fn a_second_search_waits_for_the_first() {
     let mut routes = two_cover_routes();
     routes.push(listing_route(
         SECOND_TITLE,
         &[cover("Other", "/image/other.png", None)],
     ));
-    routes.push(image_route("/image/other.png", 8, 8, 50));
     let server = server_with(routes);
     let mut harness = harness_for(&server);
     search_for(&mut harness, FIRST_TITLE);
+
     search_for(&mut harness, SECOND_TITLE);
-    let still_searching_after_first = Cell::new(None);
+    assert_eq!(harness.app().status().text, BUSY_TEXT);
+    harness.run_jobs();
 
-    harness.run_jobs_with(|app, stage| {
-        if still_searching_after_first.get().is_none() && stage == OutcomeStage::Final {
-            still_searching_after_first.set(Some(app.locks().online_search));
-        }
-    });
-
-    assert_eq!(still_searching_after_first.get(), Some(true));
     let app = harness.app();
     let labels: Vec<&str> = app
         .online()
@@ -410,14 +382,14 @@ fn stale_search_results_are_dropped() {
         .iter()
         .map(|tile| tile.result.label.as_str())
         .collect();
-    assert_eq!(labels, [label("Other")]);
+    assert_eq!(labels, [label("One"), label("Two")]);
+    assert_eq!(app.status().text, format!("2 results for {FIRST_TITLE}"));
+    assert!(!app.locks().online_search);
     drop(app);
     assert_eq!(
-        harness.app().status().text,
-        format!("1 result for {SECOND_TITLE}")
+        requests_to(&server, &format!("/api/Covers/{SECOND_TITLE}")),
+        0
     );
-    assert!(!harness.app().locks().online_search);
-    assert_eq!(requests_to(&server, "/thumb/one.png"), 0);
 }
 
 #[test]

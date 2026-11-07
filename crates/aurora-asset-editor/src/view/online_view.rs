@@ -66,6 +66,7 @@ pub(super) fn render_online(window: &MainWindow, app: &App, images: &mut OnlineI
     online.set_search_text(state.search_text().into());
     online.set_search_placeholder(placeholder(state.mode).into());
     online.set_tiles(result_tiles(state, images));
+    online.set_searching(app.locks().online_search);
     online.set_empty_text(empty_text(state, app.locks().online_search).into());
     render_selection(&online, state, app.locks().use_result, images);
 }

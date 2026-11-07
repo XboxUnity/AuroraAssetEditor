@@ -13,6 +13,7 @@ use crate::platform::SaveRequest;
 use crate::status::StatusLine;
 use crate::text::filter_hex_input;
 
+use super::file_actions::BUSY_TEXT;
 use super::{App, PendingImportStatus};
 
 pub const ENTER_TITLE_ID_TEXT: &str = "Enter a TitleID to search.";
@@ -57,8 +58,13 @@ impl App {
         }
     }
 
-    /// Clears the grid and asks the source for covers; a search still waiting is replaced.
+    /// Clears the grid and asks the source for covers. Like the old app, a second search waits until the
+    /// running one has answered.
     pub fn search_online(&mut self) {
+        if self.locks().online_search {
+            self.status = StatusLine::info(BUSY_TEXT);
+            return;
+        }
         let query = match self.search_query() {
             Ok(query) => query,
             Err(QueryError::Empty) => {

@@ -19,6 +19,8 @@ export global OnlineModel {
     in property <bool> selected-failed;
     in property <bool> can-use;
     in property <bool> can-save;
+    // A search runs; Search is disabled until it ends.
+    in property <bool> searching;
     // Shown in place of the grid while it has no results; empty while a search runs.
     in property <string> empty-text;
 

@@ -36,12 +36,15 @@ export component OnlinePage inherits VerticalLayout {
                 OnlineModel.edit-search(text);
             }
             accepted => {
-                OnlineModel.search();
+                if !OnlineModel.searching {
+                    OnlineModel.search();
+                }
             }
         }
         search-button := PillButton {
             text: "Search";
             accent: true;
+            enabled: !OnlineModel.searching;
             clicked => {
                 OnlineModel.search();
             }
