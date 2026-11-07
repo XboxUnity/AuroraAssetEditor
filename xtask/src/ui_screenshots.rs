@@ -33,6 +33,9 @@ impl ScreenshotMode {
 /// Runs the screenshot suite, limited to the screens whose name contains `only` when given, and
 /// prints where the contact sheet is. An update also lists the reference files it changed.
 pub fn run(mode: ScreenshotMode, only: Option<&str>) -> Result<()> {
+    if only.is_some_and(str::is_empty) {
+        bail!("--only needs the text the screen names must contain; it was empty");
+    }
     let root = repository_root();
     let mut test = Command::new("cargo");
     test.current_dir(&root)
@@ -52,14 +55,23 @@ pub fn run(mode: ScreenshotMode, only: Option<&str>) -> Result<()> {
         .status()
         .context("could not run `cargo test` for the UI screenshots")?;
 
-    if mode == ScreenshotMode::Update {
-        print_reference_changes(&root)?;
-    }
+    let reference_changes = match mode {
+        ScreenshotMode::Update => print_reference_changes(&root),
+        ScreenshotMode::Check => Ok(()),
+    };
     print_contact_sheet(&root);
-    if !status.success() {
-        bail!("the UI screenshot tests failed: `cargo test` exited with {status}");
+
+    // A failed test run is the main result, so a failing `git status` never hides it.
+    if status.success() {
+        return reference_changes;
     }
-    Ok(())
+    let test_failure = format!("the UI screenshot tests failed: `cargo test` exited with {status}");
+    match reference_changes {
+        Ok(()) => bail!("{test_failure}"),
+        Err(git_error) => {
+            bail!("{test_failure}; listing the changed references failed too: {git_error:#}")
+        }
+    }
 }
 
 /// Every new file is listed by name, also while the folder itself is still untracked.
