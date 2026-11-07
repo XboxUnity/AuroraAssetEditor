@@ -8,10 +8,13 @@ publish = false
 [dependencies]
 anyhow = "1"
 aurora-asset = { path = "../crates/aurora-asset" }
+aurora-online = { path = "../crates/aurora-online" }
 hex = "0.4"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp"] }
 rusqlite = { version = "0.41.1", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 sha2 = "0.11.1"
 tempfile = "3"
 toml = "1.2.1"
+ureq = "3.5.1"

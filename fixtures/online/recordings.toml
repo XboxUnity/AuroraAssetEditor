@@ -1,0 +1,47 @@
+[[response]]
+name = "xboxunity_title_4D5307E6"
+url = "http://xboxunity.net/api/Covers/4D5307E6"
+path = "/api/Covers/4D5307E6"
+status = 200
+content_type = "application/json"
+body = "xboxunity_title_4D5307E6.json"
+
+[[response]]
+name = "xboxunity_keywords_halo_3"
+url = "http://xboxunity.net/api/Covers/halo+3"
+path = "/api/Covers/halo+3"
+status = 200
+content_type = "application/json"
+body = "xboxunity_keywords_halo_3.json"
+
+[[response]]
+name = "xboxunity_title_FFFFFFFF"
+url = "http://xboxunity.net/api/Covers/FFFFFFFF"
+path = "/api/Covers/FFFFFFFF"
+status = 200
+content_type = "application/json"
+body = "xboxunity_title_FFFFFFFF.json"
+
+[[response]]
+name = "archive_listing_4D5307E6"
+url = "https://archive.org/download/xboxunity-covers-fulldump_202311/xboxunity-covers-fulldump/4D5307E6/"
+path = "/download/xboxunity-covers-fulldump_202311/xboxunity-covers-fulldump/4D5307E6/"
+status = 200
+content_type = "text/html; charset=UTF-8"
+body = "archive_listing_4D5307E6.html"
+
+[[response]]
+name = "archive_listing_FFFFFFFF"
+url = "https://archive.org/download/xboxunity-covers-fulldump_202311/xboxunity-covers-fulldump/FFFFFFFF/"
+path = "/download/xboxunity-covers-fulldump_202311/xboxunity-covers-fulldump/FFFFFFFF/"
+status = 404
+content_type = "text/html; charset=UTF-8"
+body = "archive_listing_FFFFFFFF.html"
+
+[[response]]
+name = "xboxunity_thumbnail_225"
+url = "http://assets.xboxunity.net/api/boxartsm/225"
+path = "/api/boxartsm/225"
+status = 200
+content_type = "image/jpeg"
+body = "xboxunity_thumbnail_225.jpg"

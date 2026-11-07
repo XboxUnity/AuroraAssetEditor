@@ -1314,13 +1314,16 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aurora-asset",
+ "aurora-online",
  "hex",
  "image",
  "rusqlite",
  "serde",
+ "serde_json",
  "sha2",
  "tempfile",
  "toml",
+ "ureq",
 ]
 
 [[package]]

@@ -7,6 +7,7 @@ mod dds_sample;
 mod golden;
 mod minimum_read;
 mod prng;
+mod record_online;
 mod surface_unit;
 mod synthetic;
 
@@ -24,6 +25,7 @@ fn main() -> ExitCode {
         ["golden", "check"] => golden::check(),
         ["cross-samples"] => cross_decode::write_samples(),
         ["content-db-samples"] => content_db::write_samples(),
+        ["record-online"] => record_online::record(),
         ["cross-decode", files @ ..] => {
             let files: Vec<PathBuf> = files.iter().map(PathBuf::from).collect();
             cross_decode::run(&files)
