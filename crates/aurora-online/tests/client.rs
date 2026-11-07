@@ -308,7 +308,11 @@ fn unresponsive_server_times_out() {
     let result = client.download_image(&format!("{}/hang.png", server.base_url()));
 
     let elapsed = started.elapsed();
-    assert!(matches!(result, Err(OnlineError::Request { .. })));
+    let error = result.unwrap_err();
+    assert!(matches!(error, OnlineError::Request { .. }));
+    let url = format!("{}/hang.png", server.base_url());
+    assert_eq!(error.to_string(), format!("requesting {url} failed"));
+    assert!(std::error::Error::source(&error).is_some());
     assert!(
         elapsed >= Duration::from_millis(250),
         "gave up after {elapsed:?}"
@@ -477,4 +481,12 @@ fn random_cover_reaches_every_index() {
 
     assert_eq!(reached.len(), 3);
     assert!(server.unmatched().is_empty());
+}
+
+#[test]
+fn errors_can_cross_threads() {
+    fn assert_send_sync<T: Send + Sync + 'static>() {}
+    assert_send_sync::<OnlineError>();
+    assert_send_sync::<aurora_online::QueryError>();
+    assert_send_sync::<OnlineClient>();
 }

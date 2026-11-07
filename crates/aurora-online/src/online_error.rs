@@ -24,7 +24,7 @@ pub enum OnlineError {
 impl fmt::Display for OnlineError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Request { url, source } => write!(f, "requesting {url} failed: {source}"),
+            Self::Request { url, .. } => write!(f, "requesting {url} failed"),
             Self::HttpStatus { url, status } => write!(f, "{url} answered HTTP {status}"),
             Self::InvalidResponse { url, reason } => {
                 write!(f, "the answer from {url} is not usable: {reason}")
