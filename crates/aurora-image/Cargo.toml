@@ -1,0 +1,19 @@
+[package]
+name = "aurora-image"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+aurora-asset = { path = "../aurora-asset" }
+image = { version = "0.25.10", default-features = false, features = [
+    "png",
+    "jpeg",
+    "bmp",
+    "gif",
+    "tiff",
+    "webp",
+    "tga",
+    "ico",
+    "qoi",
+] }

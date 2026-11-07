@@ -1,0 +1,39 @@
+import { ShellModel } from "../model/shell_model.slint";
+
+export global Theme {
+    out property <bool> dark: ShellModel.dark;
+
+    out property <color> window-background: dark ? #1b1d22 : #f5f6f8;
+    out property <color> bar-background: dark ? #24272e : #ffffff;
+    out property <color> sidebar-background: dark ? #202329 : #eef0f3;
+    out property <color> status-background: dark ? #202329 : #eef0f3;
+    out property <color> border: dark ? #2c2f36 : #dfe2e7;
+    out property <color> text: dark ? #d8dbe2 : #1f2329;
+    out property <color> text-strong: dark ? #ffffff : #0f172a;
+    out property <color> text-muted: dark ? #7d8596 : #6b7280;
+    out property <color> row-text: dark ? #b8bdc8 : #3c4250;
+    out property <color> pill-background: dark ? #2e323a : #e6e8ec;
+    out property <color> pill-text: dark ? #aaaabb : #4a5060;
+    out property <color> accent: #3b82f6;
+    out property <color> accent-text: #ffffff;
+    out property <color> chip-background: dark ? #2e3a52 : #dbe6fb;
+    out property <color> chip-text: dark ? #cfe0ff : #1e3a8a;
+    out property <color> slot-background: dark ? #262a31 : #ffffff;
+    out property <color> slot-border: dark ? #475063 : #b8c0cc;
+    out property <color> slot-filled-border: #3b82f6;
+    out property <brush> slot-filled-gradient: dark
+        ? @linear-gradient(135deg, #2b3f63 0%, #1f2a3d 100%)
+        : @linear-gradient(135deg, #e3ecfb 0%, #f2f6fd 100%);
+    out property <color> thumb-selected-outline: dark ? #ffffff : #0f172a;
+    out property <color> error-text: dark ? #f87171 : #b91c1c;
+    out property <color> danger: #dc2626;
+    out property <color> link-ok: dark ? #22c55e : #16a34a;
+    out property <color> link-failed: dark ? #f87171 : #b91c1c;
+
+    out property <string> font-family: "Inter";
+    out property <length> font-size: 12px;
+    out property <length> caption-font-size: 11px;
+    out property <length> page-title-font-size: 12px;
+    out property <length> dialog-title-font-size: 13px;
+    out property <int> semibold-font-weight: 600;
+}

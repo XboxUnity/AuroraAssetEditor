@@ -2,14 +2,24 @@
 resolver = "3"
 members = [
     "crates/aurora-asset",
+    "crates/aurora-asset-editor",
     "crates/aurora-console",
+    "crates/aurora-image",
     "crates/aurora-online",
+    "crates/aurora-ui",
     "crates/dotnet-number-text",
+    "tools/editor-test-support",
     "tools/golden/harness",
     "tools/test-servers",
     "xtask",
 ]
 
 [workspace.package]
+version = "2.0.0"
 edition = "2024"
 rust-version = "1.99"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = "symbols"

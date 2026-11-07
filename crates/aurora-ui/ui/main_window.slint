@@ -1,0 +1,16 @@
+import "fonts/Inter-Regular.ttf";
+import "fonts/Inter-SemiBold.ttf";
+import { ShellModel } from "model/shell_model.slint";
+import { Theme } from "theme/theme.slint";
+
+export { ShellModel, Theme }
+
+export component MainWindow inherits Window {
+    preferred-width: 1024px;
+    preferred-height: 680px;
+    min-width: 760px;
+    min-height: 500px;
+    default-font-family: Theme.font-family;
+    default-font-size: Theme.font-size;
+    background: Theme.window-background;
+}

@@ -1,0 +1,29 @@
+[package]
+name = "editor-test-support"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+aurora-asset = { path = "../../crates/aurora-asset" }
+aurora-asset-editor = { path = "../../crates/aurora-asset-editor" }
+aurora-console = { path = "../../crates/aurora-console" }
+aurora-image = { path = "../../crates/aurora-image" }
+aurora-online = { path = "../../crates/aurora-online" }
+aurora-ui = { path = "../../crates/aurora-ui" }
+chrono = { version = "0.4.45", default-features = false, features = ["clock", "std"] }
+i-slint-backend-testing = { version = "=1.18.1", features = ["renderer-software"] }
+image = { version = "0.25.10", default-features = false }
+slint = { version = "=1.18.1", default-features = false, features = [
+    "std",
+    "compat-1-2",
+    "backend-winit",
+    "renderer-software",
+    "software-renderer-systemfonts",
+    "accessibility",
+    "unstable-winit-030",
+    "raw-window-handle-06",
+] }
+tempfile = "3.27.0"
+test-servers = { path = "../test-servers" }

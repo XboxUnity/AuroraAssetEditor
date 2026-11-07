@@ -1,0 +1,20 @@
+[package]
+name = "aurora-ui"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+slint = { version = "=1.18.1", default-features = false, features = [
+    "std",
+    "compat-1-2",
+    "backend-winit",
+    "renderer-software",
+    "software-renderer-systemfonts",
+    "accessibility",
+    "unstable-winit-030",
+    "raw-window-handle-06",
+] }
+
+[build-dependencies]
+slint-build = "=1.18.1"
