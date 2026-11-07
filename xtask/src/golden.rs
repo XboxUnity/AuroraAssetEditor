@@ -1,5 +1,6 @@
 //! Generates and verifies the golden codec corpus produced by the original AuroraAsset.dll.
 
+use std::collections::BTreeSet;
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -10,12 +11,23 @@ use image::{ImageFormat, RgbaImage};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::crafted::{self, Crafted};
-use crate::dds_corpus::{self, DdsSample};
+use crate::crafted::{self, CRAFTED_DIRECTORY, Crafted};
+use crate::dds_corpus::{self, DDS_DIRECTORY, DdsSample};
 use crate::minimum_read::{self, LinearTexture, SurfaceUnit};
 use crate::synthetic;
 
 const HARNESS_TARGET: &str = "i686-pc-windows-msvc";
+const DXT_DIRECTORY: &str = "dxt";
+const ARGB_DIRECTORY: &str = "argb";
+const DECODED_DIRECTORY: &str = "decoded";
+/// The corpus directories `golden generate` writes; `golden check` refuses any other file in them.
+const GENERATED_DIRECTORIES: [&str; 5] = [
+    DXT_DIRECTORY,
+    ARGB_DIRECTORY,
+    DECODED_DIRECTORY,
+    CRAFTED_DIRECTORY,
+    DDS_DIRECTORY,
+];
 const HARNESS_PACKAGE: &str = "golden-harness";
 const MASTER_PLACEHOLDER_DIRECTORY: &str = "AuroraAssetEditor/Resources/Placeholders";
 const MAX_STORED_ARGB_PIXELS: u32 = 65_536;
@@ -393,9 +405,9 @@ fn sorted_input_pngs(inputs_dir: &Path) -> Result<Vec<PathBuf>> {
 
 /// Runs the DLL over every committed input and writes the fixtures and manifest into `out_dir`.
 fn write_goldens(paths: &Paths, inputs_dir: &Path, out_dir: &Path) -> Result<Manifest> {
-    let dxt_dir = out_dir.join("dxt");
-    let argb_dir = out_dir.join("argb");
-    let decoded_dir = out_dir.join("decoded");
+    let dxt_dir = out_dir.join(DXT_DIRECTORY);
+    let argb_dir = out_dir.join(ARGB_DIRECTORY);
+    let decoded_dir = out_dir.join(DECODED_DIRECTORY);
     std::fs::create_dir_all(&dxt_dir)?;
     std::fs::create_dir_all(&argb_dir)?;
     std::fs::create_dir_all(&decoded_dir)?;
@@ -595,6 +607,52 @@ fn compare_manifests(committed: &Manifest, regenerated: &Manifest, mismatches: &
     }
 }
 
+fn report_duplicates<'a>(
+    kind: &str,
+    names: impl Iterator<Item = &'a str>,
+    mismatches: &mut Vec<String>,
+) {
+    let mut seen = BTreeSet::new();
+    for name in names {
+        if !seen.insert(name) {
+            mismatches.push(format!("the manifest lists {kind} {name} more than once"));
+        }
+    }
+}
+
+/// Every file in the generated directories of `corpus`, relative to it.
+fn generated_directory_files(corpus: &Path) -> Result<BTreeSet<PathBuf>> {
+    let mut files = BTreeSet::new();
+    for directory in GENERATED_DIRECTORIES {
+        let path = corpus.join(directory);
+        if !path.is_dir() {
+            continue;
+        }
+        for entry in
+            std::fs::read_dir(&path).with_context(|| format!("cannot read {}", path.display()))?
+        {
+            files.insert(Path::new(directory).join(entry?.file_name()));
+        }
+    }
+    Ok(files)
+}
+
+/// Committed files that `golden generate` no longer writes, so that no manifest entry checks.
+fn report_unreferenced_files(
+    committed_corpus: &Path,
+    regenerated_corpus: &Path,
+    mismatches: &mut Vec<String>,
+) -> Result<()> {
+    let generated = generated_directory_files(regenerated_corpus)?;
+    for file in generated_directory_files(committed_corpus)?.difference(&generated) {
+        mismatches.push(format!(
+            "{} is not written by golden generate",
+            committed_corpus.join(file).display()
+        ));
+    }
+    Ok(())
+}
+
 /// Regenerates into a temp directory from the committed inputs and compares with the committed
 /// corpus.
 pub fn check() -> Result<()> {
@@ -611,16 +669,36 @@ pub fn check() -> Result<()> {
         toml::from_str(&committed_text).context("committed manifest.toml does not parse")?;
 
     let mut mismatches = Vec::new();
+    report_duplicates(
+        "fixture",
+        committed
+            .fixture
+            .iter()
+            .map(|fixture| fixture.name.as_str()),
+        &mut mismatches,
+    );
+    report_duplicates(
+        "crafted case",
+        committed.crafted.iter().map(Crafted::name),
+        &mut mismatches,
+    );
+    report_duplicates(
+        "DDS sample",
+        committed.dds.iter().map(DdsSample::name),
+        &mut mismatches,
+    );
+    report_unreferenced_files(&paths.corpus(), &regenerated_dir, &mut mismatches)?;
     compare_manifests(&committed, &regenerated, &mut mismatches);
     for fixture in &regenerated.fixture {
-        let relative_dxt = Path::new("dxt").join(format!("{}.vid", fixture.name));
+        let relative_dxt = Path::new(DXT_DIRECTORY).join(format!("{}.vid", fixture.name));
         compare_file(
             &paths.corpus().join(&relative_dxt),
             &regenerated_dir.join(&relative_dxt),
             &mut mismatches,
         )?;
         if fixture.dxt_decoded_stored {
-            let relative_decoded = Path::new("decoded").join(format!("{}.dxt.rgba", fixture.name));
+            let relative_decoded =
+                Path::new(DECODED_DIRECTORY).join(format!("{}.dxt.rgba", fixture.name));
             compare_file(
                 &paths.corpus().join(&relative_decoded),
                 &regenerated_dir.join(&relative_decoded),
@@ -628,7 +706,7 @@ pub fn check() -> Result<()> {
             )?;
         }
         if fixture.argb_video_stored {
-            let relative_argb = Path::new("argb").join(format!("{}.vid", fixture.name));
+            let relative_argb = Path::new(ARGB_DIRECTORY).join(format!("{}.vid", fixture.name));
             compare_file(
                 &paths.corpus().join(&relative_argb),
                 &regenerated_dir.join(&relative_argb),
