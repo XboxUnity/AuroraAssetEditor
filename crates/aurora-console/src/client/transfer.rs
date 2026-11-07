@@ -63,7 +63,14 @@ impl ConsoleClient {
                 Err(ConsoleError::MissingFolder { .. }) => return Ok(AssetPresence::NONE),
                 Err(other) => return Err(other),
             };
-            let has = |kind| is_present(&entries, &asset_file_name(kind, &ids.title_id));
+            let empty_asset_len = empty_asset_bytes().len() as u64;
+            let has = |kind| {
+                is_present(
+                    &entries,
+                    &asset_file_name(kind, &ids.title_id),
+                    empty_asset_len,
+                )
+            };
             Ok(AssetPresence {
                 cover: has(AssetKind::Cover),
                 background: has(AssetKind::Background),
@@ -77,12 +84,16 @@ impl ConsoleClient {
         self.report(ConsoleStatus::OpeningFolder {
             path: path.to_owned(),
         });
-        if self.execute(&format!("CWD {path}"))?.is_success() {
-            Ok(())
-        } else {
-            Err(ConsoleError::MissingFolder {
+        let reply = self.execute(&format!("CWD {path}"))?;
+        match reply.code / 100 {
+            1..=3 => Ok(()),
+            4 => Err(ConsoleError::Refused {
+                action: format!("open {path}"),
+                reply: format!("{} {}", reply.code, reply.message),
+            }),
+            _ => Err(ConsoleError::MissingFolder {
                 path: path.to_owned(),
-            })
+            }),
         }
     }
 
@@ -133,8 +144,7 @@ fn empty_asset_bytes() -> Vec<u8> {
     AssetFile::new().to_bytes()
 }
 
-fn is_present(entries: &[ListingEntry], file_name: &str) -> bool {
-    let empty_asset_len = empty_asset_bytes().len() as u64;
+fn is_present(entries: &[ListingEntry], file_name: &str, empty_asset_len: u64) -> bool {
     find_entry(entries, file_name)
         .and_then(|entry| entry.size)
         .is_some_and(|size| size > empty_asset_len)

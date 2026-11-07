@@ -33,6 +33,11 @@ pub enum ConsoleError {
     MissingFolder {
         path: String,
     },
+    /// A 4xx reply: the console may accept the same command later.
+    Refused {
+        action: String,
+        reply: String,
+    },
     FileTooLarge {
         file: String,
         size: u64,
@@ -67,6 +72,9 @@ impl fmt::Display for ConsoleError {
             }
             Self::Protocol { action, .. } => write!(f, "could not {action}"),
             Self::MissingFolder { path } => write!(f, "the console has no folder {path}"),
+            Self::Refused { action, reply } => {
+                write!(f, "the console refused to {action}: {reply}")
+            }
             Self::FileTooLarge { file, size, limit } => write!(
                 f,
                 "{file} is listed as {size} bytes, more than the {limit} bytes the editor accepts"
@@ -75,10 +83,19 @@ impl fmt::Display for ConsoleError {
                 file,
                 listed,
                 received,
-            } => write!(
-                f,
-                "{file} is listed as {listed} bytes but the console sent {received}"
-            ),
+            } => {
+                if received > listed {
+                    write!(
+                        f,
+                        "{file} is listed as {listed} bytes but the console sent more than that"
+                    )
+                } else {
+                    write!(
+                        f,
+                        "{file} is listed as {listed} bytes but the console sent {received}"
+                    )
+                }
+            }
             Self::InvalidAsset { file, .. } => write!(f, "{file} is not a valid asset file"),
         }
     }
@@ -95,6 +112,7 @@ impl std::error::Error for ConsoleError {
             | Self::LoginRejected { .. }
             | Self::NotAurora { .. }
             | Self::MissingFolder { .. }
+            | Self::Refused { .. }
             | Self::FileTooLarge { .. }
             | Self::SizeMismatch { .. } => None,
         }

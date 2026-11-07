@@ -1,11 +1,11 @@
 use std::io::{self, Cursor, Read};
-use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
+use std::net::{Shutdown, SocketAddr, TcpStream, ToSocketAddrs};
 
 use suppaftp::types::{FileType, Mode, Response};
-use suppaftp::{FtpError, FtpStream};
+use suppaftp::{FtpError, FtpStream, Status};
 
 use super::{AuroraRevision, ConsoleError, ConsoleStatus, Timeouts};
-use crate::ftp::{Features, FtpReply, features_from_reply};
+use crate::ftp::{Features, FtpReply, features_from_reply, terminated_lines};
 use crate::settings::FtpSettings;
 
 /// One logged-in control connection, checked to be Aurora.
@@ -72,15 +72,11 @@ impl ConsoleConnection {
     }
 
     pub(super) fn list(&mut self, path: &str) -> Result<Vec<String>, ConsoleError> {
-        self.stream
-            .list(Some(path))
-            .map_err(protocol_error(format!("list {path}")))
+        self.read_listing("LIST", path)
     }
 
     pub(super) fn mlsd(&mut self, path: &str) -> Result<Vec<String>, ConsoleError> {
-        self.stream
-            .mlsd(Some(path))
-            .map_err(protocol_error(format!("list {path}")))
+        self.read_listing("MLSD", path)
     }
 
     /// Reads the file, which the listing gave as `listed` bytes, and fails on any other length.
@@ -90,18 +86,11 @@ impl ConsoleConnection {
             .stream
             .retr_as_stream(name)
             .map_err(protocol_error(action.clone()))?;
-        let mut bytes = Vec::new();
         // One byte past the listed size is enough to tell that the console sends more.
-        transfer
-            .by_ref()
-            .take(listed.saturating_add(1))
-            .read_to_end(&mut bytes)
-            .map_err(|source| ConsoleError::Protocol {
-                action: action.clone(),
-                source: FtpError::ConnectionError(source),
-            })?;
+        let bytes = self.read_data(&mut transfer, listed.saturating_add(1), &action)?;
         let received = bytes.len() as u64;
         if received != listed {
+            self.abandon_control_connection();
             return Err(ConsoleError::SizeMismatch {
                 file: name.to_owned(),
                 listed,
@@ -118,6 +107,53 @@ impl ConsoleConnection {
             .put_file(name, &mut Cursor::new(bytes))
             .map(|_| ())
             .map_err(protocol_error(format!("upload {name}")))
+    }
+
+    /// Lines are split like the old `ReadLine`; the listing has no size cap, as in the old app.
+    fn read_listing(&mut self, verb: &str, path: &str) -> Result<Vec<String>, ConsoleError> {
+        let action = format!("list {path}");
+        let (_, mut transfer) = self
+            .stream
+            .custom_data_command(
+                format!("{verb} {path}"),
+                &[Status::AboutToSend, Status::AlreadyOpen],
+            )
+            .map_err(protocol_error(action.clone()))?;
+        let bytes = self.read_data(&mut transfer, u64::MAX, &action)?;
+        transfer.finish().map_err(protocol_error(action))?;
+        Ok(terminated_lines(&bytes).collect())
+    }
+
+    /// A failed read closes the control connection before the transfer drops: dropping a transfer
+    /// waits for the console's completion reply, which a stalled console never sends.
+    fn read_data(
+        &self,
+        transfer: &mut impl Read,
+        limit: u64,
+        action: &str,
+    ) -> Result<Vec<u8>, ConsoleError> {
+        let mut bytes = Vec::new();
+        transfer
+            .by_ref()
+            .take(limit)
+            .read_to_end(&mut bytes)
+            .map_err(|source| {
+                self.abandon_control_connection();
+                ConsoleError::Protocol {
+                    action: action.to_owned(),
+                    source: FtpError::ConnectionError(source),
+                }
+            })?;
+        Ok(bytes)
+    }
+
+    /// Only for a connection that is about to be discarded.
+    fn abandon_control_connection(&self) {
+        if let Err(error) = self.stream.get_ref().shutdown(Shutdown::Both)
+            && error.kind() != io::ErrorKind::NotConnected
+        {
+            eprintln!("could not close the control connection: {error}");
+        }
     }
 
     fn log_in(&mut self, settings: &FtpSettings) -> Result<(), ConsoleError> {

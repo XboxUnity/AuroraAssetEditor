@@ -99,6 +99,17 @@ impl FakeConsole {
         self.shared.state().stalled_downloads.insert(key, after);
     }
 
+    /// Listing the folder sends nothing and goes silent without closing.
+    pub fn stall_listing(&self, path: &str) {
+        let key = path_key(&resolve_path(&[], path));
+        self.shared.state().stalled_listings.insert(key);
+    }
+
+    /// Every `CWD` is answered with this full reply line; `None` restores normal behaviour.
+    pub fn answer_folder_changes_with(&self, reply: Option<&str>) {
+        self.shared.state().folder_change_reply = reply.map(str::to_owned);
+    }
+
     /// Closes every control connection that is open now.
     pub fn drop_connections(&self) {
         let sockets = std::mem::take(&mut self.shared.state().control_sockets);

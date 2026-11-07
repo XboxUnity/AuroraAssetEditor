@@ -1,3 +1,4 @@
+use std::io;
 use std::time::{Duration, Instant};
 
 use aurora_asset::{
@@ -6,6 +7,7 @@ use aurora_asset::{
 use aurora_console::{
     ConsoleClient, ConsoleError, ConsoleStatus, FtpSettings, GameIds, HexId, Timeouts,
 };
+use suppaftp::FtpError;
 use test_servers::{FakeConsole, FakeConsoleConfig, FakeFeatures, ListingStyle};
 
 const HOST: &str = "127.0.0.1";
@@ -289,9 +291,36 @@ fn reports_extra_bytes() {
         .unwrap_err();
 
     assert!(matches!(
-        error,
-        ConsoleError::SizeMismatch { listed: 1000, .. }
+        &error,
+        ConsoleError::SizeMismatch { file, listed: 1000, received: 1001 }
+            if file == "GC4D5307E6.asset"
     ));
+    assert!(error.to_string().ends_with("more than that"));
+}
+
+fn assert_read_timeout(error: &ConsoleError) {
+    let ConsoleError::Protocol {
+        source: FtpError::ConnectionError(io_error),
+        ..
+    } = error
+    else {
+        panic!("expected a timed out read, got {error:?}");
+    };
+    assert!(
+        matches!(
+            io_error.kind(),
+            io::ErrorKind::TimedOut | io::ErrorKind::WouldBlock
+        ),
+        "{io_error:?}"
+    );
+}
+
+fn assert_fails_after_one_timeout(started: Instant) {
+    assert!(
+        started.elapsed() < SHORT.mul_f32(1.5),
+        "{:?}",
+        started.elapsed()
+    );
 }
 
 #[test]
@@ -299,12 +328,48 @@ fn stalled_download_times_out() {
     let console = console_with_game_folder(FakeConsoleConfig::default());
     console.add_file(COVER_FILE, &empty_asset_bytes());
     console.stall_download(COVER_FILE, 10);
+    let mut client = client_for(&console);
+    client.ensure_connected().unwrap();
     let started = Instant::now();
 
-    let result = client_for(&console).download_asset(&game(), AssetKind::Cover);
+    let error = client
+        .download_asset(&game(), AssetKind::Cover)
+        .unwrap_err();
 
-    assert!(result.is_err());
-    assert!(started.elapsed() < Duration::from_secs(3));
+    assert_read_timeout(&error);
+    assert_fails_after_one_timeout(started);
+}
+
+#[test]
+fn stalled_listing_times_out() {
+    let console = console_with_game_folder(FakeConsoleConfig::default());
+    console.stall_listing(FOLDER);
+    let mut client = client_for(&console);
+    client.ensure_connected().unwrap();
+    let started = Instant::now();
+
+    let error = client.asset_presence(&game()).unwrap_err();
+
+    assert_read_timeout(&error);
+    assert_fails_after_one_timeout(started);
+}
+
+#[test]
+fn stalled_mlsd_listing_times_out() {
+    let console = console_with_game_folder(FakeConsoleConfig {
+        features: FakeFeatures::MlsdAndUtf8,
+        listing_style: ListingStyle::Mlsd,
+        ..FakeConsoleConfig::default()
+    });
+    console.stall_listing(FOLDER);
+    let mut client = client_for(&console);
+    client.ensure_connected().unwrap();
+    let started = Instant::now();
+
+    let error = client.asset_presence(&game()).unwrap_err();
+
+    assert_read_timeout(&error);
+    assert_fails_after_one_timeout(started);
 }
 
 #[test]
@@ -450,4 +515,93 @@ fn error_drops_connection() {
     client.asset_presence(&game()).unwrap();
 
     assert_eq!(console.login_count(), 2);
+}
+
+#[test]
+fn refused_folder_change_is_missing_folder() {
+    let console = console_with_game_folder(FakeConsoleConfig::default());
+    console.answer_folder_changes_with(Some("550 Access denied"));
+
+    let error = client_for(&console)
+        .upload_asset(&game(), AssetKind::Cover, &empty_asset_bytes())
+        .unwrap_err();
+
+    assert!(matches!(&error, ConsoleError::MissingFolder { path } if path == FOLDER));
+}
+
+#[test]
+fn transient_folder_change_refusal_drops_connection() {
+    let console = console_with_game_folder(FakeConsoleConfig::default());
+    let mut client = client_for(&console);
+    console.answer_folder_changes_with(Some("421 Service not available"));
+
+    let error = client
+        .download_asset(&game(), AssetKind::Cover)
+        .unwrap_err();
+
+    assert!(matches!(
+        &error,
+        ConsoleError::Refused { reply, .. } if reply == "421 Service not available"
+    ));
+    console.answer_folder_changes_with(None);
+    client.asset_presence(&game()).unwrap();
+    assert_eq!(console.login_count(), 2);
+}
+
+#[test]
+fn dropped_connection_reconnects_for_download() {
+    let console = console_with_game_folder(FakeConsoleConfig::default());
+    let mut client = client_for(&console);
+    client.ensure_connected().unwrap();
+    console.drop_connections();
+
+    client.download_asset(&game(), AssetKind::Cover).unwrap();
+
+    assert_eq!(console.login_count(), 2);
+}
+
+#[test]
+fn dropped_connection_reconnects_for_upload() {
+    let console = console_with_game_folder(FakeConsoleConfig::default());
+    let mut client = client_for(&console);
+    client.ensure_connected().unwrap();
+    console.drop_connections();
+
+    client
+        .upload_asset(&game(), AssetKind::Cover, &empty_asset_bytes())
+        .unwrap();
+
+    assert_eq!(console.login_count(), 2);
+    assert_eq!(console.file(COVER_FILE), Some(empty_asset_bytes()));
+}
+
+#[test]
+fn dropped_connection_reconnects_for_presence() {
+    let console = console_with_game_folder(FakeConsoleConfig::default());
+    let mut client = client_for(&console);
+    client.ensure_connected().unwrap();
+    console.drop_connections();
+
+    client.asset_presence(&game()).unwrap();
+
+    assert_eq!(console.login_count(), 2);
+}
+
+#[test]
+fn two_downloads_share_one_connection() {
+    let console = console_with_game_folder(FakeConsoleConfig::default());
+    console.add_file(COVER_FILE, &cover_asset_bytes(200));
+    let mut client = client_for(&console);
+
+    client
+        .download_asset(&game(), AssetKind::Cover)
+        .unwrap()
+        .unwrap();
+    client
+        .download_asset(&game(), AssetKind::Cover)
+        .unwrap()
+        .unwrap();
+
+    assert_eq!(commands_containing(&console, "RETR").len(), 2);
+    assert_eq!(console.login_count(), 1);
 }

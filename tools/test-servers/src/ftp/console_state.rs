@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io;
 use std::net::{Shutdown, TcpStream};
 use std::sync::atomic::AtomicBool;
@@ -25,6 +25,8 @@ pub(crate) struct ConsoleState {
     pub(crate) listed_sizes: HashMap<String, u64>,
     pub(crate) truncated_downloads: HashMap<String, usize>,
     pub(crate) stalled_downloads: HashMap<String, usize>,
+    pub(crate) stalled_listings: HashSet<String>,
+    pub(crate) folder_change_reply: Option<String>,
     pub(crate) commands: Vec<String>,
     pub(crate) login_count: usize,
     pub(crate) control_sockets: Vec<TcpStream>,

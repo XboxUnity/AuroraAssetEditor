@@ -207,6 +207,10 @@ impl<'a> Session<'a> {
     }
 
     fn cwd(&mut self, argument: &str) -> io::Result<()> {
+        let forced_reply = self.shared.state().folder_change_reply.clone();
+        if let Some(reply) = forced_reply {
+            return self.reply(&reply);
+        }
         let target = resolve_path(&self.current_folder, argument);
         if self.shared.state().file_system.is_folder(&target) {
             self.current_folder = target;
@@ -250,6 +254,11 @@ impl<'a> Session<'a> {
             argument
         };
         let folder = resolve_path(&self.current_folder, path_argument);
+        let stalled = self
+            .shared
+            .state()
+            .stalled_listings
+            .contains(&path_key(&folder));
         let lines = {
             let state = self.shared.state();
             if !state.file_system.is_folder(&folder) {
@@ -273,6 +282,9 @@ impl<'a> Session<'a> {
         let Some(mut data) = self.begin_transfer()? else {
             return Ok(());
         };
+        if stalled {
+            return self.stay_silent_until_client_gives_up(&mut data);
+        }
         for line in lines {
             data.write_all(format!("{line}\r\n").as_bytes())?;
         }
