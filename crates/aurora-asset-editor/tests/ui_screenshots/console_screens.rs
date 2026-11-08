@@ -34,7 +34,7 @@ pub const CONSOLE: ScreenArea = ScreenArea {
         },
         Screen {
             name: "console-refreshing",
-            description: "A refresh is running: the status says \"Refreshing the game list…\" and the controls are disabled.",
+            description: "A refresh is running: the status says \"Refreshing the game list…\", Refresh and Bulk actions… are disabled and so are the console actions (no game is selected either); the filters and the table stay usable.",
             stage: stage_refreshing,
         },
         Screen {
@@ -94,7 +94,7 @@ pub const CONSOLE: ScreenArea = ScreenArea {
         },
         Screen {
             name: "console-bulk-running",
-            description: "A bulk cover run at game 2 of 8: the status shows its progress with Stop, the other controls disabled.",
+            description: "A bulk cover run at game 2 of 8: the status shows its progress with Stop, Refresh and Bulk actions… are disabled and so are the console actions (no game is selected either); the filters and the table stay usable.",
             stage: stage_bulk_running,
         },
     ],
