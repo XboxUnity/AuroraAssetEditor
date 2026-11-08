@@ -10,7 +10,7 @@ use crate::app::{App, Menu};
 use crate::console::{ConsoleLink, ConsoleState, GameColumn, PresenceCell};
 
 use super::GameRows;
-use super::shell_view::{Refresh, action_runner};
+use super::shell_view::{Refresh, action_runner, arrow_step};
 
 const NOT_SET_UP_TEXT: &str = "Not set up";
 /// The table's sortable columns in the order `ConsoleModel.sort` numbers them.
@@ -80,8 +80,9 @@ pub(super) fn connect_console(window: &MainWindow, app: &Rc<RefCell<App>>, refre
 
     let act = action_runner(app, refresh);
     console.on_move_selection(move |step| {
-        let step = isize::try_from(step).unwrap_or_default();
-        act(&mut |app| app.move_game_selection(step));
+        if let Some(step) = arrow_step(step) {
+            act(&mut |app| app.move_game_selection(step));
+        }
     });
 
     let act = action_runner(app, refresh);

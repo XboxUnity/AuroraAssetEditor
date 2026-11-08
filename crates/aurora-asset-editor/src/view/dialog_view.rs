@@ -12,7 +12,7 @@ use crate::dialogs::{BulkForm, ChoiceId, ConnectionForm, Modal, ModalAnswer, Mod
 use crate::status::Severity;
 
 use super::PickerRows;
-use super::shell_view::{Refresh, action_runner};
+use super::shell_view::{Refresh, action_runner, arrow_step};
 
 /// The choice dialog draws a button for each of the app's choices, at most two (Icon or Banner, Replace or
 /// Add to free slots).
@@ -65,8 +65,9 @@ pub(super) fn connect_dialogs(window: &MainWindow, app: &Rc<RefCell<App>>, refre
 
     let act = action_runner(app, refresh);
     dialog.on_move_picker_highlight(move |step| {
-        let step = isize::try_from(step).unwrap_or_default();
-        act(&mut |app| app.move_picker_highlight(step));
+        if let Some(step) = arrow_step(step) {
+            act(&mut |app| app.move_picker_highlight(step));
+        }
     });
 
     let act = action_runner(app, refresh);

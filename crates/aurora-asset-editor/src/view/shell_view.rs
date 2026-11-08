@@ -53,6 +53,16 @@ pub(super) fn action_runner(
     }
 }
 
+/// The window's arrow-key step as the app's; a step that does not fit is a bug of the window, so it
+/// is logged and the key does nothing.
+pub(super) fn arrow_step(step: i32) -> Option<isize> {
+    let converted = isize::try_from(step).ok();
+    if converted.is_none() {
+        log::error!("The window moved the selection by {step}, which does not fit a step");
+    }
+    converted
+}
+
 pub(super) fn render_shell(window: &MainWindow, app: &App, system_theme: SystemTheme) {
     let shell = window.global::<ShellModel>();
     render_theme(&shell, app, system_theme);
@@ -204,5 +214,16 @@ fn menu_action_of(item: MenuItem) -> MenuAction {
         MenuItem::RemoveBackground => MenuAction::Remove(one(AssetKind::Background)),
         MenuItem::RemoveIconBanner => MenuAction::Remove(one(AssetKind::IconBanner)),
         MenuItem::RemoveScreenshots => MenuAction::Remove(one(AssetKind::Screenshots)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn arrow_steps_keep_their_direction() {
+        assert_eq!(arrow_step(-1), Some(-1));
+        assert_eq!(arrow_step(1), Some(1));
     }
 }
