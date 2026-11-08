@@ -2,6 +2,7 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::time::SystemTime;
 
 use anyhow::{Context, Result, bail};
 
@@ -11,7 +12,6 @@ const LABEL_VARIABLE: &str = "AURORA_UI_LABEL";
 const SCREENS_VARIABLE: &str = "AURORA_UI_SCREENS";
 const OUTPUT_FOLDER: &str = "target/ui-screenshots";
 const REPORT_FILE: &str = "report.txt";
-const CONTACT_SHEET_FILE: &str = "index.html";
 
 pub(crate) const EDITOR_PACKAGE: &str = "aurora-asset-editor";
 pub(crate) const SCREENSHOT_TEST_TARGET: &str = "ui_screenshots";
@@ -49,8 +49,8 @@ pub fn parse_options(arguments: &[&str]) -> Result<ScreenshotOptions> {
     Ok(options)
 }
 
-/// The test process runs in the repository root, so a relative baseline is resolved here, against
-/// the folder the user typed it in.
+/// `cargo test` runs the test binary in the package folder, not where the user typed the command,
+/// so a relative baseline is resolved here, against the folder the user typed it in.
 fn absolute_baseline(path: &Path, working_folder: &Path) -> PathBuf {
     working_folder.join(path)
 }
@@ -61,11 +61,7 @@ pub fn run(arguments: &[&str]) -> Result<()> {
     let root = repository_root();
     let output = root.join(OUTPUT_FOLDER).join(current_platform());
     let report = output.join(REPORT_FILE);
-    let sheet = output.join(CONTACT_SHEET_FILE);
-    // The suite removes both files first, but a run that never starts (a build error) must not
-    // leave an earlier run's files to be read as this run's.
-    remove_earlier_file(&report)?;
-    remove_earlier_file(&sheet)?;
+    let started = SystemTime::now();
 
     let mut test = Command::new("cargo");
     test.current_dir(&root).args([
@@ -95,30 +91,33 @@ pub fn run(arguments: &[&str]) -> Result<()> {
         .status()
         .context("could not run `cargo test` for the UI screenshots")?;
 
-    print_report(&report);
+    print_report(&report, started);
     if !status.success() {
         bail!("the UI screenshot tests failed: `cargo test` exited with {status}");
     }
     Ok(())
 }
 
-fn remove_earlier_file(path: &Path) -> Result<()> {
-    match fs::remove_file(path) {
-        Ok(()) => Ok(()),
-        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
-        Err(error) => Err(error).with_context(|| format!("could not remove {}", path.display())),
+/// A run that never starts (a build error) leaves the report of an earlier run in place, so the
+/// report is printed only when this run wrote it. The report itself ends with the contact
+/// sheet's URL.
+fn print_report(report: &Path, started: SystemTime) {
+    match written_since(report, started) {
+        Ok(true) => match fs::read_to_string(report) {
+            Ok(text) => print!("{text}"),
+            Err(error) => println!("Report: could not read {}: {error}", report.display()),
+        },
+        Ok(false) => println!("Report: not written by this run, see the test output above"),
+        Err(error) => println!("Report: could not check {}: {error}", report.display()),
     }
 }
 
-/// Only a report this run wrote can exist here; when it is missing the run stopped early and the
-/// test output above says why. The report itself ends with the contact sheet's URL.
-fn print_report(report: &Path) {
-    match fs::read_to_string(report) {
-        Ok(text) => print!("{text}"),
-        Err(error) if error.kind() == io::ErrorKind::NotFound => {
-            println!("Report: not written by this run, see the test output above");
-        }
-        Err(error) => println!("Report: could not read {}: {error}", report.display()),
+/// Whether the file was modified at or after `started`; a file that is not there was not.
+fn written_since(path: &Path, started: SystemTime) -> io::Result<bool> {
+    match fs::metadata(path) {
+        Ok(metadata) => Ok(metadata.modified()? >= started),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(false),
+        Err(error) => Err(error),
     }
 }
 
@@ -193,6 +192,24 @@ mod tests {
             assert!(message.contains(mode), "{message}");
             assert!(message.contains(USAGE_LINE), "{message}");
         }
+    }
+
+    #[test]
+    fn a_report_is_this_runs_only_when_written_after_it_started() {
+        let folder = std::env::temp_dir().join(format!("xtask-report-{}", std::process::id()));
+        fs::create_dir_all(&folder).unwrap();
+        let report = folder.join(REPORT_FILE);
+        assert!(!written_since(&report, SystemTime::now()).unwrap());
+
+        fs::write(&report, "report").unwrap();
+        let before = SystemTime::now() - std::time::Duration::from_secs(60);
+        let after = SystemTime::now() + std::time::Duration::from_secs(60);
+        let written_before_start = written_since(&report, after).unwrap();
+        let written_after_start = written_since(&report, before).unwrap();
+        fs::remove_dir_all(&folder).unwrap();
+
+        assert!(!written_before_start);
+        assert!(written_after_start);
     }
 
     #[test]
