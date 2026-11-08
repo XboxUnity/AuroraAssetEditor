@@ -95,7 +95,7 @@ pub fn fail_running_refresh(app: &mut App, error: ConsoleError) {
     }));
 }
 
-/// Ends an "Upload current" to the game with `ids` as `report` says, without contacting a console.
+/// Ends an "Upload current" as `report` says, without contacting a console.
 pub fn finish_upload(app: &mut App, report: TransferReport) {
     app.on_job_outcome(JobOutcome::Console(ConsoleOutcome::Uploaded {
         report,
