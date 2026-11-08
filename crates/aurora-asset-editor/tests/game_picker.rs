@@ -220,6 +220,11 @@ fn an_unlisted_console_is_listed_once_while_the_boxes_work() {
         1,
         "the refresh that runs is not repeated"
     );
+    assert_ne!(
+        harness.app().status().text,
+        BUSY_TEXT,
+        "the second dialog waits for the listing that runs, without a word"
+    );
 
     harness
         .app()
