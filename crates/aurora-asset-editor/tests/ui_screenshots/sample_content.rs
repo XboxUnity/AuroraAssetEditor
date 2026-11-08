@@ -44,6 +44,8 @@ const COVER_SIZE: (u32, u32) = (900, 600);
 const BACKGROUND_SIZE: (u32, u32) = (1280, 720);
 const ICON_SIZE: (u32, u32) = (64, 64);
 const BANNER_SIZE: (u32, u32) = (420, 96);
+const SCREENSHOT_SIZE: (u32, u32) = (1000, 562);
+const SCREENSHOT_SEED_BASE: u8 = 10;
 const TILED_COVER_SIZE: (u32, u32) = (8, 8);
 const COVER_SEED: u8 = 1;
 const BACKGROUND_SEED: u8 = 2;
@@ -122,6 +124,24 @@ pub fn sample_asset_bytes(asset: SampleAsset) -> Vec<u8> {
         SampleAsset::IconOnly => ICON_ONLY.get_or_init(icon_only_bytes).clone(),
         SampleAsset::TiledCover => TILED_COVER.get_or_init(tiled_cover_bytes).clone(),
     }
+}
+
+/// An uncompressed screenshots file holding the given positions, each in its own colours so the
+/// strip shows which thumbnail is which.
+pub fn sample_screenshots_bytes(positions: &[u8]) -> Vec<u8> {
+    let entries: Vec<_> = positions
+        .iter()
+        .map(|position| {
+            let slot = AssetSlot::screenshot(*position).expect("a screenshot position");
+            art_entry(
+                slot,
+                SCREENSHOT_SIZE,
+                SCREENSHOT_SEED_BASE + position,
+                Compression::None,
+            )
+        })
+        .collect();
+    asset_file_with(&entries).to_bytes()
 }
 
 fn art_entry(

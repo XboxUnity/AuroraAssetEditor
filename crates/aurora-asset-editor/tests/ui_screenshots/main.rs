@@ -3,6 +3,7 @@
 
 mod asset_page_screens;
 mod sample_content;
+mod screenshot_page_screens;
 mod shell_screens;
 
 use std::collections::BTreeSet;
@@ -16,7 +17,11 @@ use editor_test_support::{
 };
 
 /// The catalogue, one area per section of the contact sheet.
-const AREAS: &[ScreenArea] = &[shell_screens::SHELL, asset_page_screens::ASSET_PAGES];
+const AREAS: &[ScreenArea] = &[
+    shell_screens::SHELL,
+    asset_page_screens::ASSET_PAGES,
+    screenshot_page_screens::SCREENSHOT_PAGE,
+];
 
 /// A screen name starts with what it shows, so a sorted listing of `fixtures/ui` groups related
 /// screens and each file name leads to its area.
