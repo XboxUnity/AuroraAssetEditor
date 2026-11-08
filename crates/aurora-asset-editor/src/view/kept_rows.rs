@@ -43,3 +43,51 @@ impl<Content: PartialEq, Row: Clone + 'static> KeptRows<Content, Row> {
         self.shown = contents;
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A screenshot strip in letters: each character is one row, `+` the Add tile.
+    type Strip = KeptRows<char, char>;
+
+    /// Shows `contents` and returns how many rows `show` built.
+    fn rows_built(strip: &mut Strip, contents: &str) -> usize {
+        let mut built = 0;
+        strip.show(contents.chars().collect(), |content| {
+            built += 1;
+            *content
+        });
+        let shown: String = strip.model().iter().collect();
+        assert_eq!(shown, contents, "the model shows what was asked");
+        built
+    }
+
+    #[test]
+    fn a_render_builds_only_the_rows_that_changed() {
+        let mut strip = Strip::default();
+        let model = strip.model();
+
+        assert_eq!(rows_built(&mut strip, "12+"), 3, "the first render");
+        assert_eq!(rows_built(&mut strip, "12+"), 0, "nothing changed");
+        assert_eq!(rows_built(&mut strip, "1X+"), 1, "one row changed");
+        assert_eq!(rows_built(&mut strip, "1X+4"), 1, "a row added at the end");
+        assert_eq!(rows_built(&mut strip, "1X"), 0, "rows removed from the end");
+        assert_eq!(
+            rows_built(&mut strip, "1X+"),
+            1,
+            "the Add tile back at the end"
+        );
+        assert_eq!(
+            rows_built(&mut strip, "1X3+"),
+            2,
+            "the Add tile moved on by one"
+        );
+        assert_eq!(
+            rows_built(&mut strip, "1X+"),
+            1,
+            "the Add tile moved back by one"
+        );
+        assert!(strip.model() == model, "the window keeps one model");
+    }
+}
