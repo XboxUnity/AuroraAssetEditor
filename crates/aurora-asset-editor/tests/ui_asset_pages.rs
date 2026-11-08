@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::rc::Rc;
 
 use aurora_asset::{AssetFile, AssetSlot, Compression, ScreenshotNumber, TextureHeader, encode};
-use aurora_asset_editor::app::{App, Page};
+use aurora_asset_editor::app::{App, BUSY_TEXT, Page};
 use aurora_asset_editor::editor::SlotPreview;
 use aurora_asset_editor::settings::ThemeChoice;
 use aurora_asset_editor::view::MainWindowView;
@@ -722,6 +722,31 @@ fn add_tile_looks_disabled_while_importing() {
         near(dimmed, half_way(enabled, DARK_WINDOW_BACKGROUND)),
         "the Add tile is drawn at half opacity like a disabled button: {enabled:?} became {dimmed:?}"
     );
+}
+
+#[test]
+fn the_keyboard_does_not_select_while_importing() {
+    let mut harness = harness_with_theme(ThemeChoice::Dark);
+    load_screenshots(&mut harness, &[(1, RED), (2, GREEN)]);
+    harness.app().show_page(Page::Screenshots);
+    let folder = TempDir::new().expect("tests need a temp folder");
+    harness
+        .dialogs()
+        .push_files(vec![write_png(&folder, "more.png", BLUE)]);
+    let ui = Ui::start(&mut harness);
+    // A click gives the strip the keyboard.
+    ui.thumb("Screenshot 1")
+        .expect("position 1 is in view")
+        .mock_single_click(PointerEventButton::Left);
+
+    ui.act(|app| app.add_screenshots());
+    assert!(ui.app.borrow().locks().editor, "the import is queued");
+    ui.press_key(Key::RightArrow);
+    ui.render();
+
+    let app = ui.app.borrow();
+    assert_eq!(app.selected_screenshot().get(), 1, "the selection stays");
+    assert_eq!(app.status().text, BUSY_TEXT);
 }
 
 #[test]

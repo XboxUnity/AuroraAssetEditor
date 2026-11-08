@@ -32,6 +32,9 @@ impl App {
     }
 
     pub fn select_screenshot(&mut self, number: ScreenshotNumber) {
+        if self.refuse_while_busy() {
+            return;
+        }
         self.selected_screenshot = number;
     }
 
