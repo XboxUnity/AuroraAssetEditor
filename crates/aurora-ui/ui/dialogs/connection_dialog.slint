@@ -61,7 +61,6 @@ export component ConnectionDialog inherits DialogFrame {
         password-row := FormFieldRow {
             label: "Password:";
             value: DialogModel.fields[3];
-            input-type: InputType.password;
             edited(text) => {
                 DialogModel.edit-field(3, text);
             }

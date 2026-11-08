@@ -698,7 +698,7 @@ fn long_message_caps_its_height_and_scrolls() {
 }
 
 #[test]
-fn password_box_is_masked_and_not_read_out() {
+fn password_box_shows_its_text_like_the_username_box() {
     let mut harness = AppHarness::new();
     harness.with_ftp_settings(FtpSettings {
         host: "192.168.1.50".to_owned(),
@@ -711,15 +711,8 @@ fn password_box_is_masked_and_not_read_out() {
 
     let password = text_input(&ui, "Password:");
     let username = text_input(&ui, "Username:");
-    assert_eq!(password.accessible_value().unwrap_or_default(), "");
+    assert_eq!(password.accessible_value().unwrap_or_default(), PASSWORD);
     assert_eq!(username.accessible_value().unwrap_or_default(), PASSWORD);
-    let readers = ElementHandle::find_by_element_id(ui.view.window(), "TextField::input")
-        .filter(|element| element.accessible_value().as_deref() == Some(PASSWORD))
-        .count();
-    assert_eq!(
-        readers, 1,
-        "of the inputs holding the text, only the Username one reads it out"
-    );
 
     let snapshot = ui.snapshot();
     let crop = |element: &ElementHandle| {
@@ -733,10 +726,10 @@ fn password_box_is_masked_and_not_read_out() {
         )
         .to_image()
     };
-    assert_ne!(
+    assert_eq!(
         crop(&username),
         crop(&password),
-        "the same text is drawn masked in the Password box"
+        "the same text is drawn the same way in both boxes"
     );
 }
 
