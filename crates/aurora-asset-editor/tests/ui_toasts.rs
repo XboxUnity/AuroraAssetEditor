@@ -5,7 +5,7 @@ use std::time::Duration;
 use aurora_asset::{AssetKind, AssetSlot, Compression, RgbaImage};
 use aurora_asset_editor::app::{App, CurrentGame, KindChoice, Page};
 use aurora_asset_editor::status::{MAX_TOASTS, Severity, TOAST_DURATION};
-use aurora_asset_editor::view::MainWindowView;
+use aurora_asset_editor::view::{APP_BUSY_RETRY, MainWindowView};
 use aurora_console::{GameIds, HexId, asset_folder};
 use aurora_ui::{MainWindow, ShellModel, ToastView};
 use editor_test_support::{AppHarness, HeadlessUi, PreviewJobs, asset_file_with};
@@ -249,6 +249,22 @@ fn each_toast_ends_four_seconds_after_it_showed_whatever_renders_since() {
     );
     mock_elapsed_time(half);
     assert!(window.toasts().is_empty(), "the second ends 2 s later");
+}
+
+#[test]
+fn a_toast_whose_time_ends_while_an_action_holds_the_app_ends_once_it_is_free() {
+    let mut harness = game_harness();
+    let window = Window::start(&mut harness);
+    copy_ids(&window, 1);
+
+    // As a native file dialog's modal loop can run the timers inside an action.
+    let action = window.app.borrow_mut();
+    mock_elapsed_time(TOAST_DURATION);
+    drop(action);
+    assert_eq!(window.toasts().len(), 1, "waits for the app, not dropped");
+
+    mock_elapsed_time(APP_BUSY_RETRY);
+    assert!(window.toasts().is_empty(), "ends once the app is free");
 }
 
 #[test]

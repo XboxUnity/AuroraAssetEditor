@@ -1,3 +1,4 @@
+mod app_when_free;
 mod console_view;
 mod dialog_view;
 mod editor_view;
@@ -21,6 +22,7 @@ mod toast_rows;
 mod toast_timers;
 mod toast_view;
 
+pub use app_when_free::APP_BUSY_RETRY;
 pub use game_rows::GameRows;
 pub use image_cache::ImageCache;
 pub use kept_rows::KeptRows;

@@ -1,5 +1,5 @@
 use std::cell::RefCell;
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
 
 use aurora_ui::{MainWindow, ShellModel, ToastView};
 use slint::ComponentHandle;
@@ -7,6 +7,7 @@ use slint::ComponentHandle;
 use crate::app::App;
 use crate::status::Severity;
 
+use super::app_when_free::run_when_app_free;
 use super::shell_view::{Refresh, action_runner};
 use super::{ToastRows, ToastTimers};
 
@@ -25,13 +26,14 @@ pub(super) fn connect_toasts(
     let app = Rc::downgrade(app);
     let refresh = Rc::downgrade(refresh);
     timers.borrow_mut().connect(Rc::new(move |id| {
-        // Gone only while the window closes, and its toasts with it.
-        let (Some(app), Some(refresh)) = (app.upgrade(), refresh.upgrade()) else {
-            return;
-        };
-        let mut app = app.borrow_mut();
-        app.dismiss_toast(id);
-        refresh(&app);
+        let refresh = Weak::clone(&refresh);
+        run_when_app_free(Weak::clone(&app), move |app| {
+            app.dismiss_toast(id);
+            // Gone only while the window closes, and its toasts with it.
+            if let Some(refresh) = refresh.upgrade() {
+                refresh(app);
+            }
+        });
     }));
 }
 

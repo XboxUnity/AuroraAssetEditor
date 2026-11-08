@@ -9,7 +9,7 @@ use std::time::Duration;
 
 use aurora_asset::{AssetKind, AssetSlot, Compression, RgbaImage};
 use aurora_asset_editor::app::{App, Page};
-use aurora_asset_editor::view::{MainWindowView, SPACE_SETTLE_TIME};
+use aurora_asset_editor::view::{APP_BUSY_RETRY, MainWindowView, SPACE_SETTLE_TIME};
 use aurora_image::preview_size;
 use aurora_ui::{EditorModel, MainWindow};
 use editor_test_support::{
@@ -263,6 +263,32 @@ fn placeholder_art_reaches_the_window_at_the_size_it_is_shown() {
         ui.drawn_placeholder_sizes(),
         vec![icon_size, banner_art],
         "drawn pixel for pixel"
+    );
+}
+
+#[test]
+fn spaces_that_settle_while_an_action_holds_the_app_are_used_once_it_is_free() {
+    let folder = TempDir::new().expect("tests need a temp folder");
+    let mut harness = AppHarness::new();
+    let ui = Ui::start(&mut harness);
+    load_icon_and_banner(&mut harness, &ui, folder.path());
+    ui.show_page(Page::IconBanner);
+
+    // As a native file dialog's modal loop can run the timers inside an action.
+    let action = ui.app.borrow_mut();
+    settle_preview_spaces();
+    drop(action);
+    assert_eq!(
+        ui.previews.queued(),
+        0,
+        "nothing settled while the app was held"
+    );
+
+    mock_elapsed_time(APP_BUSY_RETRY);
+    assert_eq!(
+        ui.previews.run(&ui.view),
+        2,
+        "the icon and the banner, once free"
     );
 }
 

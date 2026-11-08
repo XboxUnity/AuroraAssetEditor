@@ -1,5 +1,5 @@
 use std::cell::RefCell;
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
 use std::time::Duration;
 
 use aurora_ui::{MainWindow, PreviewModel};
@@ -8,6 +8,7 @@ use slint::{ComponentHandle, Timer, TimerMode};
 use crate::app::App;
 
 use super::Previews;
+use super::app_when_free::run_when_app_free;
 use super::shell_view::Refresh;
 
 /// How long an area's space must hold still before its pictures are resized to it, so dragging the window's
@@ -37,12 +38,16 @@ pub(super) fn connect_previews(
         if !previews.borrow_mut().report_space(area, (width, height)) {
             return;
         }
-        let app = Rc::clone(&app);
+        let app = Rc::downgrade(&app);
         let refresh = Rc::clone(&refresh);
         let previews = Rc::clone(&previews);
         settle_timer.start(TimerMode::SingleShot, SPACE_SETTLE_TIME, move || {
-            previews.borrow_mut().settle_spaces();
-            refresh(&app.borrow());
+            let refresh = Rc::clone(&refresh);
+            let previews = Rc::clone(&previews);
+            run_when_app_free(Weak::clone(&app), move |app| {
+                previews.borrow_mut().settle_spaces();
+                refresh(app);
+            });
         });
     });
     preview_model.set_view_listening(true);
