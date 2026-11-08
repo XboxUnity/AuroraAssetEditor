@@ -2,6 +2,7 @@
 //! references in `fixtures/ui`. `cargo xtask ui-screenshots check|update` runs this target.
 
 mod asset_page_screens;
+mod console_screens;
 mod online_screens;
 mod sample_content;
 mod screenshot_page_screens;
@@ -24,6 +25,7 @@ const AREAS: &[ScreenArea] = &[
     asset_page_screens::ASSET_PAGES,
     screenshot_page_screens::SCREENSHOT_PAGE,
     online_screens::ONLINE,
+    console_screens::CONSOLE,
 ];
 
 /// A screen name starts with what it shows, so a sorted listing of `fixtures/ui` groups related

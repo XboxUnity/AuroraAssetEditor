@@ -3,7 +3,7 @@
 pub struct AuroraRevision(String);
 
 impl AuroraRevision {
-    pub(crate) fn new(revision: String) -> AuroraRevision {
+    pub fn new(revision: String) -> AuroraRevision {
         AuroraRevision(revision)
     }
 

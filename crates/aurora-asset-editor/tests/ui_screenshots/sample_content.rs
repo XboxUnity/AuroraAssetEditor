@@ -5,7 +5,7 @@ use std::sync::OnceLock;
 
 use aurora_asset::{AssetFile, AssetSlot, Compression, TextureHeader, encode};
 use aurora_asset_editor::app::CurrentGame;
-use aurora_console::{FtpSettings, GameIds, HexId};
+use aurora_console::{FtpSettings, Game, GameIds, HexId};
 use editor_test_support::{AppHarness, Scene, asset_file_with};
 use image::{ImageFormat, Rgba, RgbaImage};
 use tempfile::TempDir;
@@ -29,6 +29,22 @@ pub fn halo_3() -> CurrentGame {
     }
 }
 
+/// The console's games as the catalogue lists them, in the order a refresh returns them.
+pub fn sample_games() -> Vec<Game> {
+    SAMPLE_GAMES
+        .iter()
+        .map(|sample| Game {
+            title_name: sample.title.to_owned(),
+            ids: GameIds {
+                title_id: HexId::parse(sample.title_id).expect("the sample TitleID is valid"),
+                database_id: HexId::from_database_value(sample.database_id),
+            },
+            media_id: HexId::parse(SAMPLE_MEDIA_ID).expect("the sample MediaID is valid"),
+            disc: sample.disc,
+        })
+        .collect()
+}
+
 /// A harness whose app starts with the console set up, with the default user and password.
 pub fn console_harness() -> AppHarness {
     let mut harness = AppHarness::new();
@@ -39,6 +55,66 @@ pub fn console_harness() -> AppHarness {
     });
     harness
 }
+
+const SAMPLE_MEDIA_ID: &str = "1A2B3C4D";
+
+struct SampleGame {
+    title: &'static str,
+    disc: u32,
+    title_id: &'static str,
+    database_id: i64,
+}
+
+const SAMPLE_GAMES: [SampleGame; 8] = [
+    SampleGame {
+        title: "Halo 3",
+        disc: 1,
+        title_id: "4D5307E6",
+        database_id: 1,
+    },
+    SampleGame {
+        title: "Fable II",
+        disc: 2,
+        title_id: "4D530842",
+        database_id: 2,
+    },
+    SampleGame {
+        title: "Hexic HD",
+        disc: 1,
+        title_id: "58410A1C",
+        database_id: 18,
+    },
+    SampleGame {
+        title: "Gears of War 2",
+        disc: 1,
+        title_id: "4D53082D",
+        database_id: 3,
+    },
+    SampleGame {
+        title: "Forza Motorsport 3",
+        disc: 1,
+        title_id: "4D530896",
+        database_id: 4,
+    },
+    SampleGame {
+        title: "Mass Effect",
+        disc: 1,
+        title_id: "4D5307EF",
+        database_id: 5,
+    },
+    SampleGame {
+        title: "Banjo-Kazooie",
+        disc: 1,
+        title_id: "584108A9",
+        database_id: 6,
+    },
+    SampleGame {
+        title: "Perfect Dark",
+        disc: 1,
+        title_id: "584108A8",
+        database_id: 7,
+    },
+];
 
 const COVER_SIZE: (u32, u32) = (900, 600);
 const BACKGROUND_SIZE: (u32, u32) = (1280, 720);
