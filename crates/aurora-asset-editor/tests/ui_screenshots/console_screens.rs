@@ -15,8 +15,8 @@ const SECOND_GAME: usize = 1;
 const THIRD_GAME: usize = 2;
 const TITLE_FILTER: &str = "a";
 const TITLE_ID_FILTER: &str = "4D53";
+/// Counted from 1, as the status line shows it: the run is at the second sample game.
 const BULK_POSITION: usize = 2;
-const BULK_TITLE: &str = "Fable II";
 const DROPPED_IMAGE: &str = "art.png";
 const DROPPED_IMAGE_SIZE: (u32, u32) = (64, 64);
 const DROPPED_IMAGE_SEED: u8 = 5;
@@ -224,11 +224,12 @@ fn stage_image_dropped(theme: ThemeChoice) -> Scene {
 
 fn stage_bulk_running(theme: ThemeChoice) -> Scene {
     let scene = start_with_games(theme);
-    let total = sample_games().len();
+    let games = sample_games();
+    let current_title = &games[BULK_POSITION - 1].title_name;
     scene.act(|app| {
         app.open_bulk_actions();
         app.answer_modal(ModalAnswer::Accept);
-        report_bulk_progress(app, BULK_POSITION, total, BULK_TITLE);
+        report_bulk_progress(app, BULK_POSITION, games.len(), current_title);
     });
     scene
 }
