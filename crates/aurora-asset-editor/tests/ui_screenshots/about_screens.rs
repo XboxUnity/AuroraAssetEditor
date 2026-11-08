@@ -18,7 +18,7 @@ pub const ABOUT: ScreenArea = ScreenArea {
         },
         Screen {
             name: "about-copy-failed",
-            description: "\"Could not copy the build info\" after \"Copy build info\" in an app whose clipboard fails: the About dialog closes to show the error.",
+            description: "\"Could not copy the build info\" after \"Copy build info\" in an app whose clipboard fails: the About dialog closes to show the error, whose text gives the reason \"Could not use the clipboard: clipboard is gone\".",
             stage: stage_copy_failed,
         },
         Screen {

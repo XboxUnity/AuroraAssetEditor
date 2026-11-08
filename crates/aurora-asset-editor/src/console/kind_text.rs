@@ -20,7 +20,7 @@ pub fn kind_list(kinds: &[AssetKind]) -> String {
     }
 }
 
-/// `text` with its first letter in capitals, for a sentence that starts with a kind list.
+/// `text` with its first letter in capitals, for a sentence that starts with a kind list or an error's text.
 pub fn capitalize_first(text: &str) -> String {
     let mut chars = text.chars();
     match chars.next() {

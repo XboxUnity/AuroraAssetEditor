@@ -1,6 +1,9 @@
+use std::error::Error;
 use std::fs;
 
+use crate::console::capitalize_first;
 use crate::dialogs::Modal;
+use crate::logging::error_chain;
 use crate::status::StatusLine;
 
 use super::App;
@@ -38,10 +41,7 @@ impl App {
                 self.about_copied = true;
                 self.status = StatusLine::info(BUILD_INFO_COPIED_TEXT.to_owned());
             }
-            Err(error) => {
-                let message = format!("{COPY_BUILD_INFO_FAILED}: {error}");
-                self.fail_over_about(COPY_BUILD_INFO_FAILED, message, &error);
-            }
+            Err(error) => self.fail_over_about(COPY_BUILD_INFO_FAILED, &error),
         }
     }
 
@@ -52,21 +52,17 @@ impl App {
         let opened = fs::create_dir_all(&folder)
             .and_then(|()| self.environment.folder_opener.open_folder(&folder));
         if let Err(error) = opened {
-            let message = format!("{OPEN_LOG_FOLDER_FAILED}: {error}");
-            self.fail_over_about(OPEN_LOG_FOLDER_FAILED, message, &error);
+            self.fail_over_about(OPEN_LOG_FOLDER_FAILED, &error);
         }
     }
 
-    /// The About dialog covers the status line, so it closes to let the error dialog show.
-    fn fail_over_about(
-        &mut self,
-        title: &str,
-        text: String,
-        error: &(dyn std::error::Error + 'static),
-    ) {
+    /// The About dialog covers the status line, so it closes to let the error dialog show. The title says what
+    /// failed and the text says why.
+    fn fail_over_about(&mut self, title: &str, error: &(dyn Error + 'static)) {
         if matches!(self.modals.current(), Some(Modal::About)) {
             self.modals.close_current();
         }
-        self.show_error(title, text, error);
+        let reason = capitalize_first(&error_chain(error).join(": "));
+        self.show_error(title, reason, error);
     }
 }

@@ -238,10 +238,7 @@ fn open_log_folder_shows_why_the_folder_cannot_be_created() {
     match harness.app().modal() {
         Some(Modal::Message { title, text }) => {
             assert_eq!(title, OPEN_LOG_FOLDER_FAILED);
-            assert!(
-                text.starts_with(&format!("{OPEN_LOG_FOLDER_FAILED}: ")),
-                "{text}"
-            );
+            assert!(!text.is_empty(), "the dialog gives no reason");
         }
         other => panic!("expected the error dialog, got {other:?}"),
     }
@@ -256,7 +253,7 @@ fn open_log_folder_failure_is_shown() {
     match harness.app().modal() {
         Some(Modal::Message { title, text }) => {
             assert_eq!(title, OPEN_LOG_FOLDER_FAILED);
-            assert!(text.contains("no file manager"), "{text}");
+            assert_eq!(text, "No file manager");
         }
         other => panic!("expected the error dialog, got {other:?}"),
     }
@@ -276,6 +273,35 @@ fn copy_build_info_failure_is_shown() {
         other => panic!("expected the error dialog, got {other:?}"),
     }
     assert!(harness.error_log_text().contains("clipboard busy"));
+}
+
+#[test]
+fn about_failures_give_the_reason_without_repeating_the_title() {
+    let mut copy_failure = AppHarness::new();
+    copy_failure.clipboard().fail_with("clipboard busy");
+    copy_failure.app().show_about();
+    copy_failure.app().copy_build_info();
+
+    let mut folder_failure = AppHarness::new();
+    folder_failure.folder_opener().fail_with("no file manager");
+    folder_failure.app().show_about();
+    folder_failure.app().open_log_folder();
+
+    for (harness, expected_text) in [
+        (
+            &mut copy_failure,
+            "Could not use the clipboard: clipboard busy",
+        ),
+        (&mut folder_failure, "No file manager"),
+    ] {
+        match harness.app().modal() {
+            Some(Modal::Message { title, text }) => {
+                assert!(!text.starts_with(title.as_str()), "{title} / {text}");
+                assert_eq!(text, expected_text);
+            }
+            other => panic!("expected the error dialog, got {other:?}"),
+        }
+    }
 }
 
 #[test]
