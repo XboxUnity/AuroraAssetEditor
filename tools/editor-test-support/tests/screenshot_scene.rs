@@ -5,8 +5,7 @@ use aurora_asset::AssetSlot;
 use aurora_asset_editor::app::{CurrentGame, Menu, Page};
 use aurora_asset_editor::jobs::{Job, OnlineJob};
 use aurora_asset_editor::settings::ThemeChoice;
-use aurora_console::FtpSettings;
-use aurora_console::{GameIds, HexId};
+use aurora_console::{FtpSettings, GameIds, HexId};
 use aurora_ui::ConsoleModel;
 use editor_test_support::{
     AppHarness, HeadlessUi, STAGED_CONSOLE_HOST, Scene, ScreenTextProblem, check_screen_text,

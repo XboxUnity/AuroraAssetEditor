@@ -173,6 +173,7 @@ fn is_address(run: &str) -> bool {
     groups.len() == 4
         && groups.iter().all(|group| {
             (1..=3).contains(&group.len())
+                // `u8::parse` accepts a leading '+', so the digits are checked on their own.
                 && group.bytes().all(|byte| byte.is_ascii_digit())
                 && group.parse::<u8>().is_ok()
         })
@@ -217,6 +218,14 @@ mod tests {
         assert!(addresses_in("1.2.3.4.5").is_empty());
         assert!(addresses_in("999.1.1.1").is_empty());
         assert!(addresses_in("192.168.1.").is_empty());
+        assert!(addresses_in("0001.1.1.1").is_empty());
+        assert!(addresses_in("1.2.3.4.").is_empty());
+        assert_eq!(
+            addresses_in("192.168.1.50 and 10.0.0.1"),
+            ["192.168.1.50", "10.0.0.1"]
+        );
+        assert!(!is_address("1.+2.3.4"));
+        assert!(!is_address("+1.2.3.4"));
     }
 
     #[test]
