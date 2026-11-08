@@ -878,6 +878,40 @@ fn online_images_are_converted_once_per_result() {
 }
 
 #[test]
+fn a_render_during_a_press_on_a_result_keeps_the_click() {
+    let server = online_server();
+    let mut harness = online_harness(&server, ThemeChoice::Dark);
+    let ui = Ui::start(&mut harness);
+    ui.act(|app| {
+        app.edit_search_text(RESULTS_TITLE);
+        app.search_online();
+    });
+    harness.run_jobs();
+    ui.render();
+    let first = ui.online().get_tiles().row_data(0).expect("a result").label;
+    let tile = ui.labelled_in(&first, "OnlinePage::result-grid");
+    let (position, size) = (tile.absolute_position(), tile.size());
+    let centre = slint::LogicalPosition::new(
+        position.x + size.width / 2.0,
+        position.y + size.height / 2.0,
+    );
+    let window = ui.view.window().window();
+    window.dispatch_event(WindowEvent::PointerMoved { position: centre });
+    window.dispatch_event(WindowEvent::PointerPressed {
+        position: centre,
+        button: PointerEventButton::Left,
+    });
+    // What the app does after any job outcome, such as another result's thumbnail arriving.
+    ui.render();
+    window.dispatch_event(WindowEvent::PointerReleased {
+        position: centre,
+        button: PointerEventButton::Left,
+    });
+
+    assert_eq!(ui.online().get_selected(), 0, "the result was selected");
+}
+
+#[test]
 fn typing_does_not_reconvert_result_images() {
     let server = online_server();
     let mut harness = online_harness(&server, ThemeChoice::Dark);
