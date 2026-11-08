@@ -29,6 +29,7 @@ pub use screenshots::{
     PixelBounds, PixelComparison, PixelDifference, PngFileError, REFERENCES_VARIABLE, REPORT_FILE,
     ReferenceMode, ReferenceModeError, ReferenceStore, SCREEN_THEMES, SCREENS_VARIABLE,
     SETTLE_TIME, Scene, Screen, ScreenArea, ScreenFilterOnCi, ScreenTextProblem, ScreenshotSuite,
-    SuiteReport, changed_pixels, check_screen_text, compare_pixels, diff_image, image_name,
-    read_png, write_contact_sheet, write_opaque_png,
+    SuiteReport, TEST_ASSETS_VARIABLE, TestAssets, TestAssetsError, changed_pixels,
+    check_screen_text, compare_pixels, diff_image, image_name, read_png, write_contact_sheet,
+    write_opaque_png,
 };
