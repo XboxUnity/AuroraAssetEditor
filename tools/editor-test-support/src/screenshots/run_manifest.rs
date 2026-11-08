@@ -4,6 +4,8 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
+use super::path_error::with_path;
+
 pub const MANIFEST_FILE: &str = "manifest.txt";
 pub const MANIFEST_FORMAT: u32 = 1;
 
@@ -85,10 +87,6 @@ impl RunManifest {
             Err(error) => Err(ManifestError::Unreadable { path, error }),
         }
     }
-}
-
-fn with_path(path: &Path, error: io::Error) -> io::Error {
-    io::Error::new(error.kind(), format!("{}: {error}", path.display()))
 }
 
 #[derive(Debug)]

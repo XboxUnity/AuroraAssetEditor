@@ -9,6 +9,7 @@ use super::baseline::Baseline;
 use super::diff_image::diff_image;
 use super::image_change::ImageChange;
 use super::image_files::{png_path, validate_image_name};
+use super::path_error::with_path;
 use super::pixel_comparison::{PixelComparison, compare_pixels};
 use super::png_file::{PngFileError, first_translucent_pixel, read_png, write_opaque_png};
 
@@ -138,8 +139,4 @@ fn copy_file(source: &Path, target: &Path) -> io::Result<()> {
             ),
         )
     })
-}
-
-fn with_path(path: &Path, error: io::Error) -> io::Error {
-    io::Error::new(error.kind(), format!("{}: {error}", path.display()))
 }

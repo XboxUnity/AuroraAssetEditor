@@ -93,12 +93,8 @@ fn manifest_with_an_unknown_line_is_refused() {
 
 #[test]
 fn manifest_with_a_repeated_key_is_refused() {
-    let text = "format: 1
-platform: test-platform
-label: local run
-rendered: now
-platform: other
-";
+    let text =
+        "format: 1\nplatform: test-platform\nlabel: local run\nrendered: now\nplatform: other\n";
 
     let Err(error) = RunManifest::from_text(text) else {
         panic!("a repeated key must be refused");
@@ -115,12 +111,7 @@ fn manifest_without_a_required_line_is_refused() {
         let without: String = full
             .lines()
             .filter(|line| !line.starts_with(&format!("{key}: ")))
-            .map(|line| {
-                format!(
-                    "{line}
-"
-                )
-            })
+            .map(|line| format!("{line}\n"))
             .collect();
 
         assert!(

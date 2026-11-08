@@ -3,6 +3,7 @@ mod contact_sheet;
 mod diff_image;
 mod image_change;
 mod image_files;
+mod path_error;
 mod pixel_comparison;
 mod png_file;
 mod reference_mode;
