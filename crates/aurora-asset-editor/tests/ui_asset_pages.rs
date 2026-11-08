@@ -269,6 +269,14 @@ fn near(pixel: Rgba<u8>, expected: Rgba<u8>) -> bool {
         .all(|(actual, wanted)| actual.abs_diff(wanted) <= COLOUR_TOLERANCE)
 }
 
+/// The colour half way between `top` and `bottom`: `top` drawn at half opacity over `bottom`.
+fn half_way(top: Rgba<u8>, bottom: Rgba<u8>) -> Rgba<u8> {
+    Rgba(std::array::from_fn(|channel| {
+        let sum = u16::from(top.0[channel]) + u16::from(bottom.0[channel]);
+        u8::try_from(sum / 2).expect("the mean of two bytes is a byte")
+    }))
+}
+
 fn keep_snapshot(image: &RgbaImage, name: &str) {
     if let Some(folder) = std::env::var_os(SNAPSHOT_DIR_VARIABLE) {
         let folder = PathBuf::from(folder);
@@ -653,6 +661,31 @@ fn editor_buttons_disabled_while_importing() {
     assert!(
         near(pixel_at(&snapshot, slot_centre), BLUE),
         "the new cover is shown"
+    );
+}
+
+#[test]
+fn add_tile_looks_disabled_while_importing() {
+    let mut harness = harness_with_theme(ThemeChoice::Dark);
+    load_screenshots(&mut harness, &[(1, RED)]);
+    let folder = TempDir::new().expect("tests need a temp folder");
+    harness
+        .dialogs()
+        .push_files(vec![write_png(&folder, "more.png", BLUE)]);
+    let ui = Ui::start(&mut harness);
+    let add_tile = ui.thumb("Add…").expect("the strip shows the Add tile");
+    assert_eq!(add_tile.accessible_enabled(), Some(true));
+    let plus = centre(&add_tile);
+    let enabled = pixel_at(&ui.snapshot(), plus);
+
+    ui.act(|app| app.add_screenshots());
+    assert!(ui.app.borrow().locks().editor, "the import is queued");
+    let add_tile = ui.thumb("Add…").expect("the strip shows the Add tile");
+    assert_eq!(add_tile.accessible_enabled(), Some(false));
+    let dimmed = pixel_at(&ui.snapshot(), plus);
+    assert!(
+        near(dimmed, half_way(enabled, DARK_WINDOW_BACKGROUND)),
+        "the Add tile is drawn at half opacity like a disabled button: {enabled:?} became {dimmed:?}"
     );
 }
 

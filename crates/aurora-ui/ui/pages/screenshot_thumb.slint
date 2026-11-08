@@ -13,6 +13,7 @@ export component ScreenshotThumb inherits Rectangle {
     callback drag-ended(length);
 
     property <bool> dragging;
+    property <bool> enabled: !ShellModel.editor-locked;
 
     width: Theme.thumb-width;
     height: Theme.thumb-height;
@@ -20,15 +21,18 @@ export component ScreenshotThumb inherits Rectangle {
     background: tile.filled ? Theme.slot-filled-gradient : Theme.slot-background;
     border-width: tile.filled ? Theme.border-width : 0;
     border-color: Theme.slot-filled-border;
+    // The Add tile is a button and dims like one; the thumbnails keep showing their screenshots.
+    opacity: tile.is-next-free && !enabled ? Theme.disabled-opacity : 1;
     accessible-role: list-item;
     accessible-label: tile.is-next-free ? "Add…" : "Screenshot \{tile.number}";
     accessible-item-selected: tile.selected;
+    accessible-enabled: enabled;
     accessible-action-default => {
         activate();
     }
 
     function activate() {
-        if ShellModel.editor-locked {
+        if !enabled {
             return;
         }
         if !tile.is-next-free {
@@ -78,7 +82,7 @@ export component ScreenshotThumb inherits Rectangle {
 
     TouchArea {
         moved => {
-            if tile.filled && self.pressed && !ShellModel.editor-locked
+            if tile.filled && self.pressed && enabled
                 && (abs(self.mouse-x - self.pressed-x) > Theme.drag-threshold
                 || abs(self.mouse-y - self.pressed-y) > Theme.drag-threshold) {
                 dragging = true;
