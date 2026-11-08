@@ -4,7 +4,8 @@ use std::path::PathBuf;
 
 use aurora_asset::{AssetKind, AssetSlot, Compression, RgbaImage};
 use aurora_asset_editor::app::{
-    BUSY_TEXT, CONNECTION_FAILED_TITLE, NO_CONSOLE_TEXT, REFRESHING_TEXT, TEMP_FILE_NOTE,
+    BUSY_TEXT, CONNECTION_FAILED_TITLE, LOG_WRITE_FAILED, NO_CONSOLE_TEXT, REFRESHING_TEXT,
+    TEMP_FILE_NOTE,
 };
 use aurora_asset_editor::console::{ConsoleLink, GameColumn, PresenceCell, port_text_for_save};
 use aurora_asset_editor::dialogs::{ConnectionForm, Modal, ModalAnswer, ModalField};
@@ -296,6 +297,39 @@ fn failed_save_keeps_the_form_and_says_why() {
         harness
             .error_log_text()
             .contains("Could not save the connection settings")
+    );
+}
+
+#[test]
+fn a_failed_save_that_cannot_be_logged_toasts_the_log_failure() {
+    let mut harness = AppHarness::new();
+    std::fs::create_dir(harness.config_dir().join(FTP_SETTINGS_FILE)).unwrap();
+    std::fs::create_dir(harness.config_dir().join("error.log")).unwrap();
+    harness.app().edit_connection();
+
+    harness.app().save_connection();
+
+    let (_, shown) = form(&mut harness)
+        .test_status
+        .expect("the dialog shows the save failure");
+    let app = harness.app();
+    let status = app.status().clone();
+    assert_eq!(status.severity, Severity::Error);
+    let log_failure_at = status
+        .text
+        .find(LOG_WRITE_FAILED)
+        .unwrap_or_else(|| panic!("the status names the log failure: {}", status.text));
+    assert!(status.text.starts_with(&shown), "{}", status.text);
+    assert!(log_failure_at > shown.len());
+    let toasts: Vec<(String, Severity)> = app
+        .toasts()
+        .iter()
+        .map(|toast| (toast.text.clone(), toast.severity))
+        .collect();
+    assert_eq!(
+        toasts,
+        [(status.text, Severity::Error)],
+        "the log failure, which the dialog does not show, toasts"
     );
 }
 
