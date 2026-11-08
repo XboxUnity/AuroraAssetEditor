@@ -10,7 +10,7 @@ use crate::app::App;
 use crate::editor::{AssetDocument, SlotPreview, texture_caption};
 
 use super::shell_view::{Refresh, action_runner};
-use super::{ImageCache, ScreenshotTiles, TileContent};
+use super::{ImageCache, ScreenshotTileContent, ScreenshotTiles};
 
 /// Connects the asset pages' buttons, the screenshot strip and drag-reorder to `app`.
 pub(super) fn connect_editor(window: &MainWindow, app: &Rc<RefCell<App>>, refresh: &Refresh) {
@@ -108,15 +108,15 @@ fn tile_contents(
     screenshots: &AssetDocument,
     shown_count: usize,
     selected: ScreenshotNumber,
-) -> Vec<TileContent> {
-    let content = |number: ScreenshotNumber, is_next_free: bool| TileContent {
+) -> Vec<ScreenshotTileContent> {
+    let content = |number: ScreenshotNumber, is_next_free: bool| ScreenshotTileContent {
         number,
         image_revision: screenshots.revision(AssetSlot::Screenshot(number)),
         filled: is_filled(screenshots, number),
         selected: number == selected,
         is_next_free,
     };
-    let mut contents: Vec<TileContent> = ScreenshotNumber::ALL[..shown_count]
+    let mut contents: Vec<ScreenshotTileContent> = ScreenshotNumber::ALL[..shown_count]
         .iter()
         .map(|number| content(*number, false))
         .collect();
@@ -128,7 +128,7 @@ fn tile_contents(
 
 fn screenshot_tile(
     screenshots: &AssetDocument,
-    content: &TileContent,
+    content: &ScreenshotTileContent,
     images: &mut ImageCache,
 ) -> ScreenshotTile {
     let image = if content.is_next_free {
