@@ -57,10 +57,12 @@ export component AboutDialog inherits DialogFrame {
                 wrap: word-wrap;
             }
 
+            // One line however long the address is, so the card's height never depends on it. "Copy build info"
+            // copies the whole address.
             if DialogModel.about-run != "": Text {
                 text: DialogModel.about-run;
                 color: Theme.text-muted;
-                wrap: word-wrap;
+                overflow: elide;
             }
 
             HorizontalLayout {

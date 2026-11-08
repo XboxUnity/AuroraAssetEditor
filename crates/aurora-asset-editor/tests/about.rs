@@ -23,8 +23,10 @@ const CARD_PROBE_GAP: f32 = 4.0;
 const SLINT_URL: &str = "https://slint.dev";
 const DATE_EXAMPLE: &str = "2026-11-07T10:00:00Z";
 const MINIMUM_WINDOW: (f32, f32) = (760.0, 500.0);
-/// As long as a GitHub Actions run address gets.
+/// A long address of today's form, a GitHub Actions run.
 const LONG_RUN_URL: &str = "https://github.com/Swizzy/AuroraAssetEditor/actions/runs/19283746501";
+/// An address too long for the card's width, so the About card shortens it with an ellipsis.
+const ELIDED_RUN_URL: &str = "https://github.com/Swizzy/AuroraAssetEditor/actions/runs/19283746501/attempts/12/jobs/56473829101";
 /// A rule of this many "=" is one word wider than the notices list (a line can break between words only). Some
 /// licence texts in the generated part have 79-character ones.
 const WIDE_RULE_LENGTH: usize = 70;
@@ -72,6 +74,19 @@ fn copy_build_info_lists_every_field() {
     assert_eq!(
         with_run.lines().last(),
         Some("Run: https://example.test/runs/7")
+    );
+}
+
+#[test]
+fn copy_build_info_copies_the_whole_run_address() {
+    let mut harness = AppHarness::new();
+    harness.with_build(build_info(Some(ELIDED_RUN_URL)));
+    harness.app().show_about();
+    harness.app().copy_build_info();
+    let copied = harness.clipboard_text().expect("the build info was copied");
+    assert_eq!(
+        copied.lines().last(),
+        Some(format!("Run: {ELIDED_RUN_URL}").as_str())
     );
 }
 
@@ -419,10 +434,11 @@ fn escape_and_enter_close_about() {
     }
 }
 
-/// A CI build shows one more line, the run's address, so the card is checked with it too.
+/// A CI build shows one more line, the run's address, so the card is checked with it too, also with an
+/// address too long for one line.
 #[test]
 fn about_card_fits_the_default_window_with_the_notices_open() {
-    for run_url in [None, Some(LONG_RUN_URL)] {
+    for run_url in [None, Some(LONG_RUN_URL), Some(ELIDED_RUN_URL)] {
         let mut harness = AppHarness::new();
         harness.with_build(build_info(run_url));
         let ui = Ui::start(&mut harness, ThemeChoice::Dark);
