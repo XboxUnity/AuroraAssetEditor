@@ -1,10 +1,10 @@
 Software and fonts that Aurora Asset Editor includes, and the licences they carry.
 The Rust crates it is built from follow after these entries.
 
-================================================================
+=======================================================
 Slint (Made with Slint)
 The user interface toolkit, used under the Slint Royalty-free licence, version 2.0.
-================================================================
+=======================================================
 
 # Slint Royalty-free Desktop, Mobile, and Web Applications License
 
@@ -50,10 +50,10 @@ SixtyFPS is only liable for conflicting rights of third parties if SixtyFPS was 
 
 Unless required by law, SixtyFPS won't be liable for any direct, indirect, incidental, or consequential damages arising in any way out of the use of the Software.
 
-================================================================
+=======================================================
 DirectXTex
 The BC3 block encoder in aurora-asset is ported from DirectXTex (BC.cpp).
-================================================================
+=======================================================
 
 MIT License
 
@@ -76,10 +76,10 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 
-================================================================
+=======================================================
 Inter
 The bundled user interface font.
-================================================================
+=======================================================
 
 Copyright (c) 2016 The Inter Project Authors (https://github.com/rsms/inter)
 
@@ -174,7 +174,7 @@ DAMAGES, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM
 OTHER DEALINGS IN THE FONT SOFTWARE.
 
-================================================================
+=======================================================
 Third-party Rust crates
-================================================================
+=======================================================
 
