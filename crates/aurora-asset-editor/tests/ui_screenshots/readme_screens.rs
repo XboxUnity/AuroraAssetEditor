@@ -12,8 +12,8 @@ use test_servers::{RecordedHttp, Route};
 
 use crate::console_screens::{TABLE, start_console};
 use crate::online_screens::{
-    Cover, THUMBNAIL_SIZE, image_path, json_route, listing_json, listing_path, png_route,
-    search_for_title_id, select_result_at, start_online, thumbnail_path,
+    Cover, FIRST_RESULT, THUMBNAIL_SIZE, image_path, json_route, listing_json, listing_path,
+    png_route, search_for_title_id, select_result_at, start_online, thumbnail_path,
 };
 use crate::real_art::{
     README_GAME_TITLE_ID, asset_bytes, console_games, decoded_cover, readme_current_game,
@@ -28,7 +28,6 @@ const README_COVER: Cover = Cover {
     slug: "neverdead",
     available: true,
 };
-const FIRST_RESULT: usize = 0;
 
 pub const README_SCREENS: &[Screen] = &[
     Screen {

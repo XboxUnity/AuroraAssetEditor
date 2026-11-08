@@ -12,6 +12,7 @@ const NOT_SET_TEXT: &str = "AURORA_TEST_ASSETS is not set. The README screenshot
      folder kept outside the repository: set AURORA_TEST_ASSETS to a folder holding \
      GameData/<TitleID>_<DatabaseID>/ and DataBases/content.db, pulled from an Aurora console.";
 
+// The test name and the folder mirror the `ui_screenshots` test target and `docs/images/readme`.
 const README_IMAGE_TEST: &str = "render_readme_images";
 const README_IMAGES_FOLDER: &str = "docs/images/readme";
 
