@@ -1,53 +1,93 @@
+use std::fs;
+use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result, anyhow, bail};
 
-// The same names and paths as in `editor-test-support`, which xtask does not depend on.
-const REFERENCES_VARIABLE: &str = "AURORA_UI_REFERENCES";
+// These names and the platform rule mirror `editor-test-support`, which xtask does not depend on.
+const BASELINE_VARIABLE: &str = "AURORA_UI_BASELINE";
+const LABEL_VARIABLE: &str = "AURORA_UI_LABEL";
 const SCREENS_VARIABLE: &str = "AURORA_UI_SCREENS";
-const CONTACT_SHEET: &str = "target/ui-screenshots/index.html";
-const REFERENCES_FOLDER: &str = "fixtures/ui";
+const OUTPUT_FOLDER: &str = "target/ui-screenshots";
+const REPORT_FILE: &str = "report.txt";
+const CONTACT_SHEET_FILE: &str = "index.html";
 
 const EDITOR_PACKAGE: &str = "aurora-asset-editor";
 const SCREENSHOT_TEST_TARGET: &str = "ui_screenshots";
-/// Characters a `file://` URL carries as they are; every other byte is percent-encoded.
-const URL_SAFE_PUNCTUATION: &str = "-._~/:";
 
-/// Whether the run only compares the screens with their references or rewrites the changed ones.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ScreenshotMode {
-    Check,
-    Update,
+pub const USAGE_LINE: &str =
+    "cargo xtask ui-screenshots [--baseline <folder>] [--label <text>] [--only <text>]";
+
+#[derive(Debug, PartialEq, Eq, Default)]
+pub struct ScreenshotOptions {
+    pub baseline: Option<PathBuf>,
+    pub label: Option<String>,
+    pub only: Option<String>,
 }
 
-impl ScreenshotMode {
-    fn variable_value(self) -> &'static str {
-        match self {
-            ScreenshotMode::Check => "check",
-            ScreenshotMode::Update => "update",
+pub fn parse_options(arguments: &[&str]) -> Result<ScreenshotOptions> {
+    let mut options = ScreenshotOptions::default();
+    let mut remaining = arguments.iter();
+    while let Some(&flag) = remaining.next() {
+        if !matches!(flag, "--baseline" | "--label" | "--only") {
+            bail!("unknown argument `{flag}`\nusage: {USAGE_LINE}");
+        }
+        let value = match remaining.next() {
+            Some(&value) if !value.is_empty() => value,
+            _ => bail!("{flag} needs a value\nusage: {USAGE_LINE}"),
+        };
+        let already_given = match flag {
+            "--baseline" => options.baseline.replace(PathBuf::from(value)).is_some(),
+            "--label" => options.label.replace(value.to_string()).is_some(),
+            _ => options.only.replace(value.to_string()).is_some(),
+        };
+        if already_given {
+            bail!("{flag} was given twice\nusage: {USAGE_LINE}");
         }
     }
+    Ok(options)
 }
 
-/// Runs the screenshot suite, limited to the screens whose name contains `only` when given, and
-/// prints where the contact sheet is. An update also lists the reference files it changed.
-pub fn run(mode: ScreenshotMode, only: Option<&str>) -> Result<()> {
-    if only.is_some_and(str::is_empty) {
-        bail!("--only needs the text the screen names must contain; it was empty");
-    }
+/// The test process runs in the repository root, so a relative baseline is resolved here, against
+/// the folder the user typed it in.
+fn absolute_baseline(path: &Path, working_folder: &Path) -> PathBuf {
+    working_folder.join(path)
+}
+
+/// Runs the screenshot suite and prints its report, which names the contact sheet.
+pub fn run(arguments: &[&str]) -> Result<()> {
+    let options = parse_options(arguments)?;
     let root = repository_root();
+    let output = root.join(OUTPUT_FOLDER).join(current_platform());
+    let report = output.join(REPORT_FILE);
+    let sheet = output.join(CONTACT_SHEET_FILE);
+    // The suite removes both files first, but a run that never starts (a build error) must not
+    // leave an earlier run's files to be read as this run's.
+    remove_earlier_file(&report)?;
+    remove_earlier_file(&sheet)?;
+
     let mut test = Command::new("cargo");
-    test.current_dir(&root)
-        .args([
-            "test",
-            "-p",
-            EDITOR_PACKAGE,
-            "--test",
-            SCREENSHOT_TEST_TARGET,
-        ])
-        .env(REFERENCES_VARIABLE, mode.variable_value());
-    match only {
+    test.current_dir(&root).args([
+        "test",
+        "-p",
+        EDITOR_PACKAGE,
+        "--test",
+        SCREENSHOT_TEST_TARGET,
+    ]);
+    match &options.baseline {
+        Some(path) => {
+            let working_folder =
+                std::env::current_dir().context("could not read the current folder")?;
+            test.env(BASELINE_VARIABLE, absolute_baseline(path, &working_folder))
+        }
+        None => test.env_remove(BASELINE_VARIABLE),
+    };
+    match &options.label {
+        Some(text) => test.env(LABEL_VARIABLE, text),
+        None => test.env_remove(LABEL_VARIABLE),
+    };
+    match &options.only {
         Some(text) => test.env(SCREENS_VARIABLE, text),
         None => test.env_remove(SCREENS_VARIABLE),
     };
@@ -55,75 +95,35 @@ pub fn run(mode: ScreenshotMode, only: Option<&str>) -> Result<()> {
         .status()
         .context("could not run `cargo test` for the UI screenshots")?;
 
-    let reference_changes = match mode {
-        ScreenshotMode::Update => print_reference_changes(&root),
-        ScreenshotMode::Check => Ok(()),
-    };
-    print_contact_sheet(&root);
-
-    // A failed test run is the main result, so a failing `git status` never hides it.
-    if status.success() {
-        return reference_changes;
-    }
-    let test_failure = format!("the UI screenshot tests failed: `cargo test` exited with {status}");
-    match reference_changes {
-        Ok(()) => bail!("{test_failure}"),
-        Err(git_error) => {
-            bail!("{test_failure}; listing the changed references failed too: {git_error:#}")
-        }
-    }
-}
-
-/// Every new file is listed by name, also while the folder itself is still untracked.
-fn print_reference_changes(root: &Path) -> Result<()> {
-    println!("Changed references (git status --short -- {REFERENCES_FOLDER}):");
-    let status = Command::new("git")
-        .current_dir(root)
-        .args([
-            "status",
-            "--short",
-            "--untracked-files=all",
-            "--",
-            REFERENCES_FOLDER,
-        ])
-        .status()
-        .context("could not run `git status`")?;
+    print_report(&report);
     if !status.success() {
-        bail!("`git status` failed with {status}");
+        bail!("the UI screenshot tests failed: `cargo test` exited with {status}");
     }
     Ok(())
 }
 
-/// A run that could not write the sheet says so in the test output; here it is only named.
-fn print_contact_sheet(root: &Path) {
-    let sheet = root.join(CONTACT_SHEET);
-    if sheet.is_file() {
-        println!("Contact sheet: {}", file_url(&sheet));
-    } else {
-        println!(
-            "Contact sheet: not written ({} is missing)",
-            sheet.display()
-        );
+fn remove_earlier_file(path: &Path) -> Result<()> {
+    match fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(anyhow!("could not remove {}: {error}", path.display())),
     }
 }
 
-/// `D:\repo\target\index.html` becomes `file:///D:/repo/target/index.html`, which a terminal can
-/// open.
-fn file_url(path: &Path) -> String {
-    let slashed = path.display().to_string().replace('\\', "/");
-    let mut url = String::from("file://");
-    if !slashed.starts_with('/') {
-        url.push('/');
-    }
-    for byte in slashed.bytes() {
-        let character = char::from(byte);
-        if character.is_ascii_alphanumeric() || URL_SAFE_PUNCTUATION.contains(character) {
-            url.push(character);
-        } else {
-            url.push_str(&format!("%{byte:02X}"));
+/// Only a report this run wrote can exist here; when it is missing the run stopped early and the
+/// test output above says why. The report itself ends with the contact sheet's URL.
+fn print_report(report: &Path) {
+    match fs::read_to_string(report) {
+        Ok(text) => println!("{text}"),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {
+            println!("Report: not written by this run, see the test output above");
         }
+        Err(error) => println!("Report: could not read {}: {error}", report.display()),
     }
-    url
+}
+
+fn current_platform() -> String {
+    format!("{}-{}", std::env::consts::OS, std::env::consts::ARCH)
 }
 
 fn repository_root() -> PathBuf {
@@ -131,4 +131,66 @@ fn repository_root() -> PathBuf {
         .parent()
         .expect("xtask lives one folder below the repository root")
         .to_path_buf()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bare_command_compares_with_the_previous_run() {
+        assert_eq!(parse_options(&[]).unwrap(), ScreenshotOptions::default());
+    }
+
+    #[test]
+    fn options_parse_in_any_order() {
+        let options = parse_options(&[
+            "--only",
+            "shell",
+            "--label",
+            "v2.0.12 (abc1234)",
+            "--baseline",
+            "b",
+        ])
+        .unwrap();
+        assert_eq!(options.only.as_deref(), Some("shell"));
+        assert_eq!(options.label.as_deref(), Some("v2.0.12 (abc1234)"));
+        assert_eq!(options.baseline, Some(PathBuf::from("b")));
+    }
+
+    #[test]
+    fn a_flag_without_its_value_is_refused() {
+        for arguments in [&["--baseline"][..], &["--only", ""][..]] {
+            let message = parse_options(arguments).unwrap_err().to_string();
+            assert!(message.contains(arguments[0]), "{message}");
+        }
+    }
+
+    #[test]
+    fn a_flag_given_twice_is_refused() {
+        let message = parse_options(&["--only", "a", "--only", "b"])
+            .unwrap_err()
+            .to_string();
+        assert!(message.contains("--only"), "{message}");
+    }
+
+    #[test]
+    fn the_old_modes_are_refused() {
+        for mode in ["check", "update"] {
+            let message = parse_options(&[mode]).unwrap_err().to_string();
+            assert!(message.contains(mode), "{message}");
+            assert!(message.contains(USAGE_LINE), "{message}");
+        }
+    }
+
+    #[test]
+    fn baseline_path_is_made_absolute() {
+        let work = std::env::temp_dir().join("work");
+        assert_eq!(
+            absolute_baseline(Path::new("rel/x"), &work),
+            work.join("rel/x")
+        );
+        let absolute = std::env::temp_dir().join("elsewhere");
+        assert_eq!(absolute_baseline(&absolute, &work), absolute);
+    }
 }

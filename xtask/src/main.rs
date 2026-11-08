@@ -22,11 +22,14 @@ mod ui_screenshots;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use ui_screenshots::ScreenshotMode;
-
-const USAGE: &str = "usage: cargo xtask golden <generate [--refresh-inputs] | check>\n       cargo xtask cross-decode [<image files>...]\n       cargo xtask cross-samples\n       cargo xtask content-db-samples
-       cargo xtask notices [--check]
-       cargo xtask ui-screenshots <check | update> [--only <text>]";
+const USAGE_LINES: [&str; 6] = [
+    "cargo xtask golden <generate [--refresh-inputs] | check>",
+    "cargo xtask cross-decode [<image files>...]",
+    "cargo xtask cross-samples",
+    "cargo xtask content-db-samples",
+    "cargo xtask notices [--check]",
+    ui_screenshots::USAGE_LINE,
+];
 
 fn main() -> ExitCode {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
@@ -43,20 +46,13 @@ fn main() -> ExitCode {
         ["record-online"] => record_online::record(),
         ["notices"] => notices::run(false),
         ["notices", "--check"] => notices::run(true),
-        ["ui-screenshots", "check"] => ui_screenshots::run(ScreenshotMode::Check, None),
-        ["ui-screenshots", "check", "--only", text] => {
-            ui_screenshots::run(ScreenshotMode::Check, Some(text))
-        }
-        ["ui-screenshots", "update"] => ui_screenshots::run(ScreenshotMode::Update, None),
-        ["ui-screenshots", "update", "--only", text] => {
-            ui_screenshots::run(ScreenshotMode::Update, Some(text))
-        }
+        ["ui-screenshots", options @ ..] => ui_screenshots::run(options),
         ["cross-decode", files @ ..] => {
             let files: Vec<PathBuf> = files.iter().map(PathBuf::from).collect();
             cross_decode::run(&files)
         }
         _ => {
-            eprintln!("{USAGE}");
+            eprintln!("usage: {}", USAGE_LINES.join("\n       "));
             return ExitCode::from(2);
         }
     };
