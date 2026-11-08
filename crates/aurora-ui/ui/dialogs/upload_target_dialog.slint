@@ -3,10 +3,13 @@ import { DialogModel } from "../model/dialog_model.slint";
 import { PillButton } from "../controls/pill_button.slint";
 import { DialogFrame } from "dialog_frame.slint";
 import { FormFieldRow } from "form_field_row.slint";
+import { GamePicker } from "game_picker.slint";
 
-// Save all to console: the game to upload to, OK once both IDs are whole.
+// Save all to console: the game to upload to, typed or picked from the console's games, OK once both IDs are
+// whole.
 export component UploadTargetDialog inherits DialogFrame {
     title: DialogModel.title;
+    card-width: DialogModel.picker-shown ? Theme.picker-dialog-width : Theme.dialog-width;
 
     first-has-focus: title-id-row.has-focus;
     last-has-focus: cancel-button.has-focus;
@@ -41,6 +44,12 @@ export component UploadTargetDialog inherits DialogFrame {
             edited(text) => {
                 DialogModel.edit-field(1, text);
             }
+            accepted => {
+                root.submit();
+            }
+        }
+
+        if DialogModel.picker-shown: game-picker := GamePicker {
             accepted => {
                 root.submit();
             }

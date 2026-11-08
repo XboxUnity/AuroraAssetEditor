@@ -1,5 +1,7 @@
+use aurora_console::GameIds;
+
 use super::{
-    BulkForm, ChoiceId, ConfirmedAction, ConnectionForm, PendingChoice, TitleIdForm,
+    BulkForm, ChoiceId, ConfirmedAction, ConnectionForm, GamePicker, PendingChoice, TitleIdForm,
     UploadTargetForm,
 };
 
@@ -47,6 +49,54 @@ pub enum Modal {
     Bulk {
         form: BulkForm,
     },
+}
+
+impl Modal {
+    /// The list of the console's games in the dialogs that ask for IDs.
+    pub fn game_picker(&self) -> Option<&GamePicker> {
+        match self {
+            Modal::TitleId { form, .. } => Some(&form.picker),
+            Modal::UploadTarget { form, .. } => Some(&form.picker),
+            Modal::Message { .. }
+            | Modal::Choice { .. }
+            | Modal::Confirm { .. }
+            | Modal::Connection { .. }
+            | Modal::About
+            | Modal::Bulk { .. } => None,
+        }
+    }
+
+    pub fn game_picker_mut(&mut self) -> Option<&mut GamePicker> {
+        match self {
+            Modal::TitleId { form, .. } => Some(&mut form.picker),
+            Modal::UploadTarget { form, .. } => Some(&mut form.picker),
+            Modal::Message { .. }
+            | Modal::Choice { .. }
+            | Modal::Confirm { .. }
+            | Modal::Connection { .. }
+            | Modal::About
+            | Modal::Bulk { .. } => None,
+        }
+    }
+
+    /// Fills the dialog's ID boxes with the picked game's IDs: TitleID and DatabaseID, or the TitleID alone.
+    pub fn take_game_ids(&mut self, ids: &GameIds) {
+        match self {
+            Modal::TitleId { form, .. } => form.edit(ids.title_id.as_str()),
+            Modal::UploadTarget { form, .. } => {
+                form.edit_title_id(ids.title_id.as_str());
+                form.edit_database_id(ids.database_id.as_str());
+            }
+            Modal::Message { .. }
+            | Modal::Choice { .. }
+            | Modal::Confirm { .. }
+            | Modal::Connection { .. }
+            | Modal::About
+            | Modal::Bulk { .. } => {
+                log::error!("A game was picked in a dialog that asks for no IDs");
+            }
+        }
+    }
 }
 
 /// How the user closed a modal.

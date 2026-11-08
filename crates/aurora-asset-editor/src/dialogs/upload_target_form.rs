@@ -2,12 +2,15 @@ use aurora_console::{GameIds, HexId, IdError};
 
 use crate::text::filter_hex_input;
 
+use super::GamePicker;
+
 /// The "Save all assets to console" dialog's two boxes. Edits are filtered like the old ID boxes, and OK needs
-/// eight hex digits in both.
+/// eight hex digits in both. The picker below them fills both with a listed game's IDs.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct UploadTargetForm {
     pub title_id: String,
     pub database_id: String,
+    pub picker: GamePicker,
 }
 
 impl UploadTargetForm {

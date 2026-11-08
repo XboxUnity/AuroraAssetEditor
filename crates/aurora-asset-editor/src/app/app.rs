@@ -117,6 +117,13 @@ impl App {
         if self.form_not_ready(answer) {
             return;
         }
+        // The upload waits for the console, which the dialog's own list refresh may hold: the dialog stays open.
+        if answer == ModalAnswer::Accept
+            && matches!(self.modals.current(), Some(Modal::UploadTarget { .. }))
+            && self.refuse_console_transfer()
+        {
+            return;
+        }
         if answer == ModalAnswer::Accept
             && matches!(self.modals.current(), Some(Modal::Connection { .. }))
         {

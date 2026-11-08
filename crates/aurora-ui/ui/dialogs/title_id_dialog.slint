@@ -3,10 +3,13 @@ import { DialogModel } from "../model/dialog_model.slint";
 import { PillButton } from "../controls/pill_button.slint";
 import { TextField } from "../controls/text_field.slint";
 import { DialogFrame } from "dialog_frame.slint";
+import { GamePicker } from "game_picker.slint";
 
-// The Save all TitleID prompt: the label above one box, OK once the box holds a whole TitleID.
+// The Save all TitleID prompt: the label above one box, typed or filled from the console's games, OK once the
+// box holds a whole TitleID.
 export component TitleIdDialog inherits DialogFrame {
     title: DialogModel.title;
+    card-width: DialogModel.picker-shown ? Theme.picker-dialog-width : Theme.dialog-width;
 
     first-has-focus: title-id-field.has-focus;
     last-has-focus: cancel-button.has-focus;
@@ -36,6 +39,12 @@ export component TitleIdDialog inherits DialogFrame {
             edited(text) => {
                 DialogModel.edit-field(0, text);
             }
+            accepted => {
+                root.submit();
+            }
+        }
+
+        if DialogModel.picker-shown: game-picker := GamePicker {
             accepted => {
                 root.submit();
             }

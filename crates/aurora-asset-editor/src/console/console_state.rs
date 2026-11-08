@@ -54,6 +54,10 @@ impl ConsoleState {
         generation
     }
 
+    pub fn is_refreshing(&self) -> bool {
+        self.running_refresh.is_some()
+    }
+
     pub(crate) fn finish_refresh(&mut self) {
         self.running_refresh = None;
     }

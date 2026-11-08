@@ -1,7 +1,7 @@
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
-use aurora_ui::{ConsoleModel, EditorModel, MainWindow, OnlineModel};
+use aurora_ui::{ConsoleModel, DialogModel, EditorModel, MainWindow, OnlineModel};
 use slint::{ComponentHandle, Timer};
 
 use crate::app::App;
@@ -14,7 +14,9 @@ use super::editor_view::{EditorPictures, connect_editor, render_editor};
 use super::online_view::{OnlinePictures, connect_online, render_online};
 use super::preview_view::connect_previews;
 use super::shell_view::{Refresh, connect_shell, render_shell};
-use super::{GameRows, ImageCache, OnlineImageCache, Previews, ResultTiles, ScreenshotTiles};
+use super::{
+    GameRows, ImageCache, OnlineImageCache, PickerRows, Previews, ResultTiles, ScreenshotTiles,
+};
 
 /// The window: it shows what `App` holds and turns the window's callbacks into `App` calls.
 pub struct MainWindowView {
@@ -28,6 +30,7 @@ pub struct MainWindowView {
     screenshot_tiles: Rc<RefCell<ScreenshotTiles>>,
     result_tiles: Rc<RefCell<ResultTiles>>,
     game_rows: Rc<RefCell<GameRows>>,
+    picker_rows: Rc<RefCell<PickerRows>>,
 }
 
 impl MainWindowView {
@@ -43,6 +46,10 @@ impl MainWindowView {
             .set_tiles(result_tiles.model());
         let game_rows = GameRows::default();
         window.global::<ConsoleModel>().set_rows(game_rows.model());
+        let picker_rows = PickerRows::default();
+        window
+            .global::<DialogModel>()
+            .set_picker_games(picker_rows.model());
         MainWindowView {
             window,
             system_theme: Rc::new(Cell::new(SystemTheme::default())),
@@ -53,6 +60,7 @@ impl MainWindowView {
             screenshot_tiles: Rc::new(RefCell::new(screenshot_tiles)),
             result_tiles: Rc::new(RefCell::new(result_tiles)),
             game_rows: Rc::new(RefCell::new(game_rows)),
+            picker_rows: Rc::new(RefCell::new(picker_rows)),
         }
     }
 
@@ -84,6 +92,7 @@ impl MainWindowView {
         let screenshot_tiles = Rc::clone(&self.screenshot_tiles);
         let result_tiles = Rc::clone(&self.result_tiles);
         let game_rows = Rc::clone(&self.game_rows);
+        let picker_rows = Rc::clone(&self.picker_rows);
         let refresh: Refresh = Rc::new(move |app: &App| {
             if let Some(window) = weak_window.upgrade() {
                 let caches = Caches {
@@ -93,6 +102,7 @@ impl MainWindowView {
                     screenshot_tiles: &mut screenshot_tiles.borrow_mut(),
                     result_tiles: &mut result_tiles.borrow_mut(),
                     game_rows: &mut game_rows.borrow_mut(),
+                    picker_rows: &mut picker_rows.borrow_mut(),
                 };
                 render_window(&window, app, system_theme.get(), caches);
             }
@@ -119,6 +129,7 @@ impl MainWindowView {
             screenshot_tiles: &mut self.screenshot_tiles.borrow_mut(),
             result_tiles: &mut self.result_tiles.borrow_mut(),
             game_rows: &mut self.game_rows.borrow_mut(),
+            picker_rows: &mut self.picker_rows.borrow_mut(),
         };
         render_window(&self.window, app, self.system_theme.get(), caches);
     }
@@ -132,6 +143,7 @@ struct Caches<'a> {
     screenshot_tiles: &'a mut ScreenshotTiles,
     result_tiles: &'a mut ResultTiles,
     game_rows: &'a mut GameRows,
+    picker_rows: &'a mut PickerRows,
 }
 
 fn render_window(window: &MainWindow, app: &App, system_theme: SystemTheme, caches: Caches<'_>) {
@@ -148,5 +160,5 @@ fn render_window(window: &MainWindow, app: &App, system_theme: SystemTheme, cach
     render_online(window, app, &mut online_pictures, caches.result_tiles);
     caches.previews.forget_unshown();
     render_console(window, app, caches.game_rows);
-    render_dialogs(window, app);
+    render_dialogs(window, app, caches.picker_rows);
 }

@@ -145,6 +145,10 @@ export global Theme {
     out property <color> danger-text: #ffffff;
     out property <length> dialog-width: 360px;
     out property <length> connection-dialog-width: 420px;
+    // A dialog with a game picker is wide enough for the table's Title, TitleID, DatabaseID and Disc columns.
+    out property <length> picker-dialog-width: 440px;
+    // The picker's column header and six games, inside its border.
+    out property <length> picker-list-height: 7 * table-row-height + 3 * border-width;
     out property <length> about-dialog-width: 520px;
     // What the About card keeps for its title, padding and OK row, and for a margin to the window's edges, when its
     // body scrolls to fit the window. Small enough that a CI build's card, which has one more line, fits the default

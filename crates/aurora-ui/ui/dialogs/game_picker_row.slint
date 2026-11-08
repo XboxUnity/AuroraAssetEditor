@@ -1,0 +1,60 @@
+import { PickerGameView } from "../model/picker_game_view.slint";
+import { Theme } from "../theme/theme.slint";
+
+// One game of the picker's list, in the columns of the console's table.
+export component GamePickerRow inherits Rectangle {
+    in property <PickerGameView> view;
+    callback clicked();
+
+    property <color> foreground: view.highlighted ? Theme.text-strong : Theme.text;
+
+    height: Theme.table-row-height;
+    background: view.highlighted ? Theme.chip-background : touch.has-hover ? Theme.pill-background : transparent;
+    accessible-role: list-item;
+    accessible-label: view.title;
+    accessible-item-selected: view.highlighted;
+    accessible-action-default => {
+        root.clicked();
+    }
+
+    HorizontalLayout {
+        padding-left: Theme.table-cell-padding-x;
+        padding-right: Theme.table-cell-padding-x;
+        spacing: 2 * Theme.table-cell-padding-x;
+        Text {
+            horizontal-stretch: 1;
+            text: view.title;
+            color: foreground;
+            font-size: Theme.caption-font-size;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+        Text {
+            width: Theme.table-id-column-width - 2 * Theme.table-cell-padding-x;
+            text: view.title-id;
+            color: foreground;
+            font-size: Theme.caption-font-size;
+            vertical-alignment: center;
+        }
+        Text {
+            width: Theme.table-id-column-width - 2 * Theme.table-cell-padding-x;
+            text: view.database-id;
+            color: foreground;
+            font-size: Theme.caption-font-size;
+            vertical-alignment: center;
+        }
+        Text {
+            width: Theme.table-disc-column-width - 2 * Theme.table-cell-padding-x;
+            text: view.disc;
+            color: foreground;
+            font-size: Theme.caption-font-size;
+            vertical-alignment: center;
+        }
+    }
+
+    touch := TouchArea {
+        clicked => {
+            root.clicked();
+        }
+    }
+}

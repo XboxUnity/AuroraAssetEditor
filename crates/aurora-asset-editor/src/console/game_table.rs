@@ -121,9 +121,21 @@ impl GameTable {
         self.presence.insert(ids.clone(), cell);
     }
 
+    /// Every game in the sorted order, the filter left out: the list an ID dialog picks from.
+    pub fn sorted_games(&self) -> Vec<&Game> {
+        self.sorted_indices(|_| true)
+            .into_iter()
+            .map(|index| &self.games[index])
+            .collect()
+    }
+
     fn visible_indices(&self) -> Vec<usize> {
+        self.sorted_indices(|game| self.filter.matches(game))
+    }
+
+    fn sorted_indices(&self, keep: impl Fn(&Game) -> bool) -> Vec<usize> {
         let mut indices: Vec<usize> = (0..self.games.len())
-            .filter(|index| self.filter.matches(&self.games[*index]))
+            .filter(|index| keep(&self.games[*index]))
             .collect();
         if let Some((column, ascending)) = self.sort {
             indices.sort_by(|first, second| {

@@ -1,35 +1,48 @@
 use aurora_asset_editor::app::{KindChoice, Page};
-use aurora_asset_editor::dialogs::{ModalAnswer, ModalField};
+use aurora_asset_editor::dialogs::ModalAnswer;
 use aurora_asset_editor::settings::ThemeChoice;
 use aurora_console::{BulkEntry, BulkFailure, BulkOutcome, BulkReport, ConsoleError, Game};
 use editor_test_support::{AppHarness, Scene, Screen, ScreenArea};
+use slint::platform::Key;
 
-use crate::sample_content::{
-    SampleAsset, console_harness, halo_3, load_asset_file, sample_asset_bytes, sample_games,
-};
+use crate::sample_content::{console_harness, sample_games};
 use crate::staged_outcomes::{
-    answer_connection_test, finish_bulk, refresh_fails, sample_revision, show_games,
+    answer_connection_test, fail_running_refresh, finish_bulk, refresh_fails, sample_revision,
+    show_games,
 };
 
-const COVER_FILE: &str = "GC4D5307E6.asset";
 /// The sample game Halo 3, the current game of the catalogue.
 const HALO_3_ROW: usize = 0;
 const BULK_FINISHED_GAMES: usize = 4;
 /// The code a console answers a wrong username or password with.
 const LOGIN_REJECTED_CODE: u32 = 530;
+const PICKER_FILTER: &str = "GamePicker::filter-field";
+/// Part of the TitleIDs of Fable II, Gears of War 2 and Forza Motorsport 3.
+const TITLE_ID_FILTER: &str = "4D5308";
+const HALO_FILTER: &str = "halo";
 
 pub const CONSOLE_DIALOGS: ScreenArea = ScreenArea {
     title: "Console dialogs",
     screens: &[
         Screen {
-            name: "dialog-upload-target",
-            description: "\"Save all assets to console\" with both ID boxes empty and OK disabled, opened with no game selected.",
-            stage: stage_upload_target,
+            name: "dialog-upload-target-loading",
+            description: "\"Save all assets to console\" opened with no game selected while it lists the console's games: \"Refreshing the game list…\" in the picker, both ID boxes empty, OK disabled.",
+            stage: stage_upload_target_loading,
+        },
+        Screen {
+            name: "dialog-upload-target-filtered",
+            description: "\"Save all assets to console\" over the listed sample games with 4D5308 typed in the picker: the three games whose TitleID holds it, the first highlighted.",
+            stage: stage_upload_target_filtered,
         },
         Screen {
             name: "dialog-upload-target-filled",
-            description: "\"Save all assets to console\" opened with no game selected, Halo 3's TitleID and DatabaseID typed in: OK enabled.",
+            description: "\"Save all assets to console\" after Return picked Halo 3, the match of halo typed in the picker: its TitleID and DatabaseID in the boxes, OK enabled.",
             stage: stage_upload_target_filled,
+        },
+        Screen {
+            name: "dialog-upload-target-manual",
+            description: "\"Save all assets to console\" after listing the console's games failed: only the ID boxes, the error in the status line; the \"Connection failed\" dialog waits behind it.",
+            stage: stage_upload_target_manual,
         },
         Screen {
             name: "dialog-remove-confirm",
@@ -107,26 +120,37 @@ fn start_with_connection_dialog(theme: ThemeChoice) -> Scene {
     scene
 }
 
-fn stage_upload_target(theme: ThemeChoice) -> Scene {
+/// The dialog opens without a current game: with one, Save all to console asks nothing.
+fn stage_upload_target_loading(theme: ThemeChoice) -> Scene {
     let scene = Scene::start(console_harness(), theme);
     scene.act(|app| app.save_all_to_console());
     scene
 }
 
-/// With a current game Save all to console asks nothing, so the dialog opens without one and the IDs are
-/// typed in.
+/// The upload-target dialog over the listed sample games, `filter` typed in its picker.
+fn upload_target_with_filter(theme: ThemeChoice, filter: &str) -> Scene {
+    let scene = start_with_games(theme, sample_games());
+    scene.act(|app| app.save_all_to_console());
+    scene.click(PICKER_FILTER);
+    scene.type_text(filter);
+    scene
+}
+
+fn stage_upload_target_filtered(theme: ThemeChoice) -> Scene {
+    upload_target_with_filter(theme, TITLE_ID_FILTER)
+}
+
 fn stage_upload_target_filled(theme: ThemeChoice) -> Scene {
-    let mut scene = Scene::start(console_harness(), theme);
-    load_asset_file(
-        &mut scene,
-        COVER_FILE,
-        &sample_asset_bytes(SampleAsset::Cover),
-    );
-    let ids = halo_3().ids;
+    let scene = upload_target_with_filter(theme, HALO_FILTER);
+    scene.press(Key::Return);
+    scene
+}
+
+fn stage_upload_target_manual(theme: ThemeChoice) -> Scene {
+    let scene = start_console(theme);
     scene.act(|app| {
         app.save_all_to_console();
-        app.edit_modal_field(ModalField::UploadTitleId, ids.title_id.as_str());
-        app.edit_modal_field(ModalField::UploadDatabaseId, ids.database_id.as_str());
+        fail_running_refresh(app, login_rejected());
     });
     scene
 }

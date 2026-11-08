@@ -1,21 +1,24 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use aurora_console::Game;
 use aurora_online::CoverSource;
-use aurora_ui::{ChoiceView, DialogKind, DialogModel, MainWindow};
+use aurora_ui::{ChoiceView, DialogKind, DialogModel, MainWindow, PickerGameView};
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 
 use crate::about::{BuildInfo, notices_text};
-use crate::app::{ABOUT_TITLE, App, BULK_TITLE};
+use crate::app::{ABOUT_TITLE, App, BULK_TITLE, PickerContent, REFRESHING_TEXT};
 use crate::dialogs::{BulkForm, ChoiceId, ConnectionForm, Modal, ModalAnswer, ModalField};
 use crate::status::Severity;
 
+use super::PickerRows;
 use super::shell_view::{Refresh, action_runner};
 
 /// The choice dialog draws a button for each of the app's choices, at most two (Icon or Banner, Replace or
 /// Add to free slots).
 const CHOICE_BUTTONS: usize = 2;
 const CONNECTION_TITLE: &str = "Console connection";
+const NO_ROW: i32 = -1;
 const APP_NAME: &str = "Aurora Asset Editor";
 const ABOUT_CREDITS: &str = "by Swizzy, thanks to MaesterRowen";
 const BULK_SOURCES: [CoverSource; 2] = [CoverSource::XboxUnity, CoverSource::InternetArchive];
@@ -58,6 +61,24 @@ pub(super) fn connect_dialogs(window: &MainWindow, app: &Rc<RefCell<App>>, refre
     });
 
     let act = action_runner(app, refresh);
+    dialog.on_edit_picker_filter(move |text| act(&mut |app| app.edit_picker_filter(&text)));
+
+    let act = action_runner(app, refresh);
+    dialog.on_move_picker_highlight(move |step| {
+        let step = isize::try_from(step).unwrap_or_default();
+        act(&mut |app| app.move_picker_highlight(step));
+    });
+
+    let act = action_runner(app, refresh);
+    dialog.on_pick_game(move |index| match usize::try_from(index) {
+        Ok(index) => act(&mut |app| app.pick_game(index)),
+        Err(_) => log::error!("The window picked game {index}, which the picker does not list"),
+    });
+
+    let act = action_runner(app, refresh);
+    dialog.on_pick_highlighted_game(move || act(&mut |app| app.pick_highlighted_game()));
+
+    let act = action_runner(app, refresh);
     dialog.on_test_connection(move || act(&mut |app| app.test_connection()));
 
     let act = action_runner(app, refresh);
@@ -86,7 +107,7 @@ pub(super) fn connect_dialogs(window: &MainWindow, app: &Rc<RefCell<App>>, refre
     dialog.on_open_log_folder(move || act(&mut |app| app.open_log_folder()));
 }
 
-pub(super) fn render_dialogs(window: &MainWindow, app: &App) {
+pub(super) fn render_dialogs(window: &MainWindow, app: &App, picker_rows: &mut PickerRows) {
     let content = DialogContent::of(app.modal(), app.build_info());
     let dialog = window.global::<DialogModel>();
     dialog.set_kind(content.kind);
@@ -111,6 +132,49 @@ pub(super) fn render_dialogs(window: &MainWindow, app: &App) {
     dialog.set_about_notices_expanded(app.about_notices_expanded());
     dialog.set_about_copied(app.about_copied());
     set_about_notices(&dialog, app.about_notices_expanded());
+    render_game_picker(&dialog, app, picker_rows);
+}
+
+/// The ID dialogs' list of the console's games: the matches of the filter, or a note while they are listed.
+fn render_game_picker(dialog: &DialogModel<'_>, app: &App, rows: &mut PickerRows) {
+    let filter = app
+        .modal()
+        .and_then(Modal::game_picker)
+        .map(|picker| picker.filter.as_str())
+        .unwrap_or_default();
+    dialog.set_picker_filter(filter.into());
+    let content = app.game_picker_content();
+    dialog.set_picker_shown(content.is_some());
+    let (games, highlighted, note) = match content {
+        None => (Vec::new(), None, ""),
+        Some(PickerContent::Loading) => (Vec::new(), None, REFRESHING_TEXT),
+        Some(PickerContent::Games {
+            matches,
+            highlighted,
+        }) => (picker_games(&matches, highlighted), highlighted, ""),
+    };
+    rows.show(games, Clone::clone);
+    dialog.set_picker_highlighted(highlighted.map_or(NO_ROW, row_number));
+    dialog.set_picker_note(note.into());
+}
+
+/// The picker's rows, the IDs as eight hex digits as in the console's table.
+fn picker_games(matches: &[&Game], highlighted: Option<usize>) -> Vec<PickerGameView> {
+    matches
+        .iter()
+        .enumerate()
+        .map(|(row, game)| PickerGameView {
+            title: game.title_name.as_str().into(),
+            title_id: game.ids.title_id.to_string().into(),
+            database_id: game.ids.database_id.to_string().into(),
+            disc: game.disc.to_string().into(),
+            highlighted: highlighted == Some(row),
+        })
+        .collect()
+}
+
+fn row_number(index: usize) -> i32 {
+    i32::try_from(index).unwrap_or(i32::MAX)
 }
 
 /// The notices are unpacked and handed to the window only while they are expanded.

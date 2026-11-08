@@ -47,7 +47,8 @@ impl App {
         }
     }
 
-    /// The Save menu's "Save all locally…": asks for the TitleID, then the folder.
+    /// The Save menu's "Save all locally…": asks for the TitleID, typed or picked from the console's games,
+    /// then the folder.
     pub fn save_all_locally(&mut self) {
         if self.refuse_save_while_busy() {
             return;
@@ -62,6 +63,7 @@ impl App {
             label: SAVE_ALL_LABEL.to_owned(),
             form: TitleIdForm::new(&prefill),
         });
+        self.load_games_for_picker();
     }
 
     /// OK of the TitleID prompt.

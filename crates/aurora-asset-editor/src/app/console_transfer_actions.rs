@@ -124,7 +124,7 @@ impl App {
     }
 
     /// The Save menu's "Save all to console…": uploads the pages that have content to the current game
-    /// straight away; without one, it first asks which game.
+    /// straight away; without one, it first asks which game, typed or picked from the console's games.
     pub fn save_all_to_console(&mut self) {
         if self.save_to_console_disabled_reason().is_some() {
             self.status = StatusLine::info(NO_CONSOLE_TEXT);
@@ -138,10 +138,13 @@ impl App {
                 let ids = game.ids.clone();
                 self.save_all_to(ids);
             }
-            None => self.modals.push(Modal::UploadTarget {
-                title: UPLOAD_TARGET_TITLE.to_owned(),
-                form: UploadTargetForm::new(),
-            }),
+            None => {
+                self.modals.push(Modal::UploadTarget {
+                    title: UPLOAD_TARGET_TITLE.to_owned(),
+                    form: UploadTargetForm::new(),
+                });
+                self.load_games_for_picker();
+            }
         }
     }
 
@@ -200,7 +203,7 @@ impl App {
     }
 
     /// An upload reads the pages, so it waits for whatever writes them as well as for the console.
-    fn refuse_console_transfer(&mut self) -> bool {
+    pub(super) fn refuse_console_transfer(&mut self) -> bool {
         if !self.locks().console_editor_writes {
             return false;
         }

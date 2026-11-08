@@ -1,5 +1,6 @@
 import { ChoiceView } from "choice_view.slint";
 import { DialogKind } from "dialog_kind.slint";
+import { PickerGameView } from "picker_game_view.slint";
 
 export global DialogModel {
     in property <DialogKind> kind: DialogKind.none;
@@ -11,6 +12,14 @@ export global DialogModel {
     // The form's boxes in the order the dialog draws them; each edit comes back through `edit-field`.
     in property <[string]> fields;
     in property <bool> accept-enabled;
+    // The ID dialogs' list of the console's games; hidden while no console is set up or it listed none.
+    in property <bool> picker-shown;
+    in property <string> picker-filter;
+    in property <[PickerGameView]> picker-games;
+    // An index into `picker-games`, -1 for none.
+    in property <int> picker-highlighted;
+    // Shown in place of the games while they are listed; empty otherwise.
+    in property <string> picker-note;
     in property <string> test-status;
     in property <bool> test-status-is-error;
     // 0 XboxUnity, 1 Internet Archive.
@@ -32,6 +41,12 @@ export global DialogModel {
     // The index into `choices`.
     callback choose(int);
     callback edit-field(int, string);
+    callback edit-picker-filter(string);
+    // Up and Down in the picker's box; Rust stops the highlight at the first and last game.
+    callback move-picker-highlight(int);
+    // The index into `picker-games`.
+    callback pick-game(int);
+    callback pick-highlighted-game();
     callback test-connection();
     callback set-bulk-source(int);
     callback set-bulk-replace(bool);

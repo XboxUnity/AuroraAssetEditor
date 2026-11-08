@@ -81,6 +81,15 @@ fn harness_with_empty_console() -> (AppHarness, FakeConsole) {
     (harness, console)
 }
 
+/// A console that lists the games of the typical sample database, which a refresh can read.
+fn harness_with_listed_console() -> (AppHarness, FakeConsole) {
+    let content_db = std::fs::read(typical_db_path()).expect("the sample database is readable");
+    let console = FakeConsole::with_aurora_layout(FakeConsoleConfig::default(), &content_db);
+    let mut harness = AppHarness::new();
+    harness.with_console(&console);
+    (harness, console)
+}
+
 fn select_halo(harness: &mut AppHarness) {
     harness.app().set_current_game(Some(CurrentGame {
         title: GAME_TITLE.to_owned(),
@@ -404,7 +413,7 @@ fn save_all_to_console_needs_console_setup() {
 
 #[test]
 fn save_all_to_console_uploads_only_kinds_with_content() {
-    let (mut harness, console) = harness_with_empty_console();
+    let (mut harness, console) = harness_with_listed_console();
     let typed = ids("4d5307e6", "0000001a");
     console.add_dir(&asset_folder(&typed));
     let mut cover = cover_file(10);
@@ -412,6 +421,8 @@ fn save_all_to_console_uploads_only_kinds_with_content() {
     let page_bytes = harness.app().page_bytes(AssetKind::Cover);
 
     harness.app().save_all_to_console();
+    // The dialog lists the console's games first; OK waits for the console meanwhile.
+    harness.run_jobs();
     harness
         .app()
         .edit_modal_field(ModalField::UploadTitleId, "4d5307e6");

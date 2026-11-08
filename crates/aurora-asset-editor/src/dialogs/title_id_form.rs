@@ -2,16 +2,21 @@ use aurora_console::{HexId, IdError};
 
 use crate::text::filter_hex_input;
 
+use super::GamePicker;
+
 /// The Save All dialog's text box. Edits are filtered like the old TitleID boxes, and OK needs all eight digits.
+/// The picker below it fills the box with a listed game's TitleID.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TitleIdForm {
     pub title_id: String,
+    pub picker: GamePicker,
 }
 
 impl TitleIdForm {
     pub fn new(prefill: &str) -> TitleIdForm {
         TitleIdForm {
             title_id: filter_hex_input(prefill),
+            picker: GamePicker::default(),
         }
     }
 

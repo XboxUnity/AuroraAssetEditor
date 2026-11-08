@@ -1,0 +1,160 @@
+import { ListView } from "std-widgets.slint";
+import { TextField } from "../controls/text_field.slint";
+import { DialogModel } from "../model/dialog_model.slint";
+import { Theme } from "../theme/theme.slint";
+import { GamePickerRow } from "game_picker_row.slint";
+
+// The console's games in a dialog that asks for IDs: a box that filters them by title or TitleID, and the
+// matches below it. A click on a game, or Return on the highlighted one, fills the dialog's ID boxes; Up and
+// Down in the box move the highlight. Return with nothing highlighted is the dialog's own Return.
+export component GamePicker inherits VerticalLayout {
+    out property <bool> has-focus: filter-field.has-focus;
+    callback accepted();
+
+    property <int> highlighted-row: DialogModel.picker-highlighted;
+    property <length> list-content-y: list.content-y;
+    // As in the console's table: a far jump can leave the row cut off, so the scroll is done once more.
+    property <bool> reveal-pending;
+
+    changed highlighted-row => {
+        reveal-pending = reveal-highlighted-row();
+    }
+    changed list-content-y => {
+        if reveal-pending {
+            reveal-pending = false;
+            reveal-highlighted-row();
+        }
+    }
+
+    // Scrolls the least distance that shows the whole highlighted row; true when it scrolled.
+    function reveal-highlighted-row() -> bool {
+        if highlighted-row < 0 {
+            return false;
+        }
+        let top = highlighted-row * Theme.table-row-height;
+        let bottom = top + Theme.table-row-height;
+        if top < -list.content-y {
+            list.content-y = -top;
+            return true;
+        }
+        if bottom > -list.content-y + list.height {
+            list.content-y = list.height - bottom;
+            return true;
+        }
+        false
+    }
+
+    spacing: Theme.dialog-row-gap;
+
+    keys := FocusScope {
+        height: Theme.pill-height;
+        focus-on-tab-navigation: false;
+        capture-key-pressed(event) => {
+            if !filter-field.has-focus {
+                return reject;
+            }
+            if event.text == Key.UpArrow {
+                DialogModel.move-picker-highlight(-1);
+                return accept;
+            }
+            if event.text == Key.DownArrow {
+                DialogModel.move-picker-highlight(1);
+                return accept;
+            }
+            reject
+        }
+
+        filter-field := TextField {
+            value: DialogModel.picker-filter;
+            placeholder: "Filter title or TitleID";
+            edited(text) => {
+                DialogModel.edit-picker-filter(text);
+            }
+            accepted => {
+                if DialogModel.picker-highlighted >= 0 {
+                    DialogModel.pick-highlighted-game();
+                } else {
+                    root.accepted();
+                }
+            }
+        }
+    }
+
+    list-frame := Rectangle {
+        height: Theme.picker-list-height;
+        border-width: Theme.border-width;
+        border-color: Theme.field-border;
+        border-radius: Theme.pill-radius;
+        background: Theme.field-background;
+        clip: true;
+
+        VerticalLayout {
+            padding: Theme.border-width;
+
+            HorizontalLayout {
+                height: Theme.table-row-height;
+                padding-left: Theme.table-cell-padding-x;
+                padding-right: Theme.table-cell-padding-x;
+                spacing: 2 * Theme.table-cell-padding-x;
+                Text {
+                    horizontal-stretch: 1;
+                    text: "Title";
+                    color: Theme.text-muted;
+                    font-size: Theme.caption-font-size;
+                    vertical-alignment: center;
+                }
+                Text {
+                    width: Theme.table-id-column-width - 2 * Theme.table-cell-padding-x;
+                    text: "TitleID";
+                    color: Theme.text-muted;
+                    font-size: Theme.caption-font-size;
+                    vertical-alignment: center;
+                }
+                Text {
+                    width: Theme.table-id-column-width - 2 * Theme.table-cell-padding-x;
+                    text: "DatabaseID";
+                    color: Theme.text-muted;
+                    font-size: Theme.caption-font-size;
+                    vertical-alignment: center;
+                }
+                Text {
+                    width: Theme.table-disc-column-width - 2 * Theme.table-cell-padding-x;
+                    text: "Disc";
+                    color: Theme.text-muted;
+                    font-size: Theme.caption-font-size;
+                    vertical-alignment: center;
+                }
+            }
+
+            Rectangle {
+                height: Theme.border-width;
+                background: Theme.border;
+            }
+
+            Rectangle {
+                vertical-stretch: 1;
+                accessible-role: AccessibleRole.list;
+                accessible-label: "Games";
+
+                list := ListView {
+                    visible: DialogModel.picker-note == "";
+                    for game[index] in DialogModel.picker-games: GamePickerRow {
+                        view: game;
+                        clicked => {
+                            DialogModel.pick-game(index);
+                        }
+                    }
+                }
+
+                // While the list loads, it says so in place of the games.
+                if DialogModel.picker-note != "": picker-note := Text {
+                    text: DialogModel.picker-note;
+                    color: Theme.text-muted;
+                    font-size: Theme.caption-font-size;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+        }
+    }
+}

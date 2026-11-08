@@ -6,9 +6,11 @@ use aurora_asset_editor::settings::ThemeChoice;
 use editor_test_support::{AppHarness, Scene, Screen, ScreenArea};
 
 use crate::sample_content::{
-    SampleAsset, fsd_with_screenshots, halo_3, load_asset_file, png_file, sample_art,
-    sample_asset_bytes, sample_screenshots_bytes, text_file, undecodable_entry_asset,
+    SampleAsset, console_harness, fsd_with_screenshots, halo_3, load_asset_file, png_file,
+    sample_art, sample_asset_bytes, sample_games, sample_screenshots_bytes, text_file,
+    undecodable_entry_asset,
 };
+use crate::staged_outcomes::show_games;
 
 const MISSING_FILE: &str = "missing-file.asset";
 const NOTES_FILE: &str = "notes.asset";
@@ -31,6 +33,9 @@ const ALL_TWENTY: [u8; 20] = [
 const FSD_SCREENSHOTS: usize = 3;
 const TYPED_TITLE_ID: &str = "4D5";
 const DIALOG_SERVICE_FAILURE: &str = "the file dialog service is not running";
+const PICKER_FILTER: &str = "GamePicker::filter-field";
+/// Part of the titles Gears of War 2 and Perfect Dark.
+const TITLE_FILTER: &str = "ar";
 
 pub const EDITOR_DIALOGS: ScreenArea = ScreenArea {
     title: "Editor dialogs",
@@ -82,13 +87,23 @@ pub const EDITOR_DIALOGS: ScreenArea = ScreenArea {
         },
         Screen {
             name: "dialog-save-all",
-            description: "\"Save all assets\" with the current game's TitleID, 4D5307E6, prefilled.",
+            description: "\"Save all assets\" with the current game's TitleID, 4D5307E6, prefilled; no console is set up, so there is no game picker.",
             stage: stage_save_all,
         },
         Screen {
             name: "dialog-save-all-invalid",
             description: "\"Save all assets\" with the incomplete TitleID 4D5 typed: OK is disabled.",
             stage: stage_save_all_invalid,
+        },
+        Screen {
+            name: "dialog-save-all-loading",
+            description: "\"Save all assets\" with the console set up and its games not listed yet: the prefilled TitleID 4D5307E6 above \"Refreshing the game list…\" in the picker.",
+            stage: stage_save_all_loading,
+        },
+        Screen {
+            name: "dialog-save-all-filtered",
+            description: "\"Save all assets\" over the listed sample games with ar typed in the picker: Gears of War 2 and Perfect Dark, the first highlighted; the TitleID box still holds 4D5307E6.",
+            stage: stage_save_all_filtered,
         },
         Screen {
             name: "dialog-file-dialog-failed",
@@ -213,6 +228,28 @@ fn stage_save_all(theme: ThemeChoice) -> Scene {
 fn stage_save_all_invalid(theme: ThemeChoice) -> Scene {
     let scene = stage_save_all(theme);
     scene.type_text(TYPED_TITLE_ID);
+    scene
+}
+
+/// Save all with Halo 3 selected and the console set up, its games not listed yet.
+fn stage_save_all_loading(theme: ThemeChoice) -> Scene {
+    let scene = Scene::start(console_harness(), theme);
+    scene.act(|app| {
+        app.set_current_game(Some(halo_3()));
+        app.save_all_locally();
+    });
+    scene
+}
+
+fn stage_save_all_filtered(theme: ThemeChoice) -> Scene {
+    let scene = Scene::start(console_harness(), theme);
+    scene.act(|app| {
+        show_games(app, sample_games());
+        app.set_current_game(Some(halo_3()));
+        app.save_all_locally();
+    });
+    scene.click(PICKER_FILTER);
+    scene.type_text(TITLE_FILTER);
     scene
 }
 

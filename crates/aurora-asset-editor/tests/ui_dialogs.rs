@@ -182,6 +182,18 @@ fn show_games(app: &mut App, games: Vec<Game>) {
     }));
 }
 
+/// Answers the refresh an ID dialog started with `games`, as a console would.
+fn answer_listing(app: &mut App, games: Vec<Game>) {
+    let generation = app.console().refresh_generation();
+    app.on_job_outcome(JobOutcome::Console(ConsoleOutcome::Refreshed {
+        generation,
+        result: Ok(GameListing {
+            games,
+            cleanup_error: None,
+        }),
+    }));
+}
+
 fn png(folder: &Path, name: &str) -> PathBuf {
     let path = folder.join(name);
     RgbaImage::from_pixel(64, 64, Rgba([200, 30, 30, 255]))
@@ -404,6 +416,8 @@ fn ok_disabled_until_ids_valid() {
     assert_eq!(ui.fields(), ["4d5307e6", "12345678"]);
     assert!(ui.enabled(ok));
 
+    // OK waits for the console, which lists its games for the dialog's picker.
+    ui.act(|app| answer_listing(app, Vec::new()));
     ui.press(Key::Return);
     assert_eq!(ui.app.borrow().modal(), None, "Return sends once OK works");
 }
@@ -910,4 +924,52 @@ fn frame_return_accepts_only_while_accept_is_enabled() {
     dialog.set_accept_enabled(true);
     press(Key::Return);
     assert_eq!(accepted.get(), 1, "Return accepts once it is enabled");
+}
+
+fn picker_titles(ui: &Ui) -> Vec<String> {
+    ui.dialog()
+        .get_picker_games()
+        .iter()
+        .map(|game| game.title.to_string())
+        .collect()
+}
+
+/// The picker's row for the game titled `title`.
+fn picker_row(ui: &Ui, title: &str) -> ElementHandle {
+    ElementHandle::find_by_accessible_label(ui.view.window(), title)
+        .find(|element| element.accessible_role() == Some(AccessibleRole::ListItem))
+        .unwrap_or_else(|| panic!("the picker lists {title}"))
+}
+
+#[test]
+fn the_game_picker_filters_as_typed_and_picks_by_arrows_return_and_click() {
+    let mut harness = console_harness(ThemeChoice::Dark);
+    let ui = Ui::start(&mut harness);
+    ui.act(|app| app.save_all_to_console());
+    assert!(ui.dialog().get_picker_shown());
+    assert_eq!(ui.dialog().get_picker_note(), "Refreshing the game list…");
+
+    ui.act(|app| answer_listing(app, two_games()));
+    assert_eq!(ui.dialog().get_picker_note(), "");
+    ui.click("GamePicker::filter-field");
+    ui.type_text("4d53");
+    assert_eq!(picker_titles(&ui), ["Halo 3", "Fable"]);
+    assert_eq!(ui.dialog().get_picker_highlighted(), 0);
+
+    ui.press(Key::DownArrow);
+    assert_eq!(ui.dialog().get_picker_highlighted(), 1);
+    ui.press(Key::Return);
+    assert_eq!(ui.fields(), ["4D5307E7", "00000013"]);
+    assert_eq!(ui.dialog().get_picker_highlighted(), -1);
+
+    picker_row(&ui, "Halo 3").mock_single_click(PointerEventButton::Left);
+    assert_eq!(ui.fields(), ["4D5307E6", "00000012"]);
+
+    ui.click("GamePicker::filter-field");
+    ui.press(Key::Return);
+    assert_eq!(
+        ui.app.borrow().modal(),
+        None,
+        "with nothing highlighted, Return is OK"
+    );
 }

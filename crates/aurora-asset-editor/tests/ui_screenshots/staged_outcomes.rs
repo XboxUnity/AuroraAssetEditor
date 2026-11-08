@@ -83,6 +83,11 @@ pub fn show_games(app: &mut App, games: Vec<Game>) {
 /// A refresh that fails before Aurora answers, so the link stays as it was.
 pub fn refresh_fails(app: &mut App, error: ConsoleError) {
     app.refresh_games();
+    fail_running_refresh(app, error);
+}
+
+/// Ends the refresh that runs, one an ID dialog started, with `error` before Aurora answers.
+pub fn fail_running_refresh(app: &mut App, error: ConsoleError) {
     let generation = app.console().refresh_generation();
     app.on_job_outcome(JobOutcome::Console(ConsoleOutcome::Refreshed {
         generation,
