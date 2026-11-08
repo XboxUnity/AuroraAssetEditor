@@ -1,7 +1,7 @@
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
-use aurora_ui::{EditorModel, MainWindow, OnlineModel};
+use aurora_ui::{ConsoleModel, EditorModel, MainWindow, OnlineModel};
 use slint::ComponentHandle;
 
 use crate::app::App;
@@ -12,7 +12,7 @@ use super::dialog_view::{connect_dialogs, render_dialogs};
 use super::editor_view::{connect_editor, render_editor};
 use super::online_view::{connect_online, render_online};
 use super::shell_view::{Refresh, connect_shell, render_shell};
-use super::{ImageCache, OnlineImageCache, ResultTiles, ScreenshotTiles};
+use super::{GameRows, ImageCache, OnlineImageCache, ResultTiles, ScreenshotTiles};
 
 /// The window: it shows what `App` holds and turns the window's callbacks into `App` calls.
 pub struct MainWindowView {
@@ -22,6 +22,7 @@ pub struct MainWindowView {
     online_images: Rc<RefCell<OnlineImageCache>>,
     screenshot_tiles: Rc<RefCell<ScreenshotTiles>>,
     result_tiles: Rc<RefCell<ResultTiles>>,
+    game_rows: Rc<RefCell<GameRows>>,
 }
 
 impl MainWindowView {
@@ -34,6 +35,8 @@ impl MainWindowView {
         window
             .global::<OnlineModel>()
             .set_tiles(result_tiles.model());
+        let game_rows = GameRows::default();
+        window.global::<ConsoleModel>().set_rows(game_rows.model());
         MainWindowView {
             window,
             system_theme: Rc::new(Cell::new(SystemTheme::default())),
@@ -41,6 +44,7 @@ impl MainWindowView {
             online_images: Rc::new(RefCell::new(OnlineImageCache::default())),
             screenshot_tiles: Rc::new(RefCell::new(screenshot_tiles)),
             result_tiles: Rc::new(RefCell::new(result_tiles)),
+            game_rows: Rc::new(RefCell::new(game_rows)),
         }
     }
 
@@ -65,6 +69,7 @@ impl MainWindowView {
         let online_images = Rc::clone(&self.online_images);
         let screenshot_tiles = Rc::clone(&self.screenshot_tiles);
         let result_tiles = Rc::clone(&self.result_tiles);
+        let game_rows = Rc::clone(&self.game_rows);
         let refresh: Refresh = Rc::new(move |app: &App| {
             if let Some(window) = weak_window.upgrade() {
                 let caches = Caches {
@@ -72,6 +77,7 @@ impl MainWindowView {
                     online: &mut online_images.borrow_mut(),
                     screenshot_tiles: &mut screenshot_tiles.borrow_mut(),
                     result_tiles: &mut result_tiles.borrow_mut(),
+                    game_rows: &mut game_rows.borrow_mut(),
                 };
                 render_window(&window, app, system_theme.get(), caches);
             }
@@ -89,6 +95,7 @@ impl MainWindowView {
             online: &mut self.online_images.borrow_mut(),
             screenshot_tiles: &mut self.screenshot_tiles.borrow_mut(),
             result_tiles: &mut self.result_tiles.borrow_mut(),
+            game_rows: &mut self.game_rows.borrow_mut(),
         };
         render_window(&self.window, app, self.system_theme.get(), caches);
     }
@@ -100,12 +107,13 @@ struct Caches<'a> {
     online: &'a mut OnlineImageCache,
     screenshot_tiles: &'a mut ScreenshotTiles,
     result_tiles: &'a mut ResultTiles,
+    game_rows: &'a mut GameRows,
 }
 
 fn render_window(window: &MainWindow, app: &App, system_theme: SystemTheme, caches: Caches<'_>) {
     render_shell(window, app, system_theme);
     render_editor(window, app, caches.editor, caches.screenshot_tiles);
     render_online(window, app, caches.online, caches.result_tiles);
-    render_console(window, app);
+    render_console(window, app, caches.game_rows);
     render_dialogs(window, app);
 }

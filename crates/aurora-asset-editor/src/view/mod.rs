@@ -1,6 +1,7 @@
 mod console_view;
 mod dialog_view;
 mod editor_view;
+mod game_rows;
 mod image_cache;
 mod kept_rows;
 mod main_window_view;
@@ -10,6 +11,7 @@ mod result_tiles;
 mod screenshot_tiles;
 mod shell_view;
 
+pub use game_rows::GameRows;
 pub use image_cache::ImageCache;
 pub use kept_rows::KeptRows;
 pub use main_window_view::MainWindowView;

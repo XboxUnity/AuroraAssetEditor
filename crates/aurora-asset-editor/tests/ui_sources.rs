@@ -922,6 +922,34 @@ fn clicking_a_header_sorts_and_a_row_selects() {
 }
 
 #[test]
+fn a_render_that_changes_the_row_count_keeps_a_click_on_a_row() {
+    let mut harness = console_harness(ThemeChoice::Dark);
+    let ui = Ui::start(&mut harness);
+    ui.act(|app| show_games(app, mixed_games()));
+    let row = ui.labelled_in("banana", "ConsolePage::game-table");
+    let (position, size) = (row.absolute_position(), row.size());
+    let centre = slint::LogicalPosition::new(
+        position.x + size.width / 2.0,
+        position.y + size.height / 2.0,
+    );
+    let window = ui.view.window().window();
+    window.dispatch_event(WindowEvent::PointerMoved { position: centre });
+    window.dispatch_event(WindowEvent::PointerPressed {
+        position: centre,
+        button: PointerEventButton::Left,
+    });
+    // The first row stays, the two after it go.
+    ui.act(|app| app.set_game_filter("an", ""));
+    assert_eq!(ui.row_titles(), ["banana"]);
+    window.dispatch_event(WindowEvent::PointerReleased {
+        position: centre,
+        button: PointerEventButton::Left,
+    });
+
+    assert_eq!(ui.console().get_selected_row(), 0, "the row was selected");
+}
+
+#[test]
 fn filters_from_the_two_boxes_are_anded() {
     let mut harness = console_harness(ThemeChoice::Dark);
     let ui = Ui::start(&mut harness);

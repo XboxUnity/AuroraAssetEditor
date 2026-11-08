@@ -4,11 +4,12 @@ use std::rc::Rc;
 use aurora_asset::AssetKind;
 use aurora_console::{FtpSettings, Game};
 use aurora_ui::{ConsoleModel, GameRowView, KindMarks, MainWindow};
-use slint::{ComponentHandle, Model, ModelRc, VecModel};
+use slint::ComponentHandle;
 
 use crate::app::{App, Menu};
 use crate::console::{ConsoleLink, ConsoleState, GameColumn, PresenceCell};
 
+use super::GameRows;
 use super::shell_view::{Refresh, action_runner};
 
 const NOT_SET_UP_TEXT: &str = "Not set up";
@@ -83,7 +84,7 @@ pub(super) fn connect_console(window: &MainWindow, app: &Rc<RefCell<App>>, refre
     console.on_select_last(move || act(&mut |app| app.select_last_game()));
 }
 
-pub(super) fn render_console(window: &MainWindow, app: &App) {
+pub(super) fn render_console(window: &MainWindow, app: &App, rows: &mut GameRows) {
     let model = window.global::<ConsoleModel>();
     let console = app.console();
     model.set_chip_text(chip_text(console.settings.as_ref()).into());
@@ -95,7 +96,7 @@ pub(super) fn render_console(window: &MainWindow, app: &App) {
 
     let visible = console.table.visible();
     let selected_row = console.table.selected_visible_row();
-    update_rows(&model, game_rows(console, &visible, selected_row));
+    rows.show(game_rows(console, &visible, selected_row), Clone::clone);
     model.set_selected_row(selected_row.map_or(NO_ROW, row_number));
     model.set_has_selection(selected_row.is_some());
 
@@ -153,24 +154,6 @@ fn game_rows(
             selected: selected_row == Some(row),
         })
         .collect()
-}
-
-/// Changes only the rows that differ. A new model would make the ListView rebuild its rows and lose the
-/// part of a row it was scrolled by.
-fn update_rows(model: &ConsoleModel, rows: Vec<GameRowView>) {
-    let current = model.get_rows();
-    let same_length = current.row_count() == rows.len();
-    match current.as_any().downcast_ref::<VecModel<GameRowView>>() {
-        Some(shown) if same_length => {
-            for (index, row) in rows.into_iter().enumerate() {
-                if shown.row_data(index).as_ref() != Some(&row) {
-                    shown.set_row_data(index, row);
-                }
-            }
-        }
-        Some(shown) => shown.set_vec(rows),
-        None => model.set_rows(ModelRc::new(VecModel::from(rows))),
-    }
 }
 
 fn kind_marks(cell: PresenceCell) -> KindMarks {
