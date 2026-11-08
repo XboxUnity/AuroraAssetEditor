@@ -47,6 +47,7 @@ const SELECTION_OUTLINE: image::Rgba<u8> = image::Rgba([0x3b, 0x82, 0xf6, 0xff])
 const DARK_WINDOW_BACKGROUND: image::Rgba<u8> = image::Rgba([0x1b, 0x1d, 0x22, 0xff]);
 /// From the tile's edge: the selection outline covers 3 and 4 px out, the gap 1 and 2 px out.
 const OUTLINE_PROBE: f32 = 3.0;
+const OUTLINE_REACH: f32 = 4.0;
 const GAP_PROBE: f32 = 1.0;
 const THEMES: [(ThemeChoice, &str); 2] =
     [(ThemeChoice::Dark, "dark"), (ThemeChoice::Light, "light")];
@@ -399,6 +400,11 @@ fn the_selected_result_is_outlined_outside_its_picture() {
         pixel(middle_x, top - GAP_PROBE),
         DARK_WINDOW_BACKGROUND,
         "top gap"
+    );
+    assert_eq!(
+        pixel(left - OUTLINE_REACH, top - OUTLINE_REACH),
+        SELECTION_OUTLINE,
+        "the outline around a picture has square corners"
     );
     // The left half: the tick sits at the top right.
     let picture_columns = left as u32..middle_x as u32;

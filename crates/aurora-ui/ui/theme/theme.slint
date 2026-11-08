@@ -94,6 +94,9 @@ export global Theme {
     out property <length> body-gap: 8px;
     out property <length> header-gap: 6px;
     out property <length> slot-radius: 6px;
+    // A tile or slot showing a picture, and its outlines, keep square corners: the software renderer does not
+    // round a picture's corners, so they would poke out past a rounded edge.
+    out property <length> picture-radius: 0px;
     out property <length> slot-dash-length: 4px;
     out property <length> slot-dash-gap: 3px;
     out property <length> slot-content-padding: 12px;

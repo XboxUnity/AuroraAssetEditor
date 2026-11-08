@@ -65,7 +65,7 @@ export component OnlinePage inherits VerticalLayout {
             alignment: start;
             if OnlineModel.selected >= 0: preview := Rectangle {
                 height: self.width * Theme.result-aspect;
-                border-radius: Theme.slot-radius;
+                border-radius: OnlineModel.selected-has-image ? Theme.picture-radius : Theme.slot-radius;
                 border-width: Theme.border-width;
                 border-color: Theme.slot-filled-border;
                 background: Theme.slot-filled-gradient;

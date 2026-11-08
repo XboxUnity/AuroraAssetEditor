@@ -13,8 +13,9 @@ export component DropSlot inherits Rectangle {
     in property <bool> highlighted;
 
     property <bool> filled: has-image || unsupported;
+    property <length> radius: has-image ? Theme.picture-radius : Theme.slot-radius;
 
-    border-radius: Theme.slot-radius;
+    border-radius: radius;
     background: filled ? Theme.slot-filled-gradient : Theme.slot-background;
     border-width: filled ? Theme.border-width : 0;
     border-color: Theme.slot-filled-border;
@@ -69,7 +70,7 @@ export component DropSlot inherits Rectangle {
 
     // Drawn last and wider than a filled slot's border, so it shows over a preview too.
     if highlighted: drop-highlight := Rectangle {
-        border-radius: Theme.slot-radius;
+        border-radius: radius;
         border-width: Theme.drop-highlight-width;
         border-color: Theme.slot-filled-border;
     }

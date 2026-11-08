@@ -16,10 +16,12 @@ export component ScreenshotThumb inherits Rectangle {
 
     property <bool> dragging;
     property <bool> enabled: !ShellModel.editor-locked;
+    // A filled position whose texture the editor cannot show has no picture.
+    property <bool> shows-picture: tile.filled && tile.image.width > 0;
 
     width: Theme.thumb-width;
     height: Theme.thumb-height;
-    border-radius: Theme.slot-radius;
+    border-radius: shows-picture ? Theme.picture-radius : Theme.slot-radius;
     background: tile.filled ? Theme.slot-filled-gradient : Theme.slot-background;
     border-width: tile.filled ? Theme.border-width : 0;
     border-color: Theme.slot-filled-border;
@@ -79,7 +81,7 @@ export component ScreenshotThumb inherits Rectangle {
         height: parent.height + 2 * Theme.thumb-selected-outline-width;
         border-width: Theme.thumb-selected-outline-width;
         border-color: Theme.thumb-selected-outline;
-        border-radius: Theme.slot-radius + Theme.thumb-selected-outline-width;
+        border-radius: shows-picture ? Theme.picture-radius : Theme.slot-radius + Theme.thumb-selected-outline-width;
     }
 
     TouchArea {

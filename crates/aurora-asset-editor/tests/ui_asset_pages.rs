@@ -20,6 +20,9 @@ const LIGHT_SLOT_BACKGROUND: Rgba<u8> = Rgba([0xff, 0xff, 0xff, 0xff]);
 const DARK_WINDOW_BACKGROUND: Rgba<u8> = Rgba([0x1b, 0x1d, 0x22, 0xff]);
 const LIGHT_WINDOW_BACKGROUND: Rgba<u8> = Rgba([0xf5, 0xf6, 0xf8, 0xff]);
 const SLOT_FILLED_BORDER: Rgba<u8> = Rgba([0x3b, 0x82, 0xf6, 0xff]);
+const DARK_THUMB_SELECTED_OUTLINE: Rgba<u8> = Rgba([0xff, 0xff, 0xff, 0xff]);
+/// The selected thumbnail's 2 px outline starts this far outside the thumbnail.
+const THUMB_OUTLINE_REACH: f32 = 2.0;
 const RED: Rgba<u8> = Rgba([255, 0, 0, 255]);
 const GREEN: Rgba<u8> = Rgba([0, 255, 0, 255]);
 const BLUE: Rgba<u8> = Rgba([0, 0, 255, 255]);
@@ -649,6 +652,51 @@ fn drop_hover_highlights_filled_slots_on_every_asset_page() {
             );
         }
     }
+}
+
+#[test]
+fn picture_tiles_have_square_corners() {
+    let mut harness = harness_with_theme(ThemeChoice::Dark);
+    let ui = Ui::start(&mut harness);
+    ui.act(|app| app.show_page(Page::Cover));
+    let empty_slot = ui.element("ImagePanel::slot");
+    assert_ne!(
+        pixel_at(&ui.snapshot(), empty_slot.absolute_position()),
+        SLOT_FILLED_BORDER,
+        "an empty slot keeps its rounded corners"
+    );
+
+    load_cover(&mut harness, RED);
+    load_screenshots(&mut harness, &[(1, GREEN), (2, BLUE)]);
+    ui.render();
+    let cover_slot = ui.element("ImagePanel::slot");
+    assert_eq!(
+        pixel_at(&ui.snapshot(), cover_slot.absolute_position()),
+        SLOT_FILLED_BORDER,
+        "the cover slot's border reaches its corner"
+    );
+
+    ui.act(|app| app.show_page(Page::Screenshots));
+    let snapshot = ui.snapshot();
+    let preview_slot = ui.element("ImagePanel::slot");
+    assert_eq!(
+        pixel_at(&snapshot, preview_slot.absolute_position()),
+        SLOT_FILLED_BORDER,
+        "the screenshot slot's border reaches its corner"
+    );
+    let thumb = ui
+        .thumb("Screenshot 1")
+        .expect("the first thumbnail is shown");
+    let corner = thumb.absolute_position();
+    let outline_corner = LogicalPosition::new(
+        corner.x - THUMB_OUTLINE_REACH,
+        corner.y - THUMB_OUTLINE_REACH,
+    );
+    assert_eq!(
+        pixel_at(&snapshot, outline_corner),
+        DARK_THUMB_SELECTED_OUTLINE,
+        "the selected thumbnail's outline reaches its corner"
+    );
 }
 
 #[test]
