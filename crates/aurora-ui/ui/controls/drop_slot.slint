@@ -13,7 +13,7 @@ export component DropSlot inherits Rectangle {
 
     border-radius: Theme.slot-radius;
     background: filled ? Theme.slot-filled-gradient : Theme.slot-background;
-    border-width: filled || highlighted ? Theme.border-width : 0;
+    border-width: filled ? Theme.border-width : 0;
     border-color: Theme.slot-filled-border;
 
     if !filled && !highlighted: DashedBorder {
@@ -61,5 +61,12 @@ export component DropSlot inherits Rectangle {
             horizontal-alignment: center;
             overflow: elide;
         }
+    }
+
+    // Drawn last and wider than a filled slot's border, so it shows over a preview too.
+    if highlighted: drop-highlight := Rectangle {
+        border-radius: Theme.slot-radius;
+        border-width: Theme.drop-highlight-width;
+        border-color: Theme.slot-filled-border;
     }
 }

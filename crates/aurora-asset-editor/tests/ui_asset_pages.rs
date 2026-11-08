@@ -32,6 +32,8 @@ const TILED_FLAG: u8 = 0x80;
 const MIN_ART_SHARE: f32 = 0.1;
 /// Inside the slot, clear of the dashed outline and the rounded corner.
 const SLOT_INSET: f32 = 8.0;
+/// The second pixel column of a slot: past a filled slot's 1 px border, inside the 2 px drop highlight.
+const DROP_HIGHLIGHT_PROBE: f32 = 1.0;
 const ASSET_PAGES: [Page; 4] = [
     Page::Cover,
     Page::Background,
@@ -582,6 +584,40 @@ fn drop_hover_highlights_page() {
     ui.act(|app| app.set_drop_hover(true));
     assert!(ui.model().get_drop_hover());
     assert_eq!(pixel_at(&ui.snapshot(), top_edge), SLOT_FILLED_BORDER);
+}
+
+#[test]
+fn drop_hover_highlights_filled_slots_on_every_asset_page() {
+    let mut harness = harness_with_theme(ThemeChoice::Dark);
+    load_every_asset_page(&mut harness);
+    let ui = Ui::start(&mut harness);
+    for page in ASSET_PAGES {
+        ui.act(|app| {
+            app.show_page(page);
+            app.set_drop_hover(false);
+        });
+        let idle = ui.snapshot();
+        ui.act(|app| app.set_drop_hover(true));
+        let hovered = ui.snapshot();
+        for slot in ui.elements("ImagePanel::slot") {
+            // Inside the filled slot's own 1 px border, where the preview starts. The left edge, because the
+            // Icon & Banner page's second slot starts half a pixel down.
+            let inside_border = LogicalPosition::new(
+                slot.absolute_position().x + DROP_HIGHLIGHT_PROBE,
+                centre(&slot).y,
+            );
+            assert_ne!(
+                pixel_at(&idle, inside_border),
+                SLOT_FILLED_BORDER,
+                "{page:?}: no highlight before the drag"
+            );
+            assert_eq!(
+                pixel_at(&hovered, inside_border),
+                SLOT_FILLED_BORDER,
+                "{page:?}: the highlight shows over the preview"
+            );
+        }
+    }
 }
 
 #[test]
