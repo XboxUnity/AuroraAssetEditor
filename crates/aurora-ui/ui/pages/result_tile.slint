@@ -5,14 +5,12 @@ import { PreviewArea } from "../model/preview_area.slint";
 import { ResultTileView } from "../model/result_tile_view.slint";
 import { Theme } from "../theme/theme.slint";
 
-// One result of the Online grid: the thumbnail, or the label until it has loaded.
-export component ResultTile inherits Rectangle {
+// One result of the Online grid: the thumbnail, or the label until it has loaded. The selection is an
+// outline in the gap around the tile, so it never covers the picture.
+export component ResultTile {
     in property <ResultTileView> view;
     callback clicked();
 
-    border-radius: Theme.slot-radius;
-    clip: true;
-    background: view.selected ? Theme.slot-filled-gradient : Theme.slot-background;
     accessible-role: button;
     accessible-label: view.label;
     accessible-checkable: true;
@@ -21,45 +19,54 @@ export component ResultTile inherits Rectangle {
         clicked();
     }
 
-    if view.has-image: thumbnail := PreviewImage {
-        width: 100%;
-        height: 100%;
-        area: PreviewArea.result;
-        source: view.image;
-    }
-
-    if !view.has-image: VerticalLayout {
-        padding: Theme.result-label-padding;
-        alignment: center;
-        if !view.failed: label := Text {
-            text: view.label;
-            color: view.selected ? Theme.chip-text : Theme.text-muted;
-            font-size: Theme.caption-font-size;
-            horizontal-alignment: center;
-            wrap: word-wrap;
-            overflow: elide;
-        }
-        if view.failed: failed-text := Text {
-            text: "Failed to load image";
-            // The error colour is too faint on the selected gradient, so the failure reads like the label there.
-            color: view.selected ? Theme.chip-text : Theme.error-text;
-            font-size: Theme.caption-font-size;
-            horizontal-alignment: center;
-            wrap: word-wrap;
-        }
-    }
-
-    if !view.selected && !view.has-image: DashedBorder {
-        width: 100%;
-        height: 100%;
-        dash-color: Theme.slot-border;
-    }
-
-    if view.selected: Rectangle {
+    tile := Rectangle {
         width: 100%;
         height: 100%;
         border-radius: Theme.slot-radius;
-        border-width: Theme.border-width;
+        clip: true;
+        background: view.selected ? Theme.slot-filled-gradient : Theme.slot-background;
+
+        if view.has-image: thumbnail := PreviewImage {
+            width: 100%;
+            height: 100%;
+            area: PreviewArea.result;
+            source: view.image;
+        }
+
+        if !view.has-image: VerticalLayout {
+            padding: Theme.result-label-padding;
+            alignment: center;
+            if !view.failed: label := Text {
+                text: view.label;
+                color: view.selected ? Theme.chip-text : Theme.text-muted;
+                font-size: Theme.caption-font-size;
+                horizontal-alignment: center;
+                wrap: word-wrap;
+                overflow: elide;
+            }
+            if view.failed: failed-text := Text {
+                text: "Failed to load image";
+                // The error colour is too faint on the selected gradient, so the failure reads like the label there.
+                color: view.selected ? Theme.chip-text : Theme.error-text;
+                font-size: Theme.caption-font-size;
+                horizontal-alignment: center;
+                wrap: word-wrap;
+            }
+        }
+
+        if !view.selected && !view.has-image: DashedBorder {
+            width: 100%;
+            height: 100%;
+            dash-color: Theme.slot-border;
+        }
+    }
+
+    if view.selected: selection-outline := Rectangle {
+        x: -Theme.result-selection-reach;
+        y: -Theme.result-selection-reach;
+        width: parent.width + 2 * Theme.result-selection-reach;
+        height: parent.height + 2 * Theme.result-selection-reach;
+        border-width: Theme.result-selection-width;
         border-color: Theme.slot-filled-border;
     }
 

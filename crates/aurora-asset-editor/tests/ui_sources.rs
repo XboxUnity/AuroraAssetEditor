@@ -43,6 +43,11 @@ const MIN_TEXT_CONTRAST: f64 = 4.5;
 const TEXT_BAND_HALF_HEIGHT: f32 = 6.0;
 /// Inside an element's left edge, clear of its border and of its text.
 const BACKGROUND_PROBE_INSET: f32 = 3.0;
+const SELECTION_OUTLINE: image::Rgba<u8> = image::Rgba([0x3b, 0x82, 0xf6, 0xff]);
+const DARK_WINDOW_BACKGROUND: image::Rgba<u8> = image::Rgba([0x1b, 0x1d, 0x22, 0xff]);
+/// From the tile's edge: the selection outline covers 3 and 4 px out, the gap 1 and 2 px out.
+const OUTLINE_PROBE: f32 = 3.0;
+const GAP_PROBE: f32 = 1.0;
 const THEMES: [(ThemeChoice, &str); 2] =
     [(ThemeChoice::Dark, "dark"), (ThemeChoice::Light, "light")];
 
@@ -347,6 +352,63 @@ fn image_failures_are_readable_on_the_selected_background() {
             assert!(
                 contrast >= MIN_TEXT_CONTRAST,
                 "{name}: the failure on the selected {place} has contrast {contrast:.2}"
+            );
+        }
+    }
+}
+
+#[test]
+fn the_selected_result_is_outlined_outside_its_picture() {
+    let server = online_server();
+    let mut harness = online_harness(&server, ThemeChoice::Dark);
+    let ui = Ui::start(&mut harness);
+    ui.act(|app| {
+        app.edit_search_text(RESULTS_TITLE);
+        app.search_online();
+    });
+    harness.run_jobs();
+    ui.render();
+    let first = ui.online().get_tiles().row_data(0).expect("a result").label;
+    let before = ui.snapshot();
+
+    ui.click_label_in(&first, "OnlinePage::result-grid");
+    ui.render();
+    let after = ui.snapshot();
+
+    let tile = ui.labelled_in(&first, "OnlinePage::result-grid");
+    let (position, size) = (tile.absolute_position(), tile.size());
+    let (left, top) = (position.x, position.y);
+    let (middle_x, middle_y) = (left + size.width / 2.0, top + size.height / 2.0);
+    let pixel = |x: f32, y: f32| *after.get_pixel(x as u32, y as u32);
+    assert_eq!(
+        pixel(left - OUTLINE_PROBE, middle_y),
+        SELECTION_OUTLINE,
+        "left"
+    );
+    assert_eq!(
+        pixel(middle_x, top - OUTLINE_PROBE),
+        SELECTION_OUTLINE,
+        "top"
+    );
+    assert_eq!(
+        pixel(left - GAP_PROBE, middle_y),
+        DARK_WINDOW_BACKGROUND,
+        "left gap"
+    );
+    assert_eq!(
+        pixel(middle_x, top - GAP_PROBE),
+        DARK_WINDOW_BACKGROUND,
+        "top gap"
+    );
+    // The left half: the tick sits at the top right.
+    let picture_columns = left as u32..middle_x as u32;
+    let picture_rows = top as u32..(top + size.height) as u32;
+    for y in picture_rows {
+        for x in picture_columns.clone() {
+            assert_eq!(
+                after.get_pixel(x, y),
+                before.get_pixel(x, y),
+                "the picture changed at {x}, {y}"
             );
         }
     }

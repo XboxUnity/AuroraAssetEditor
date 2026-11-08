@@ -3,9 +3,11 @@ import { OnlineModel } from "../model/online_model.slint";
 import { Theme } from "../theme/theme.slint";
 import { ResultTile } from "result_tile.slint";
 
-// The Online results, three to a row at the cover's 900:600, scrolling when they do not fit.
+// The Online results, three to a row at the cover's 900:600, scrolling when they do not fit. The rows keep a
+// margin as wide as the selection outline's reach, so the scroll area does not cut it off.
 export component ResultGrid inherits Rectangle {
-    property <length> tile-width: (scroll.visible-width - (Theme.result-columns - 1) * Theme.result-gap) / Theme.result-columns;
+    property <length> inset: Theme.result-selection-reach;
+    property <length> tile-width: (scroll.visible-width - 2 * inset - (Theme.result-columns - 1) * Theme.result-gap) / Theme.result-columns;
     property <length> tile-height: tile-width * Theme.result-aspect;
     property <int> row-count: ceil(OnlineModel.tiles.length / Theme.result-columns);
 
@@ -24,11 +26,11 @@ export component ResultGrid inherits Rectangle {
         width: 100%;
         height: 100%;
         content-width: self.visible-width;
-        content-height: max(0, row-count * (tile-height + Theme.result-gap) - Theme.result-gap);
+        content-height: max(0, row-count * (tile-height + Theme.result-gap) - Theme.result-gap) + 2 * inset;
 
         for tile[index] in OnlineModel.tiles: ResultTile {
-            x: mod(index, Theme.result-columns) * (tile-width + Theme.result-gap);
-            y: floor(index / Theme.result-columns) * (tile-height + Theme.result-gap);
+            x: inset + mod(index, Theme.result-columns) * (tile-width + Theme.result-gap);
+            y: inset + floor(index / Theme.result-columns) * (tile-height + Theme.result-gap);
             width: tile-width;
             height: tile-height;
             view: tile;
