@@ -15,7 +15,6 @@ pub const TEST_ASSETS_VARIABLE: &str = "AURORA_TEST_ASSETS";
 const GAME_DATA_FOLDER: &str = "GameData";
 const DATABASES_FOLDER: &str = "DataBases";
 const CONTENT_DB_FILE_NAME: &str = "content.db";
-const CONTENT_DB_PART: &str = "DataBases/content.db";
 
 /// The user's real Aurora assets, pulled from a console into a folder kept outside the
 /// repository. Only the README screenshots read them; the tests use generated art.
@@ -26,25 +25,31 @@ pub struct TestAssets {
 
 impl TestAssets {
     pub fn from_environment() -> Result<TestAssets, TestAssetsError> {
-        TestAssets::from_value(std::env::var(TEST_ASSETS_VARIABLE).ok().as_deref())
+        match std::env::var_os(TEST_ASSETS_VARIABLE) {
+            Some(value) if !value.is_empty() => TestAssets::from_folder(PathBuf::from(value)),
+            _ => Err(TestAssetsError::NotSet),
+        }
     }
 
     /// An unset or empty `value` is `NotSet`. Every missing part is collected before failing, so
     /// one message lists them all.
     pub fn from_value(value: Option<&str>) -> Result<TestAssets, TestAssetsError> {
-        let folder = match value {
-            Some(value) if !value.is_empty() => PathBuf::from(value),
-            _ => return Err(TestAssetsError::NotSet),
-        };
+        match value {
+            Some(value) if !value.is_empty() => TestAssets::from_folder(PathBuf::from(value)),
+            _ => Err(TestAssetsError::NotSet),
+        }
+    }
+
+    fn from_folder(folder: PathBuf) -> Result<TestAssets, TestAssetsError> {
         if !folder.is_dir() {
             return Err(TestAssetsError::NotAFolder(folder));
         }
         let mut parts = Vec::new();
         if !folder.join(GAME_DATA_FOLDER).is_dir() {
-            parts.push(GAME_DATA_FOLDER);
+            parts.push(GAME_DATA_FOLDER.to_string());
         }
         if !content_db_path(&folder).is_file() {
-            parts.push(CONTENT_DB_PART);
+            parts.push(format!("{DATABASES_FOLDER}/{CONTENT_DB_FILE_NAME}"));
         }
         if !parts.is_empty() {
             return Err(TestAssetsError::MissingParts { folder, parts });
@@ -72,8 +77,9 @@ impl TestAssets {
     }
 
     pub fn asset_file(&self, ids: &GameIds, kind: AssetKind) -> Result<AssetFile, TestAssetsError> {
-        let bytes = self.asset_bytes(ids, kind)?;
-        AssetFile::parse(&bytes).map_err(|error| unreadable(self.asset_path(ids, kind), &error))
+        let path = self.asset_path(ids, kind);
+        let bytes = fs::read(&path).map_err(|error| unreadable(path.clone(), &error))?;
+        AssetFile::parse(&bytes).map_err(|error| unreadable(path, &error))
     }
 
     pub fn texture(
@@ -149,18 +155,9 @@ fn unreadable(path: PathBuf, reason: &dyn fmt::Display) -> TestAssetsError {
 pub enum TestAssetsError {
     NotSet,
     NotAFolder(PathBuf),
-    MissingParts {
-        folder: PathBuf,
-        parts: Vec<&'static str>,
-    },
-    Unreadable {
-        path: PathBuf,
-        reason: String,
-    },
-    EmptySlot {
-        path: PathBuf,
-        slot: usize,
-    },
+    MissingParts { folder: PathBuf, parts: Vec<String> },
+    Unreadable { path: PathBuf, reason: String },
+    EmptySlot { path: PathBuf, slot: usize },
 }
 
 impl fmt::Display for TestAssetsError {
