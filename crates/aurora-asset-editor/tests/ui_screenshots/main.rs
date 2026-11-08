@@ -1,6 +1,7 @@
 //! Every screen and dialog of the app in both themes, compared pixel for pixel with the approved
 //! references in `fixtures/ui`. `cargo xtask ui-screenshots check|update` runs this target.
 
+mod about_screens;
 mod asset_page_screens;
 mod console_dialog_screens;
 mod console_screens;
@@ -30,6 +31,7 @@ const AREAS: &[ScreenArea] = &[
     console_screens::CONSOLE,
     editor_dialog_screens::EDITOR_DIALOGS,
     console_dialog_screens::CONSOLE_DIALOGS,
+    about_screens::ABOUT,
 ];
 
 /// A screen name starts with what it shows, so a sorted listing of `fixtures/ui` groups related
