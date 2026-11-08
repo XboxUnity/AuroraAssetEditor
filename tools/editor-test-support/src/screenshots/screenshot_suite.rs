@@ -109,10 +109,10 @@ impl ScreenshotSuite {
             .to_owned()
     }
 
-    /// The earlier report and sheet go first and the output folder is prepared next; a failure
-    /// in either stops the run before anything is rendered. Whatever happens after that, the run
-    /// ends by writing the sheet, the text report and the manifest, so a failed run is still a
-    /// baseline for the next one.
+    /// The output folder is prepared first, which moves the earlier run to `previous`; a failure
+    /// stops the run before anything is rendered. Whatever happens after that, the run ends by
+    /// writing the sheet, the text report and the manifest, so a failed run is still a baseline
+    /// for the next one.
     pub fn run(&self, areas: &[ScreenArea]) -> SuiteReport {
         let mut report = SuiteReport {
             folder: self.folders.current(),
@@ -127,12 +127,6 @@ impl ScreenshotSuite {
             problems: Vec::new(),
             sheet: None,
         };
-        if let Err(message) = remove_earlier_results(report.folder.folder()) {
-            report
-                .problems
-                .push(format!("{message}, so nothing was rendered"));
-            return report;
-        }
         let baseline_allowed = self.check_baseline_folder(&mut report);
         match self.folders.start_run() {
             Ok(note) => report.notes.extend(note),
@@ -417,25 +411,6 @@ fn keep_removed_images(baseline: &Baseline, report: &mut SuiteReport) {
         }
         report.removed.push(removed.clone());
     }
-}
-
-/// The earlier report and contact sheet are removed before anything else, so a run that stops
-/// early never leaves either to read as its own. A file that is not there is fine.
-fn remove_earlier_results(folder: &Path) -> Result<(), String> {
-    for file in [REPORT_FILE, CONTACT_SHEET_FILE] {
-        let path = folder.join(file);
-        match fs::remove_file(&path) {
-            Ok(()) => {}
-            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
-            Err(error) => {
-                return Err(format!(
-                    "Could not remove the earlier {}: {error}",
-                    path.display()
-                ));
-            }
-        }
-    }
-    Ok(())
 }
 
 /// A file that is not there is fine; any other failure to remove it is a problem of the run.

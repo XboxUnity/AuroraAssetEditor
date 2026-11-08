@@ -432,52 +432,45 @@ fn output_folder_that_cannot_be_prepared_stops_the_run() {
 }
 
 #[test]
-fn earlier_report_that_cannot_be_removed_stops_the_run() {
+fn previous_run_keeps_its_report_and_sheet() {
     let folders = SuiteFolders::new();
-    let earlier_report = folders.current().join("report.txt");
-    fs::create_dir_all(earlier_report.join("inside"))
-        .expect("a folder in place of report.txt is created");
+    folders.run_labelled("first", None, TWO_SCREENS);
+    let first_report = fs::read_to_string(folders.current().join("report.txt"))
+        .expect("the first run wrote its report");
 
-    let report = folders.run(TWO_SCREENS);
+    let report = folders.run_labelled("second", None, TWO_SCREENS);
 
-    assert!(!report.passed());
-    let named = earlier_report.display().to_string();
-    assert!(
-        has_problem(&report, |problem| problem
-            .contains("Could not remove the earlier")
-            && problem.contains(&named)),
-        "{report}"
-    );
-    assert_eq!(report.images().count(), 0);
-    assert_eq!(report.sheet, None);
-    assert!(
-        earlier_report.join("inside").is_dir(),
-        "the run stopped before the rotation"
+    assert!(report.passed(), "{report}");
+    let previous_sheet = folders.previous().join("index.html");
+    assert!(previous_sheet.is_file(), "the previous run keeps its sheet");
+    let previous_report = fs::read_to_string(folders.previous().join("report.txt"))
+        .expect("the previous run keeps its report");
+    assert_eq!(previous_report, first_report);
+    assert_ne!(
+        fs::read_to_string(folders.current().join("report.txt")).expect("the new report is there"),
+        first_report,
+        "the current report is the second run's own"
     );
 }
 
 #[test]
-fn earlier_sheet_that_cannot_be_removed_stops_the_run() {
+fn unfinished_run_is_deleted_with_its_report_and_sheet() {
     let folders = SuiteFolders::new();
-    let earlier_sheet = folders.current().join("index.html");
-    fs::create_dir_all(earlier_sheet.join("inside"))
-        .expect("a folder in place of index.html is created");
+    let earlier_report = folders.current().join("report.txt");
+    fs::create_dir_all(earlier_report.join("inside"))
+        .expect("a folder in place of report.txt is created");
+    fs::write(folders.current().join("index.html"), "an earlier sheet")
+        .expect("an earlier sheet is written");
 
     let report = folders.run(TWO_SCREENS);
 
-    assert!(!report.passed());
-    let named = earlier_sheet.display().to_string();
-    assert!(
-        has_problem(&report, |problem| problem
-            .contains("Could not remove the earlier")
-            && problem.contains(&named)),
-        "{report}"
-    );
-    assert_eq!(report.images().count(), 0);
-    assert_eq!(report.sheet, None);
-    assert!(
-        earlier_sheet.join("inside").is_dir(),
-        "the run stopped before the rotation"
+    assert!(report.passed(), "{report}");
+    assert!(has_note(&report, "it did not finish"), "{report}");
+    assert!(!folders.previous().exists());
+    assert!(!earlier_report.join("inside").exists());
+    assert_ne!(
+        fs::read_to_string(folders.current().join("index.html")).expect("the new sheet is there"),
+        "an earlier sheet"
     );
 }
 

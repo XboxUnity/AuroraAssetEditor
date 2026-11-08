@@ -2,9 +2,11 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
+use super::contact_sheet::CONTACT_SHEET_FILE;
 use super::path_error::with_path;
 use super::run_folder::{RunFolder, current_platform};
 use super::run_manifest::{MANIFEST_FILE, ManifestError, RunManifest};
+use super::screenshot_suite::REPORT_FILE;
 
 pub const PREVIOUS_FOLDER: &str = "previous";
 
@@ -47,14 +49,21 @@ impl ScreenshotFolders {
     }
 
     /// Makes room for a new run. An earlier finished unfiltered run in the current folder becomes
-    /// the previous run; any other earlier run is deleted, and the returned note says why. The
-    /// current folder is then created empty.
+    /// the previous run, report and sheet included; any other earlier run is deleted, and the
+    /// returned note says why. The current folder is then created empty. When the earlier run
+    /// cannot be moved or deleted, its report and sheet are removed from the current folder, so
+    /// the run that stops here leaves none to read as its own.
     pub fn start_run(&self) -> io::Result<Option<String>> {
         let current = self.current_path();
         let exists = current
             .try_exists()
             .map_err(|error| with_path(&current, error))?;
-        let note = if exists { self.retire(&current)? } else { None };
+        let note = if exists {
+            self.retire(&current)
+                .map_err(|error| remove_earlier_results(&current, error))?
+        } else {
+            None
+        };
         fs::create_dir_all(&current).map_err(|error| with_path(&current, error))?;
         Ok(note)
     }
@@ -106,6 +115,24 @@ impl ScreenshotFolders {
             )
         })
     }
+}
+
+/// `failure`, the reason the earlier run could not be retired, after the earlier report and
+/// sheet were removed from `folder`; a file that cannot be removed is named in the message too.
+fn remove_earlier_results(folder: &Path, failure: io::Error) -> io::Error {
+    let mut message = failure.to_string();
+    for file in [REPORT_FILE, CONTACT_SHEET_FILE] {
+        let path = folder.join(file);
+        match fs::remove_file(&path) {
+            Ok(()) => {}
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(error) => message.push_str(&format!(
+                "; the earlier {} could not be removed either: {error}",
+                path.display()
+            )),
+        }
+    }
+    io::Error::new(failure.kind(), message)
 }
 
 fn remove_folder(folder: &Path) -> io::Result<()> {
