@@ -10,7 +10,9 @@ use aurora_console::{
 };
 use aurora_online::CoverSource;
 
-use super::{AfterDownload, AssetUpload, DownloadScope, KindDownload, TransferReport};
+use super::{
+    AfterDownload, AssetUpload, DownloadScope, KindDownload, TransferReport, UploadPurpose,
+};
 
 /// Work for the console's FTP server, done with `settings`.
 #[derive(Debug)]
@@ -42,6 +44,7 @@ pub enum ConsoleJob {
     Upload {
         ids: GameIds,
         uploads: Vec<AssetUpload>,
+        purpose: UploadPurpose,
     },
     /// Replaces the kinds' files with the empty asset; the first error ends the job.
     Remove {
@@ -112,7 +115,10 @@ pub enum ConsoleOutcome {
         after: AfterDownload,
         results: Vec<KindDownload>,
     },
-    Uploaded(TransferReport),
+    Uploaded {
+        report: TransferReport,
+        purpose: UploadPurpose,
+    },
     Removed(TransferReport),
     Bulk(Result<BulkReport, BulkError>),
 }

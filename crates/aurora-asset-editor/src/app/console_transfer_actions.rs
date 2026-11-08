@@ -9,7 +9,7 @@ use crate::editor::DecodedKind;
 use crate::files::slot_label;
 use crate::jobs::{
     AfterDownload, AssetUpload, ConsoleJob, DownloadScope, JobPriority, KindDownload,
-    TransferReport,
+    TransferReport, UploadPurpose,
 };
 use crate::status::{ConsoleActivity, STATUS_SEPARATOR, StatusLine};
 
@@ -88,7 +88,7 @@ impl App {
             .collect();
         let files = self.page_files(&kinds);
         if empty.is_empty() {
-            self.start_upload(ids, files);
+            self.start_upload(ids, files, UploadPurpose::UploadCurrent);
         } else {
             self.ask_to_upload_empty(ids, files, &empty);
         }
@@ -123,7 +123,8 @@ impl App {
         });
     }
 
-    /// The Save menu's "Save all to console…": asks which game, then uploads the pages that have content.
+    /// The Save menu's "Save all to console…": uploads the pages that have content to the current game
+    /// straight away; without one, it first asks which game.
     pub fn save_all_to_console(&mut self) {
         if self.save_to_console_disabled_reason().is_some() {
             self.status = StatusLine::info(NO_CONSOLE_TEXT);
@@ -132,11 +133,16 @@ impl App {
         if self.refuse_console_transfer() {
             return;
         }
-        let form = UploadTargetForm::new(self.current_game.as_ref().map(|game| &game.ids));
-        self.modals.push(Modal::UploadTarget {
-            title: UPLOAD_TARGET_TITLE.to_owned(),
-            form,
-        });
+        match &self.current_game {
+            Some(game) => {
+                let ids = game.ids.clone();
+                self.save_all_to(ids);
+            }
+            None => self.modals.push(Modal::UploadTarget {
+                title: UPLOAD_TARGET_TITLE.to_owned(),
+                form: UploadTargetForm::new(),
+            }),
+        }
     }
 
     /// OK of the upload target dialog.
@@ -154,6 +160,11 @@ impl App {
         if self.refuse_console_transfer() {
             return;
         }
+        self.save_all_to(ids);
+    }
+
+    /// Uploads the pages that have content to the game with `ids`, the old app's `SaveAllAssetsFtpOnClick`.
+    fn save_all_to(&mut self, ids: GameIds) {
         let kinds_with_content: Vec<AssetKind> = AssetKind::ALL
             .into_iter()
             .filter(|kind| self.pages.get(*kind).has_content())
@@ -163,13 +174,15 @@ impl App {
             return;
         }
         let files = self.page_files(&kinds_with_content);
-        self.start_upload(ids, files);
+        self.start_upload(ids, files, UploadPurpose::SaveAll);
     }
 
     pub(super) fn run_confirmed(&mut self, action: ConfirmedAction) {
         match action {
             ConfirmedAction::RemoveFromConsole { ids, kinds } => self.start_remove(ids, kinds),
-            ConfirmedAction::UploadWithEmpty { ids, files } => self.start_upload(ids, files),
+            ConfirmedAction::UploadWithEmpty { ids, files } => {
+                self.start_upload(ids, files, UploadPurpose::UploadCurrent);
+            }
         }
     }
 
@@ -238,7 +251,7 @@ impl App {
         self.submit_console_job(settings, job, JobPriority::User);
     }
 
-    fn start_upload(&mut self, ids: GameIds, uploads: Vec<AssetUpload>) {
+    fn start_upload(&mut self, ids: GameIds, uploads: Vec<AssetUpload>, purpose: UploadPurpose) {
         let Some(settings) = self.console.settings.clone() else {
             self.status = StatusLine::info(NO_CONSOLE_TEXT);
             return;
@@ -247,7 +260,11 @@ impl App {
             return;
         }
         self.active_work.console = Some(ConsoleActivity::Uploading);
-        let job = ConsoleJob::Upload { ids, uploads };
+        let job = ConsoleJob::Upload {
+            ids,
+            uploads,
+            purpose,
+        };
         self.submit_console_job(settings, job, JobPriority::User);
     }
 
@@ -384,22 +401,26 @@ impl App {
         }
     }
 
-    pub(super) fn apply_uploaded(&mut self, report: TransferReport) {
-        self.apply_transferred(report, "upload", "Uploaded", "to");
+    pub(super) fn apply_uploaded(&mut self, report: TransferReport, purpose: UploadPurpose) {
+        let success = match purpose {
+            UploadPurpose::UploadCurrent => {
+                format!("Uploaded {} to the console", kind_list(&report.done))
+            }
+            UploadPurpose::SaveAll => {
+                saved_to_game_text(report.done.len(), &self.game_label(&report.ids))
+            }
+        };
+        self.apply_transferred(report, "upload", success);
     }
 
     pub(super) fn apply_removed(&mut self, report: TransferReport) {
-        self.apply_transferred(report, "remove", "Removed", "from");
+        let success = format!("Removed {} from the console", kind_list(&report.done));
+        self.apply_transferred(report, "remove", success);
     }
 
-    /// Shows the result and checks the game's assets on the console again, since they changed.
-    fn apply_transferred(
-        &mut self,
-        report: TransferReport,
-        verb: &str,
-        past_tense: &str,
-        preposition: &str,
-    ) {
+    /// Shows the result, `success` when every kind went, and checks the game's assets on the console again,
+    /// since they changed.
+    fn apply_transferred(&mut self, report: TransferReport, verb: &str, success: String) {
         self.active_work.console = None;
         let TransferReport { ids, done, failure } = report;
         if !done.is_empty() {
@@ -419,14 +440,19 @@ impl App {
                     self.report_console_error_noting(&context, &error, &note);
                 }
             }
-            None => {
-                self.status = StatusLine::info(format!(
-                    "{past_tense} {} {preposition} the console",
-                    kind_list(&done)
-                ));
-            }
+            None => self.status = StatusLine::info(success),
         }
     }
+}
+
+/// "Saved 1 asset type to {game}", "Saved {count} asset types to {game}".
+fn saved_to_game_text(count: usize, game: &str) -> String {
+    let asset_types = if count == 1 {
+        "asset type"
+    } else {
+        "asset types"
+    };
+    format!("Saved {count} {asset_types} to {game}")
 }
 
 fn pronoun_for(kind_count: usize) -> &'static str {

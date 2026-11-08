@@ -1,5 +1,5 @@
 use aurora_asset_editor::app::{KindChoice, Page};
-use aurora_asset_editor::dialogs::ModalAnswer;
+use aurora_asset_editor::dialogs::{ModalAnswer, ModalField};
 use aurora_asset_editor::settings::ThemeChoice;
 use aurora_console::{BulkEntry, BulkFailure, BulkOutcome, BulkReport, ConsoleError, Game};
 use editor_test_support::{AppHarness, Scene, Screen, ScreenArea};
@@ -28,7 +28,7 @@ pub const CONSOLE_DIALOGS: ScreenArea = ScreenArea {
         },
         Screen {
             name: "dialog-upload-target-filled",
-            description: "\"Save all assets to console\" with the current game's TitleID and DatabaseID prefilled and OK enabled.",
+            description: "\"Save all assets to console\" opened with no game selected, Halo 3's TitleID and DatabaseID typed in: OK enabled.",
             stage: stage_upload_target_filled,
         },
         Screen {
@@ -113,15 +113,21 @@ fn stage_upload_target(theme: ThemeChoice) -> Scene {
     scene
 }
 
+/// With a current game Save all to console asks nothing, so the dialog opens without one and the IDs are
+/// typed in.
 fn stage_upload_target_filled(theme: ThemeChoice) -> Scene {
     let mut scene = Scene::start(console_harness(), theme);
-    scene.act(|app| app.set_current_game(Some(halo_3())));
     load_asset_file(
         &mut scene,
         COVER_FILE,
         &sample_asset_bytes(SampleAsset::Cover),
     );
-    scene.act(|app| app.save_all_to_console());
+    let ids = halo_3().ids;
+    scene.act(|app| {
+        app.save_all_to_console();
+        app.edit_modal_field(ModalField::UploadTitleId, ids.title_id.as_str());
+        app.edit_modal_field(ModalField::UploadDatabaseId, ids.database_id.as_str());
+    });
     scene
 }
 

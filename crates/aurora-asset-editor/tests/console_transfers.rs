@@ -432,22 +432,77 @@ fn save_all_to_console_uploads_only_kinds_with_content() {
     ] {
         assert_eq!(console.file(&console_path(&typed, kind)), None);
     }
-    assert_eq!(harness.app().status().text, "Uploaded cover to the console");
+    assert_eq!(
+        harness.app().status().text,
+        "Saved 1 asset type to 4d5307e6"
+    );
+    assert_eq!(
+        harness.app().current_game(),
+        None,
+        "the typed game does not become the current game"
+    );
+}
+
+#[test]
+fn save_all_to_console_with_a_selected_game_uploads_straight_away() {
+    let (mut harness, console) = harness_with_empty_console();
+    console.add_dir(&asset_folder(&halo()));
+    load_into_editor(&mut harness, "cover.asset", &mut cover_file(10));
+    load_into_editor(&mut harness, "background.asset", &mut background_file());
+    select_halo(&mut harness);
+    let cover_bytes = harness.app().page_bytes(AssetKind::Cover);
+    let background_bytes = harness.app().page_bytes(AssetKind::Background);
+
+    harness.app().save_all_to_console();
+    assert_eq!(harness.app().modal(), None, "no dialog asks for the game");
+    harness.run_jobs();
+
+    assert_eq!(
+        console.file(&console_path(&halo(), AssetKind::Cover)),
+        Some(cover_bytes)
+    );
+    assert_eq!(
+        console.file(&console_path(&halo(), AssetKind::Background)),
+        Some(background_bytes)
+    );
+    assert_eq!(
+        console.file(&console_path(&halo(), AssetKind::IconBanner)),
+        None
+    );
+    assert_eq!(
+        harness.app().status().text,
+        "Saved 2 asset types to Halo (4D5307E6)"
+    );
+}
+
+#[test]
+fn saving_one_asset_type_to_the_selected_game_says_so_in_the_singular() {
+    let (mut harness, console) = harness_with_empty_console();
+    console.add_dir(&asset_folder(&halo()));
+    load_into_editor(&mut harness, "cover.asset", &mut cover_file(10));
+    select_halo(&mut harness);
+
+    harness.app().save_all_to_console();
+    harness.run_jobs();
+
+    assert_eq!(
+        harness.app().status().text,
+        "Saved 1 asset type to Halo (4D5307E6)"
+    );
 }
 
 #[test]
 fn upload_target_dialog_rules() {
     let (mut harness, _console) = harness_with_empty_console();
-    select_halo(&mut harness);
 
     harness.app().save_all_to_console();
     let app = harness.app();
     let Some(Modal::UploadTarget { title, form }) = app.modal() else {
-        panic!("expected the upload target dialog");
+        panic!("without a selected game, Save all to console asks for the game");
     };
     assert_eq!(title, UPLOAD_TARGET_TITLE);
-    assert_eq!(form.title_id, "4D5307E6");
-    assert_eq!(form.database_id, "00000012");
+    assert_eq!(form.title_id, "");
+    assert_eq!(form.database_id, "");
     drop(app);
 
     harness
@@ -695,13 +750,6 @@ fn partial_upload_failure_names_what_was_sent() {
     let uploading = Cell::new(0);
 
     harness.app().save_all_to_console();
-    harness
-        .app()
-        .edit_modal_field(ModalField::UploadTitleId, "4D5307E6");
-    harness
-        .app()
-        .edit_modal_field(ModalField::UploadDatabaseId, "00000012");
-    harness.app().answer_modal(ModalAnswer::Accept);
     harness.run_jobs_with(|_, stage| {
         let OutcomeStage::Progress(Progress::Console {
             status: ConsoleStatus::Uploading { .. },
@@ -771,9 +819,9 @@ fn saving_an_empty_editor_to_the_console_says_there_is_nothing_to_upload() {
     select_halo(&mut harness);
 
     harness.app().save_all_to_console();
-    harness.app().answer_modal(ModalAnswer::Accept);
     harness.run_jobs();
 
+    assert_eq!(harness.app().modal(), None);
     assert_eq!(harness.app().status().text, NOTHING_TO_UPLOAD_TEXT);
     assert_eq!(harness.app().status().severity, Severity::Info);
     for kind in AssetKind::ALL {

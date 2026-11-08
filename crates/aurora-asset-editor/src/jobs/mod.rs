@@ -20,6 +20,7 @@ mod progress_sink;
 mod progress_slot;
 mod thread_runner;
 mod transfer_report;
+mod upload_purpose;
 
 pub use after_download::AfterDownload;
 pub use asset_upload::AssetUpload;
@@ -44,3 +45,4 @@ pub use progress_sink::ProgressSink;
 pub use progress_slot::ProgressSlot;
 pub use thread_runner::{JobSubmitter, ThreadRunner};
 pub use transfer_report::TransferReport;
+pub use upload_purpose::UploadPurpose;

@@ -78,7 +78,11 @@ impl ConsoleWorker {
                     results,
                 }
             }
-            ConsoleJob::Upload { ids, uploads } => {
+            ConsoleJob::Upload {
+                ids,
+                uploads,
+                purpose,
+            } => {
                 let mut report = TransferReport::new(ids.clone());
                 for upload in uploads {
                     let result = client.upload_asset(&ids, upload.kind, &upload.bytes);
@@ -86,7 +90,7 @@ impl ConsoleWorker {
                         break;
                     }
                 }
-                ConsoleOutcome::Uploaded(report)
+                ConsoleOutcome::Uploaded { report, purpose }
             }
             ConsoleJob::Remove { ids, kinds } => {
                 let mut report = TransferReport::new(ids.clone());

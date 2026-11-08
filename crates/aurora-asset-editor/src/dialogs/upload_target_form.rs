@@ -4,21 +4,16 @@ use crate::text::filter_hex_input;
 
 /// The "Save all assets to console" dialog's two boxes. Edits are filtered like the old ID boxes, and OK needs
 /// eight hex digits in both.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct UploadTargetForm {
     pub title_id: String,
     pub database_id: String,
 }
 
 impl UploadTargetForm {
-    /// Opens with the current game's IDs, or empty without one.
-    pub fn new(game: Option<&GameIds>) -> UploadTargetForm {
-        UploadTargetForm {
-            title_id: game.map(|ids| ids.title_id.to_string()).unwrap_or_default(),
-            database_id: game
-                .map(|ids| ids.database_id.to_string())
-                .unwrap_or_default(),
-        }
+    /// Opens with both boxes empty: with a current game, Save all to console uploads without asking.
+    pub fn new() -> UploadTargetForm {
+        UploadTargetForm::default()
     }
 
     pub fn edit_title_id(&mut self, text: &str) {
