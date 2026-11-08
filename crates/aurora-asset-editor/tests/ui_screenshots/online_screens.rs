@@ -10,7 +10,6 @@ use crate::staged_outcomes::answer_search;
 
 const TITLE_ID: &str = "4D5307E6";
 const KEYWORDS: &str = "Halo";
-const LISTING_PATH: &str = "/api/Covers/4D5307E6";
 const COVERS_PREFIX: &str = "/api/Covers/";
 const ARCHIVE_PREFIX: &str = "/archive/";
 const THUMBNAIL_SIZE: (u32, u32) = (90, 60);
@@ -21,7 +20,6 @@ const FIRST_RESULT: usize = 0;
 const FAILED_RESULT: usize = 2;
 const RESULTS_CONTAINER: &str = "OnlinePage::result-grid";
 const FAILING_STATUS: u16 = 500;
-const LISTING_URL: &str = "http://xboxunity.net/api/Covers/4D5307E6";
 
 /// The answers of the listing, in order. The last one's thumbnail and image are gone.
 const COVERS: [Cover; 3] = [
@@ -156,7 +154,7 @@ fn stage_results(theme: ThemeChoice) -> Scene {
 }
 
 fn stage_no_results(theme: ThemeChoice) -> Scene {
-    let server = RecordedHttp::start(vec![json_route(LISTING_PATH, "[]".to_owned())]);
+    let server = RecordedHttp::start(vec![json_route(&listing_path(), "[]".to_owned())]);
     let mut scene = start_online(Some(&server), theme);
     scene.keep_alive(server);
     search_for_title_id(&scene);
@@ -178,7 +176,7 @@ fn stage_search_failed(theme: ThemeChoice) -> Scene {
     answer_search(
         &mut scene,
         Err(OnlineError::HttpStatus {
-            url: LISTING_URL.to_owned(),
+            url: listing_url(),
             status: FAILING_STATUS,
         }),
     );
@@ -214,7 +212,7 @@ fn search_for_title_id(scene: &Scene) {
 
 /// XboxUnity's listing for the game and the images it points to.
 fn halo_3_routes() -> Vec<Route> {
-    let mut routes = vec![json_route(LISTING_PATH, listing_json())];
+    let mut routes = vec![json_route(&listing_path(), listing_json())];
     for (index, cover) in COVERS.iter().enumerate() {
         let index = u8::try_from(index).expect("the sample has a handful of covers");
         let routes_of_cover = [
@@ -234,6 +232,16 @@ fn halo_3_routes() -> Vec<Route> {
         }
     }
     routes
+}
+
+/// Where the test server answers the search for Halo 3.
+fn listing_path() -> String {
+    format!("{COVERS_PREFIX}{TITLE_ID}")
+}
+
+/// The search's address on XboxUnity itself, as a failure names it.
+fn listing_url() -> String {
+    format!("{}{TITLE_ID}", Endpoints::live().xboxunity_covers)
 }
 
 /// The JSON of XboxUnity's answer; `{server}` is replaced by the test server's address.
