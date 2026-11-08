@@ -10,23 +10,25 @@ pub const DIFF_BOUNDS_COLOUR: Rgba<u8> = Rgba([0xff, 0xd4, 0x00, 0xff]);
 const PANEL_COUNT: u32 = 3;
 const UNCHANGED_BRIGHTNESS_PERCENT: u32 = 30;
 
-/// Three panels side by side: the reference, the actual, and the changes. The changes panel shows
-/// the actual dimmed with every differing pixel in magenta. A yellow outline just outside the
-/// bounds of all differences marks the same area on every panel.
-pub fn diff_image(reference: &RgbaImage, actual: &RgbaImage) -> RgbaImage {
-    let panel_width = reference.width().max(actual.width());
-    let panel_height = reference.height().max(actual.height());
+/// Three panels side by side: the baseline, the current image, and the changes. The changes panel
+/// shows the current image dimmed with every differing pixel in magenta. A yellow outline just
+/// outside the bounds of all differences marks the same area on every panel.
+pub fn diff_image(baseline: &RgbaImage, current: &RgbaImage) -> RgbaImage {
+    let panel_width = baseline.width().max(current.width());
+    let panel_height = baseline.height().max(current.height());
     let width = PANEL_COUNT * panel_width + (PANEL_COUNT - 1) * DIFF_PANEL_GAP;
     let mut diff = RgbaImage::from_pixel(width, panel_height, DIFF_GAP_COLOUR);
 
-    draw_panel(&mut diff, panel_left(0, panel_width), reference, |pixel| {
+    draw_panel(&mut diff, panel_left(0, panel_width), baseline, |pixel| {
         pixel
     });
-    draw_panel(&mut diff, panel_left(1, panel_width), actual, |pixel| pixel);
-    draw_panel(&mut diff, panel_left(2, panel_width), actual, dimmed);
+    draw_panel(&mut diff, panel_left(1, panel_width), current, |pixel| {
+        pixel
+    });
+    draw_panel(&mut diff, panel_left(2, panel_width), current, dimmed);
 
     let mut bounds: Option<PixelBounds> = None;
-    for (x, y) in changed_pixels(reference, actual) {
+    for (x, y) in changed_pixels(baseline, current) {
         diff.put_pixel(panel_left(2, panel_width) + x, y, DIFF_CHANGED_COLOUR);
         match bounds.as_mut() {
             Some(known) => known.include(x, y),

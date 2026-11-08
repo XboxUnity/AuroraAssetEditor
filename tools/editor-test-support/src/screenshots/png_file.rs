@@ -10,8 +10,9 @@ use image::{ExtendedColorType, ImageEncoder, ImageFormat, ImageReader, Rgb, RgbI
 
 const TEMPORARY_SUFFIX: &str = ".partial";
 
-/// Writes `image` as an RGB8 PNG, as small as the encoder can make it, because references live
-/// in git. Refuses an image with any translucent pixel, which RGB cannot hold.
+/// Writes `image` as an RGB8 PNG, as small as the encoder can make it: every run's images go into
+/// the release zip and the README images into git. Refuses an image with any translucent pixel,
+/// which RGB cannot hold.
 ///
 /// The PNG is encoded in memory and moved into place from a temporary file next to `path`, so a
 /// failure never leaves a half-written file at `path` and never changes a file already there.

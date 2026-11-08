@@ -5,27 +5,27 @@ use image::RgbaImage;
 /// Every pixel of the union of both sizes that differs, row by row. A pixel that exists in only
 /// one image differs. This is the one place pixels are compared.
 pub fn changed_pixels<'a>(
-    reference: &'a RgbaImage,
-    actual: &'a RgbaImage,
+    baseline: &'a RgbaImage,
+    current: &'a RgbaImage,
 ) -> impl Iterator<Item = (u32, u32)> + 'a {
-    let width = reference.width().max(actual.width());
-    let height = reference.height().max(actual.height());
+    let width = baseline.width().max(current.width());
+    let height = baseline.height().max(current.height());
     (0..height)
         .flat_map(move |y| (0..width).map(move |x| (x, y)))
-        .filter(|&(x, y)| reference.get_pixel_checked(x, y) != actual.get_pixel_checked(x, y))
+        .filter(|&(x, y)| baseline.get_pixel_checked(x, y) != current.get_pixel_checked(x, y))
 }
 
-pub fn compare_pixels(reference: &RgbaImage, actual: &RgbaImage) -> PixelComparison {
-    if reference.dimensions() != actual.dimensions() {
+pub fn compare_pixels(baseline: &RgbaImage, current: &RgbaImage) -> PixelComparison {
+    if baseline.dimensions() != current.dimensions() {
         return PixelComparison::DifferentSize {
-            reference: reference.dimensions(),
-            actual: actual.dimensions(),
+            baseline: baseline.dimensions(),
+            current: current.dimensions(),
         };
     }
 
     let mut difference: Option<PixelDifference> = None;
-    for (x, y) in changed_pixels(reference, actual) {
-        let channel_difference = largest_channel_difference(reference, actual, x, y);
+    for (x, y) in changed_pixels(baseline, current) {
+        let channel_difference = largest_channel_difference(baseline, current, x, y);
         match difference.as_mut() {
             Some(known) => known.include(x, y, channel_difference),
             None => difference = Some(PixelDifference::first(x, y, channel_difference)),
@@ -37,12 +37,12 @@ pub fn compare_pixels(reference: &RgbaImage, actual: &RgbaImage) -> PixelCompari
     }
 }
 
-fn largest_channel_difference(reference: &RgbaImage, actual: &RgbaImage, x: u32, y: u32) -> u8 {
-    reference
+fn largest_channel_difference(baseline: &RgbaImage, current: &RgbaImage, x: u32, y: u32) -> u8 {
+    baseline
         .get_pixel(x, y)
         .0
         .iter()
-        .zip(actual.get_pixel(x, y).0)
+        .zip(current.get_pixel(x, y).0)
         .map(|(expected, found)| expected.abs_diff(found))
         .max()
         .unwrap_or(0)
@@ -52,8 +52,8 @@ fn largest_channel_difference(reference: &RgbaImage, actual: &RgbaImage, x: u32,
 pub enum PixelComparison {
     Same,
     DifferentSize {
-        reference: (u32, u32),
-        actual: (u32, u32),
+        baseline: (u32, u32),
+        current: (u32, u32),
     },
     DifferentPixels(PixelDifference),
 }
@@ -62,10 +62,10 @@ impl fmt::Display for PixelComparison {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Same => write!(formatter, "the images are the same"),
-            Self::DifferentSize { reference, actual } => write!(
+            Self::DifferentSize { baseline, current } => write!(
                 formatter,
                 "the size changed from {}x{} to {}x{}",
-                reference.0, reference.1, actual.0, actual.1
+                baseline.0, baseline.1, current.0, current.1
             ),
             Self::DifferentPixels(difference) => difference.fmt(formatter),
         }

@@ -3,10 +3,10 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
+use super::image_files::PNG_EXTENSION;
 use super::pixel_comparison::PixelComparison;
-use super::reference_store::{
-    ACTUAL_FOLDER, DIFF_FOLDER, ImageStatus, PNG_EXTENSION, REFERENCE_COPY_FOLDER,
-};
+use super::reference_store::{ACTUAL_FOLDER, ImageStatus, REFERENCE_COPY_FOLDER};
+use super::run_folder::DIFF_FOLDER;
 use super::suite_report::{ImageReport, SuiteReport};
 
 pub const CONTACT_SHEET_FILE: &str = "index.html";

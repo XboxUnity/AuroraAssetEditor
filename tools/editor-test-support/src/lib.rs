@@ -26,12 +26,14 @@ pub use preview_jobs::{PreviewJobs, settle_preview_spaces};
 pub use queued_runner::QueuedRunner;
 pub use sample_assets::{asset_file_with, placeholder};
 pub use screenshots::{
-    AreaReport, CI_VARIABLE, CONTACT_SHEET_FILE, DIFF_BOUNDS_COLOUR, DIFF_CHANGED_COLOUR,
-    DIFF_GAP_COLOUR, DIFF_PANEL_GAP, FORBIDDEN_SCREEN_TEXT, ImageCounts, ImageReport, ImageStatus,
-    PixelBounds, PixelComparison, PixelDifference, PngFileError, REFERENCES_VARIABLE, REPORT_FILE,
-    ReferenceMode, ReferenceModeError, ReferenceStore, SCREEN_THEMES, SCREENS_VARIABLE,
-    SETTLE_TIME, Scene, Screen, ScreenArea, ScreenFilterOnCi, ScreenTextProblem, ScreenshotSuite,
-    SuiteReport, TEST_ASSETS_VARIABLE, TestAssets, TestAssetsError, changed_pixels,
-    check_screen_text, compare_pixels, diff_image, image_name, read_png, write_contact_sheet,
+    AreaReport, BASELINE_COPY_FOLDER, Baseline, BaselineError, CI_VARIABLE, CONTACT_SHEET_FILE,
+    DIFF_BOUNDS_COLOUR, DIFF_CHANGED_COLOUR, DIFF_FOLDER, DIFF_GAP_COLOUR, DIFF_PANEL_GAP,
+    FORBIDDEN_SCREEN_TEXT, IMAGES_FOLDER, ImageChange, ImageCounts, ImageReport, ImageStatus,
+    MANIFEST_FILE, MANIFEST_FORMAT, ManifestError, PixelBounds, PixelComparison, PixelDifference,
+    PngFileError, REFERENCES_VARIABLE, REPORT_FILE, ReferenceMode, ReferenceModeError,
+    ReferenceStore, RunFolder, RunManifest, SCREEN_THEMES, SCREENS_VARIABLE, SETTLE_TIME, Scene,
+    Screen, ScreenArea, ScreenFilterOnCi, ScreenTextProblem, ScreenshotSuite, SuiteReport,
+    TEST_ASSETS_VARIABLE, TestAssets, TestAssetsError, changed_pixels, check_screen_text,
+    compare_pixels, current_platform, diff_image, image_name, read_png, write_contact_sheet,
     write_opaque_png,
 };

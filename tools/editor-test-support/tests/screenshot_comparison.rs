@@ -116,12 +116,12 @@ fn identical_images_are_the_same() {
 
 #[test]
 fn one_changed_channel_is_a_difference() {
-    let reference = plain_image(16, 16);
-    let mut actual = reference.clone();
-    actual.put_pixel(5, 7, Rgba([10, 21, 30, 255]));
+    let baseline = plain_image(16, 16);
+    let mut current = baseline.clone();
+    current.put_pixel(5, 7, Rgba([10, 21, 30, 255]));
 
     assert_eq!(
-        compare_pixels(&reference, &actual),
+        compare_pixels(&baseline, &current),
         PixelComparison::DifferentPixels(PixelDifference {
             count: 1,
             bounds: bounds(5, 7, 5, 7),
@@ -132,11 +132,11 @@ fn one_changed_channel_is_a_difference() {
 
 #[test]
 fn every_channel_counts() {
-    let reference = plain_image(4, 4);
-    let mut actual = reference.clone();
-    actual.put_pixel(0, 0, Rgba([10, 20, 30, 254]));
+    let baseline = plain_image(4, 4);
+    let mut current = baseline.clone();
+    current.put_pixel(0, 0, Rgba([10, 20, 30, 254]));
 
-    let comparison = compare_pixels(&reference, &actual);
+    let comparison = compare_pixels(&baseline, &current);
 
     assert!(matches!(
         comparison,
@@ -146,13 +146,13 @@ fn every_channel_counts() {
 
 #[test]
 fn difference_bounds_cover_every_changed_pixel() {
-    let reference = plain_image(16, 16);
-    let mut actual = reference.clone();
-    actual.put_pixel(2, 3, Rgba([50, 20, 30, 255]));
-    actual.put_pixel(9, 1, Rgba([10, 25, 30, 255]));
+    let baseline = plain_image(16, 16);
+    let mut current = baseline.clone();
+    current.put_pixel(2, 3, Rgba([50, 20, 30, 255]));
+    current.put_pixel(9, 1, Rgba([10, 25, 30, 255]));
 
     assert_eq!(
-        compare_pixels(&reference, &actual),
+        compare_pixels(&baseline, &current),
         PixelComparison::DifferentPixels(PixelDifference {
             count: 2,
             bounds: bounds(2, 1, 9, 3),
@@ -166,27 +166,27 @@ fn different_sizes_are_a_difference() {
     assert_eq!(
         compare_pixels(&plain_image(4, 4), &plain_image(4, 5)),
         PixelComparison::DifferentSize {
-            reference: (4, 4),
-            actual: (4, 5),
+            baseline: (4, 4),
+            current: (4, 5),
         }
     );
 }
 
 #[test]
 fn a_pixel_in_only_one_image_is_changed() {
-    let reference = plain_image(4, 4);
-    let actual = plain_image(6, 3);
+    let baseline = plain_image(4, 4);
+    let current = plain_image(6, 3);
 
-    let changed: Vec<(u32, u32)> = changed_pixels(&reference, &actual).collect();
+    let changed: Vec<(u32, u32)> = changed_pixels(&baseline, &current).collect();
 
-    // Right strip (x 4..6, y 0..3) exists only in the actual, bottom row (x 0..4, y 3) only in the
-    // reference. The corner (x 4..6, y 3) is in neither image, so it is not a difference.
+    // Right strip (x 4..6, y 0..3) exists only in the current, bottom row (x 0..4, y 3) only in the
+    // baseline. The corner (x 4..6, y 3) is in neither image, so it is not a difference.
     let mut expected: Vec<(u32, u32)> = Vec::new();
     for y in 0..4 {
         for x in 0..6 {
-            let only_in_actual = x >= 4 && y < 3;
-            let only_in_reference = x < 4 && y >= 3;
-            if only_in_actual || only_in_reference {
+            let only_in_current = x >= 4 && y < 3;
+            let only_in_baseline = x < 4 && y >= 3;
+            if only_in_current || only_in_baseline {
                 expected.push((x, y));
             }
         }
@@ -199,12 +199,12 @@ fn a_pixel_in_only_one_image_is_changed() {
 
 #[test]
 fn comparison_reads_as_one_sentence() {
-    let reference = plain_image(16, 16);
-    let mut two_changes = reference.clone();
+    let baseline = plain_image(16, 16);
+    let mut two_changes = baseline.clone();
     two_changes.put_pixel(2, 3, Rgba([50, 20, 30, 255]));
     two_changes.put_pixel(9, 1, Rgba([10, 25, 30, 255]));
     assert_eq!(
-        compare_pixels(&reference, &two_changes).to_string(),
+        compare_pixels(&baseline, &two_changes).to_string(),
         "2 pixels differ in x 2..=9, y 1..=3 (largest channel difference 40)"
     );
 
@@ -213,10 +213,10 @@ fn comparison_reads_as_one_sentence() {
         "the size changed from 4x4 to 4x5"
     );
 
-    let mut one_change = reference.clone();
+    let mut one_change = baseline.clone();
     one_change.put_pixel(5, 7, Rgba([10, 21, 30, 255]));
     assert_eq!(
-        compare_pixels(&reference, &one_change).to_string(),
+        compare_pixels(&baseline, &one_change).to_string(),
         "1 pixel differs in x 5..=5, y 7..=7 (largest channel difference 1)"
     );
 
@@ -263,12 +263,12 @@ fn on_outline_ring(x: u32, y: u32, bounds: &PixelBounds) -> bool {
 }
 
 #[test]
-fn diff_image_shows_reference_actual_and_changes_side_by_side() {
-    let reference = plain_image(10, 6);
-    let actual = image_with_changed_pixels(&reference, &[(3, 2)]);
+fn diff_image_shows_baseline_current_and_changes_side_by_side() {
+    let baseline = plain_image(10, 6);
+    let current = image_with_changed_pixels(&baseline, &[(3, 2)]);
     let bounds = bounds(3, 2, 3, 2);
 
-    let diff = diff_image(&reference, &actual);
+    let diff = diff_image(&baseline, &current);
 
     assert_eq!(diff.dimensions(), (3 * 10 + 2 * DIFF_PANEL_GAP, 6));
     for y in 0..6 {
@@ -278,11 +278,11 @@ fn diff_image_shows_reference_actual_and_changes_side_by_side() {
             }
             assert_eq!(
                 *diff.get_pixel(panel_left(0, 10) + x, y),
-                *reference.get_pixel(x, y)
+                *baseline.get_pixel(x, y)
             );
             assert_eq!(
                 *diff.get_pixel(panel_left(1, 10) + x, y),
-                *actual.get_pixel(x, y)
+                *current.get_pixel(x, y)
             );
         }
         for panel in 0..2 {
@@ -296,26 +296,26 @@ fn diff_image_shows_reference_actual_and_changes_side_by_side() {
 
 #[test]
 fn changed_pixels_are_magenta_on_a_dimmed_copy() {
-    let reference = plain_image(10, 6);
-    let actual = image_with_changed_pixels(&reference, &[(3, 2)]);
+    let baseline = plain_image(10, 6);
+    let current = image_with_changed_pixels(&baseline, &[(3, 2)]);
 
-    let diff = diff_image(&reference, &actual);
+    let diff = diff_image(&baseline, &current);
 
     let changes_left = panel_left(2, 10);
     assert_eq!(*diff.get_pixel(changes_left + 3, 2), DIFF_CHANGED_COLOUR);
     assert_eq!(
         *diff.get_pixel(changes_left + 9, 5),
-        dimmed_grey(*actual.get_pixel(9, 5))
+        dimmed_grey(*current.get_pixel(9, 5))
     );
 }
 
 #[test]
 fn difference_bounds_are_outlined_on_every_panel() {
-    let reference = plain_image(10, 8);
-    let actual = image_with_changed_pixels(&reference, &[(3, 2), (6, 4)]);
+    let baseline = plain_image(10, 8);
+    let current = image_with_changed_pixels(&baseline, &[(3, 2), (6, 4)]);
     let bounds = bounds(3, 2, 6, 4);
 
-    let diff = diff_image(&reference, &actual);
+    let diff = diff_image(&baseline, &current);
 
     for panel in 0..3 {
         for y in 0..8 {
@@ -336,10 +336,10 @@ fn difference_bounds_are_outlined_on_every_panel() {
 
 #[test]
 fn an_outline_at_the_image_edge_is_clipped_to_its_panel() {
-    let reference = plain_image(4, 4);
-    let actual = image_with_changed_pixels(&reference, &[(0, 0)]);
+    let baseline = plain_image(4, 4);
+    let current = image_with_changed_pixels(&baseline, &[(0, 0)]);
 
-    let diff = diff_image(&reference, &actual);
+    let diff = diff_image(&baseline, &current);
 
     assert_eq!(*diff.get_pixel(1, 1), DIFF_BOUNDS_COLOUR);
     assert_eq!(*diff.get_pixel(0, 1), DIFF_BOUNDS_COLOUR);
@@ -350,13 +350,13 @@ fn an_outline_at_the_image_edge_is_clipped_to_its_panel() {
 
 #[test]
 fn diff_of_different_sizes_keeps_both_whole() {
-    let reference = plain_image(4, 4);
-    let actual = plain_image(6, 3);
-    // Changed: x 4..=5 in rows 0..=2 (actual only) and x 0..=3 in row 3 (reference only). The
+    let baseline = plain_image(4, 4);
+    let current = plain_image(6, 3);
+    // Changed: x 4..=5 in rows 0..=2 (current only) and x 0..=3 in row 3 (baseline only). The
     // outline would lie outside the panel on every side, so nothing is outlined.
     let (panel_width, panel_height) = (6, 4);
 
-    let diff = diff_image(&reference, &actual);
+    let diff = diff_image(&baseline, &current);
 
     assert_eq!(
         diff.dimensions(),
@@ -364,24 +364,20 @@ fn diff_of_different_sizes_keeps_both_whole() {
     );
     for y in 0..panel_height {
         for x in 0..panel_width {
-            let in_reference = reference.get_pixel_checked(x, y);
-            let in_actual = actual.get_pixel_checked(x, y);
+            let in_baseline = baseline.get_pixel_checked(x, y);
+            let in_current = current.get_pixel_checked(x, y);
 
-            let expected_reference_panel = in_reference.copied().unwrap_or(DIFF_GAP_COLOUR);
-            let expected_actual_panel = in_actual.copied().unwrap_or(DIFF_GAP_COLOUR);
-            let expected_changes_panel = match (in_reference, in_actual) {
-                (Some(_), Some(actual_pixel)) => dimmed_grey(*actual_pixel),
+            let expected_baseline_panel = in_baseline.copied().unwrap_or(DIFF_GAP_COLOUR);
+            let expected_current_panel = in_current.copied().unwrap_or(DIFF_GAP_COLOUR);
+            let expected_changes_panel = match (in_baseline, in_current) {
+                (Some(_), Some(current_pixel)) => dimmed_grey(*current_pixel),
                 (Some(_), None) | (None, Some(_)) => DIFF_CHANGED_COLOUR,
                 (None, None) => DIFF_GAP_COLOUR,
             };
 
             let at = |panel| *diff.get_pixel(panel_left(panel, panel_width) + x, y);
-            assert_eq!(
-                at(0),
-                expected_reference_panel,
-                "reference panel ({x}, {y})"
-            );
-            assert_eq!(at(1), expected_actual_panel, "actual panel ({x}, {y})");
+            assert_eq!(at(0), expected_baseline_panel, "baseline panel ({x}, {y})");
+            assert_eq!(at(1), expected_current_panel, "current panel ({x}, {y})");
             assert_eq!(at(2), expected_changes_panel, "changes panel ({x}, {y})");
         }
     }

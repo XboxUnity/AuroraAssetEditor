@@ -1,5 +1,4 @@
 use std::collections::BTreeSet;
-use std::ffi::OsStr;
 use std::fmt::Display;
 use std::fs;
 use std::io;
@@ -8,15 +7,15 @@ use std::path::{Path, PathBuf};
 use image::RgbaImage;
 
 use super::diff_image::diff_image;
+use super::image_files::{png_names, png_path, validate_image_name};
 use super::pixel_comparison::{PixelComparison, compare_pixels};
 use super::png_file::{PngFileError, first_translucent_pixel, read_png, write_opaque_png};
 use super::reference_mode::ReferenceMode;
+use super::run_folder::DIFF_FOLDER;
 
 const UNUSABLE_REFERENCE_REMEDY: &str =
     "delete it and run `cargo xtask ui-screenshots update` to recreate it";
-pub(super) const PNG_EXTENSION: &str = "png";
 pub(super) const ACTUAL_FOLDER: &str = "actual";
-pub(super) const DIFF_FOLDER: &str = "diff";
 pub(super) const REFERENCE_COPY_FOLDER: &str = "reference";
 const OUTPUT_FOLDERS: [&str; 3] = [ACTUAL_FOLDER, DIFF_FOLDER, REFERENCE_COPY_FOLDER];
 
@@ -216,21 +215,6 @@ impl ImageStatus {
     }
 }
 
-/// Image names are lowercase kebab-case, so a name can never reach outside the two folders.
-fn validate_image_name(image: &str) -> io::Result<()> {
-    let is_kebab_case = !image.is_empty()
-        && image
-            .chars()
-            .all(|letter| letter.is_ascii_lowercase() || letter.is_ascii_digit() || letter == '-');
-    if is_kebab_case {
-        return Ok(());
-    }
-    Err(io::Error::new(
-        io::ErrorKind::InvalidInput,
-        format!("the image name \"{image}\" is not lowercase kebab-case (a-z, 0-9 and -)"),
-    ))
-}
-
 fn unusable_reference(path: &Path, error: PngFileError) -> String {
     format!(
         "Could not use the reference {}: {error}; {UNUSABLE_REFERENCE_REMEDY}",
@@ -238,42 +222,8 @@ fn unusable_reference(path: &Path, error: PngFileError) -> String {
     )
 }
 
-/// The file stems of the PNGs in `folder`; empty when the folder does not exist.
-fn png_names(folder: &Path) -> io::Result<BTreeSet<String>> {
-    let entries = match fs::read_dir(folder) {
-        Ok(entries) => entries,
-        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(BTreeSet::new()),
-        Err(error) => return Err(error),
-    };
-
-    let mut names = BTreeSet::new();
-    for entry in entries {
-        let path = entry?.path();
-        if path.extension() != Some(OsStr::new(PNG_EXTENSION)) {
-            continue;
-        }
-        let name = path
-            .file_stem()
-            .and_then(OsStr::to_str)
-            .ok_or_else(|| invalid_name(&path))?;
-        names.insert(name.to_owned());
-    }
-    Ok(names)
-}
-
-fn png_path(folder: &Path, image: &str) -> PathBuf {
-    folder.join(format!("{image}.{PNG_EXTENSION}"))
-}
-
 fn failure(action: &str, path: &Path, error: impl Display) -> String {
     format!("Could not {action} {}: {error}", path.display())
-}
-
-fn invalid_name(path: &Path) -> io::Error {
-    io::Error::new(
-        io::ErrorKind::InvalidData,
-        format!("the file name {} is not valid Unicode", path.display()),
-    )
 }
 
 /// `fs::remove_file` whose error names the file, keeping the error kind.
