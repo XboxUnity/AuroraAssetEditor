@@ -13,7 +13,6 @@ use crate::jobs::{ConsoleJob, ConsoleJobKind, ConsoleOutcome, ConsoleRequest, Jo
 use crate::logging::error_chain;
 use crate::status::{ConsoleActivity, STATUS_SEPARATOR, Severity, StatusLine};
 
-use super::app::with_log_failure;
 use super::file_actions::BUSY_TEXT;
 use super::{App, CurrentGame};
 
@@ -78,12 +77,12 @@ impl App {
                 self.modals.remove_connection_form();
                 self.report_done(format!("Saved {FTP_SETTINGS_FILE}"));
             }
-            // The dialog stays open and shows the failure, so no toast.
+            // The dialog stays open and shows the failure.
             Err(error) => {
                 let text = format!("{CONNECTION_SAVE_FAILED}: {}", error_sentence(&error));
                 let log_failure = self.record_error(CONNECTION_SAVE_FAILED, &error);
-                self.status = StatusLine::error(with_log_failure(text.clone(), log_failure));
                 self.set_test_result(Severity::Error, &text);
+                self.show_error_beside_dialog(text, log_failure);
             }
         }
     }
@@ -229,11 +228,20 @@ impl App {
                 let log_failure = self.record_error(CONNECTION_TEST_FAILED, &error);
                 self.console.link = ConsoleLink::Failed;
                 if self.set_test_result(Severity::Error, &text) {
-                    self.status = StatusLine::error(with_log_failure(text, log_failure));
+                    self.show_error_beside_dialog(text, log_failure);
                 } else {
                     self.set_error_status(text, log_failure);
                 }
             }
+        }
+    }
+
+    /// The status line repeats an error the dialog shows, without a toast; a failure to log it, which no dialog
+    /// shows, toasts with it.
+    fn show_error_beside_dialog(&mut self, text: String, log_failure: Option<String>) {
+        match log_failure {
+            Some(_) => self.set_error_status(text, log_failure),
+            None => self.status = StatusLine::error(text),
         }
     }
 

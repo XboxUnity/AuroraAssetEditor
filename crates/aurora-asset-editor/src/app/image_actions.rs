@@ -300,7 +300,7 @@ impl App {
         for (label, failure) in failures {
             let context = format!("Could not use image {label}");
             if let Some(log_failure) = self.record_error(&context, &failure) {
-                self.status = StatusLine::error(log_failure);
+                self.report_failure(log_failure);
             }
             let reason = error_chain(&failure).join(": ");
             lines.push(format!(

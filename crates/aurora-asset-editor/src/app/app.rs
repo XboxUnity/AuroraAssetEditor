@@ -254,8 +254,9 @@ impl App {
         text: String,
         error: &(dyn Error + 'static),
     ) {
+        // The dialog shows the error; a failure to log it shows nowhere else.
         if let Some(log_failure) = self.record_error(log_context, error) {
-            self.status = StatusLine::error(log_failure);
+            self.report_failure(log_failure);
         }
         self.modals.push(Modal::Message {
             title: title.to_owned(),

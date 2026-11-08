@@ -219,7 +219,7 @@ impl App {
         let file = file_display_name(path);
         let context = format!("{entry} in {file} could not be decoded");
         if let Some(log_failure) = self.record_error(&context, error) {
-            self.status = StatusLine::error(log_failure);
+            self.report_failure(log_failure);
         }
         let reason = error_chain(error).join(": ");
         unread_images.push(format!(
@@ -244,7 +244,7 @@ impl App {
         for FileProblem { path, problem } in problems {
             let context = format!("Could not load {}", path.display());
             if let Some(log_failure) = self.record_error(&context, &problem) {
-                self.status = StatusLine::error(log_failure);
+                self.report_failure(log_failure);
             }
             let file = file_display_name(&path);
             match problem {

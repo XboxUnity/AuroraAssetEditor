@@ -248,6 +248,52 @@ fn error_log_write_failure_shows_in_status() {
     assert!(status.text.starts_with(&expected_start), "{}", status.text);
 }
 
+/// The red toasts the app shows.
+fn error_toasts(harness: &mut AppHarness) -> Vec<String> {
+    harness
+        .app()
+        .toasts()
+        .iter()
+        .filter(|toast| toast.severity == Severity::Error)
+        .map(|toast| toast.text.clone())
+        .collect()
+}
+
+#[test]
+fn a_log_failure_beside_an_error_dialog_gets_a_red_toast() {
+    let mut harness = AppHarness::new();
+    fs::create_dir(harness.config_dir().join("error.log")).unwrap();
+    let missing = harness.config_dir().join("missing.asset");
+
+    harness.app().open_paths(vec![missing]);
+    harness.run_jobs();
+
+    assert!(
+        matches!(harness.app().modal(), Some(Modal::Message { .. })),
+        "the dialog shows the load problem"
+    );
+    let status = harness.app().status().clone();
+    assert_eq!(status.severity, Severity::Error);
+    assert!(status.text.starts_with(LOG_WRITE_FAILED), "{}", status.text);
+    assert_eq!(
+        error_toasts(&mut harness),
+        [status.text],
+        "only the log failure, which the dialog does not show"
+    );
+}
+
+#[test]
+fn an_error_dialog_with_a_written_log_gets_no_toast() {
+    let mut harness = AppHarness::new();
+    let missing = harness.config_dir().join("missing.asset");
+
+    harness.app().open_paths(vec![missing]);
+    harness.run_jobs();
+
+    assert!(matches!(harness.app().modal(), Some(Modal::Message { .. })));
+    assert_eq!(harness.app().toasts().iter().count(), 0);
+}
+
 #[test]
 fn toggling_settings_persists_them() {
     let mut harness = AppHarness::new();
