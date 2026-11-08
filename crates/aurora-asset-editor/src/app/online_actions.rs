@@ -376,7 +376,7 @@ fn reusable_thumbnail(tile: &ResultTile) -> Option<TileImage> {
     }
 }
 
-fn source_name(source: CoverSource) -> &'static str {
+pub fn source_name(source: CoverSource) -> &'static str {
     match source {
         CoverSource::XboxUnity => "XboxUnity",
         CoverSource::InternetArchive => "Internet Archive",

@@ -86,7 +86,7 @@ pub const CONSOLE_DIALOGS: ScreenArea = ScreenArea {
         },
         Screen {
             name: "dialog-bulk-finished",
-            description: "\"Bulk actions finished\" with the summary of a four-game run: one uploaded, one already had a cover, one without a cover online, one failed.",
+            description: "\"Bulk actions finished\" with the summary of a four-game run: one saved to the console, one already had a cover, one without a cover online, one failed.",
             stage: stage_bulk_finished,
         },
     ],

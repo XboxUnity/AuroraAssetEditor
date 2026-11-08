@@ -568,24 +568,90 @@ fn focus_stays_inside_an_open_dialog() {
     assert_eq!(ui.app.borrow().modal(), None, "Return clicked Cancel");
 }
 
-#[test]
-fn bulk_text_names_one_game_in_the_singular() {
-    let (_harness, ui) = open_flow(&FLOWS[6], ThemeChoice::Dark);
-    assert_eq!(
-        ui.dialog().get_text(),
-        "Uploads a random cover from the source for the 1 game in the list if it has no cover on the console. Covers are not resized."
-    );
+const BULK_TEXT_CASES: [(CoverSource, bool, usize, &str); 8] = [
+    (
+        CoverSource::XboxUnity,
+        false,
+        1,
+        "Downloads a random cover from XboxUnity for the listed game if it has no cover on the console, and saves it there. Covers are not resized.",
+    ),
+    (
+        CoverSource::XboxUnity,
+        true,
+        1,
+        "Downloads a random cover from XboxUnity for the listed game and saves it on the console, replacing any cover already there. Covers are not resized.",
+    ),
+    (
+        CoverSource::InternetArchive,
+        false,
+        1,
+        "Downloads a random cover from Internet Archive for the listed game if it has no cover on the console, and saves it there. Covers are not resized.",
+    ),
+    (
+        CoverSource::InternetArchive,
+        true,
+        1,
+        "Downloads a random cover from Internet Archive for the listed game and saves it on the console, replacing any cover already there. Covers are not resized.",
+    ),
+    (
+        CoverSource::XboxUnity,
+        false,
+        2,
+        "Downloads a random cover from XboxUnity for each of the 2 listed games that has no cover on the console, and saves it there. Covers are not resized.",
+    ),
+    (
+        CoverSource::XboxUnity,
+        true,
+        2,
+        "Downloads a random cover from XboxUnity for each of the 2 listed games and saves it on the console, replacing any cover already there. Covers are not resized.",
+    ),
+    (
+        CoverSource::InternetArchive,
+        false,
+        2,
+        "Downloads a random cover from Internet Archive for each of the 2 listed games that has no cover on the console, and saves it there. Covers are not resized.",
+    ),
+    (
+        CoverSource::InternetArchive,
+        true,
+        2,
+        "Downloads a random cover from Internet Archive for each of the 2 listed games and saves it on the console, replacing any cover already there. Covers are not resized.",
+    ),
+];
 
+#[test]
+fn bulk_text_follows_the_source_the_box_and_the_game_count() {
+    for (source, replace, game_count, expected) in BULK_TEXT_CASES {
+        let mut harness = console_harness(ThemeChoice::Dark);
+        let ui = Ui::start(&mut harness);
+        ui.act(|app| {
+            let mut games = two_games();
+            games.truncate(game_count);
+            show_games(app, games);
+            app.open_bulk_actions();
+            app.set_bulk_source(source);
+            app.set_bulk_replace(replace);
+        });
+        assert_eq!(ui.dialog().get_text(), expected);
+    }
+}
+
+#[test]
+fn bulk_text_updates_while_the_dialog_is_open() {
     let mut harness = console_harness(ThemeChoice::Dark);
     let ui = Ui::start(&mut harness);
     ui.act(|app| {
         show_games(app, two_games());
         app.open_bulk_actions();
     });
-    assert_eq!(
-        ui.dialog().get_text(),
-        "Uploads a random cover from the source for each of the 2 games in the list that has no cover on the console. Covers are not resized."
-    );
+    assert!(ui.dialog().get_text().contains("from XboxUnity for each"));
+    assert!(ui.dialog().get_text().contains("that has no cover"));
+
+    ui.act(|app| app.set_bulk_source(CoverSource::InternetArchive));
+    assert!(ui.dialog().get_text().contains("from Internet Archive"));
+
+    ui.act(|app| app.set_bulk_replace(true));
+    assert!(ui.dialog().get_text().contains("replacing any cover"));
 }
 
 #[test]

@@ -1,5 +1,3 @@
-use std::fmt;
-
 use super::{BulkOutcome, BulkStop};
 use crate::games::Game;
 
@@ -48,31 +46,4 @@ pub struct BulkSummary {
     pub failed: usize,
     /// Games the run stopped before.
     pub not_handled: usize,
-}
-
-impl fmt::Display for BulkSummary {
-    /// Reads like "3 covers uploaded, 2 already had one, 1 unreadable cover skipped,
-    /// 1 without a cover online, 1 failed", plus ", 4 not handled" when the run was stopped.
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{} {} uploaded, {} already had one, {} unreadable {} skipped, \
-             {} without a cover online, {} failed",
-            self.uploaded,
-            cover_noun(self.uploaded),
-            self.already_had_cover,
-            self.unreadable,
-            cover_noun(self.unreadable),
-            self.no_cover_online,
-            self.failed,
-        )?;
-        if self.not_handled > 0 {
-            write!(f, ", {} not handled", self.not_handled)?;
-        }
-        Ok(())
-    }
-}
-
-fn cover_noun(count: usize) -> &'static str {
-    if count == 1 { "cover" } else { "covers" }
 }

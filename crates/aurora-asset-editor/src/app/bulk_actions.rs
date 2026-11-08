@@ -9,6 +9,7 @@ use crate::jobs::{BulkRequest, ConsoleJob, JobPriority};
 use crate::status::{ConsoleActivity, StatusLine};
 
 use super::App;
+use super::bulk_summary_text::{finished_body, status_text};
 use super::console_actions::{NO_CONSOLE_TEXT, error_sentence};
 
 pub const BULK_TITLE: &str = "Bulk actions";
@@ -116,23 +117,24 @@ impl App {
             self.console.link = ConsoleLink::Failed;
         }
         self.mark_uploaded_covers(report, !console_gone);
-        let summary = report.summary().to_string();
-        let mut text = summary.clone();
+        let summary = report.summary();
+        let mut text = finished_body(&summary);
         if let Some(stop) = &report.stopped {
             text.push_str(&format!("\nStopped: {}", error_sentence(stop)));
         }
-        self.set_error_status_if(summary, log_failure);
+        self.show_bulk_status(status_text(&summary), log_failure);
         self.modals.push(Modal::Message {
             title: BULK_FINISHED_TITLE.to_owned(),
             text,
         });
     }
 
-    /// The summary in the status line and a toast; an error when `error.log` could not be written.
-    fn set_error_status_if(&mut self, summary: String, log_failure: Option<String>) {
+    /// The summary in the status line. The finished dialog reports the run, so only an error, when
+    /// `error.log` could not be written, also gets a toast.
+    fn show_bulk_status(&mut self, summary: String, log_failure: Option<String>) {
         match log_failure {
             Some(_) => self.set_error_status(summary, log_failure),
-            None => self.report_done(summary),
+            None => self.status = StatusLine::info(summary),
         }
     }
 

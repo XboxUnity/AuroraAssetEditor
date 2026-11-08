@@ -6,6 +6,7 @@ mod about_actions;
 mod app;
 mod app_environment;
 mod bulk_actions;
+mod bulk_summary_text;
 mod console_actions;
 mod console_transfer_actions;
 mod current_game;
@@ -48,7 +49,7 @@ pub use menu::Menu;
 pub use menu_action::MenuAction;
 pub use online_actions::{
     ENTER_KEYWORDS_TEXT, ENTER_TITLE_ID_TEXT, IMAGE_FAILED_TEXT, IMPORTING_COVER_TEXT,
-    SAVE_RESULT_DEFAULT_NAME, SAVE_RESULT_TITLE, SEARCH_FAILED,
+    SAVE_RESULT_DEFAULT_NAME, SAVE_RESULT_TITLE, SEARCH_FAILED, source_name,
 };
 pub use page::Page;
 pub use pending_import_status::PendingImportStatus;

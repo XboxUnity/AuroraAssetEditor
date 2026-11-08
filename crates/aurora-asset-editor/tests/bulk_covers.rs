@@ -332,8 +332,8 @@ fn bulk_stop_halts_before_next_game() {
     assert!(uploaded_cover(&fixture.console, &echo()).is_some());
     assert!(uploaded_cover(&fixture.console, &foxtrot()).is_none());
     let text = message(&mut fixture.harness, BULK_FINISHED_TITLE);
-    assert!(text.contains("1 cover uploaded"), "{text}");
-    assert!(text.contains("1 not handled"), "{text}");
+    assert!(text.contains("Saved to the console: 1"), "{text}");
+    assert!(text.contains("Not handled: 1"), "{text}");
     assert!(text.contains("Stopped: the run was stopped"), "{text}");
     assert!(!fixture.harness.app().locks().bulk_stop);
 }
@@ -357,8 +357,8 @@ fn bulk_console_gone_is_logged() {
     });
 
     let text = message(&mut fixture.harness, BULK_FINISHED_TITLE);
-    assert!(text.contains("1 cover uploaded"), "{text}");
-    assert!(text.contains("2 not handled"), "{text}");
+    assert!(text.contains("Saved to the console: 1"), "{text}");
+    assert!(text.contains("Not handled: 2"), "{text}");
     assert!(
         text.contains("Stopped: the console could not be reached again"),
         "{text}"
@@ -394,8 +394,13 @@ fn bulk_errors_continue_and_are_summarised_and_logged() {
     assert!(uploaded_cover(&fixture.console, &echo()).is_some());
     assert!(uploaded_cover(&fixture.console, &foxtrot()).is_none());
     let text = message(&mut fixture.harness, BULK_FINISHED_TITLE);
-    assert!(text.contains("2 covers uploaded"), "{text}");
-    assert!(text.contains("1 failed"), "{text}");
+    assert!(text.contains("Saved to the console: 2"), "{text}");
+    assert!(text.contains("Failed: 1"), "{text}");
+    assert_eq!(
+        fixture.harness.app().status().text,
+        "Bulk covers: 2 saved, 1 failed"
+    );
+    assert!(fixture.harness.app().toasts().iter().count() == 0);
     assert!(!text.contains("Stopped"), "{text}");
     let log = fixture.harness.error_log_text();
     assert!(log.contains("Halo 3 (4D5307E6)"), "{log}");
@@ -560,7 +565,10 @@ fn bulk_logs_an_unreadable_existing_cover_and_leaves_it() {
 
     assert_eq!(fixture.console.file(&path), Some(garbage));
     let text = message(&mut fixture.harness, BULK_FINISHED_TITLE);
-    assert!(text.contains("1 unreadable cover skipped"), "{text}");
+    assert!(
+        text.contains("Cover on the console could not be read: 1"),
+        "{text}"
+    );
     let log = fixture.harness.error_log_text();
     let expected = format!("of Fable II ({})", echo().ids.title_id);
     assert!(log.contains(&expected), "{log}");

@@ -532,9 +532,15 @@ fn summary_reads_like_a_sentence() {
     let summary: BulkSummary = report.summary();
 
     assert_eq!(
-        summary.to_string(),
-        "3 covers uploaded, 2 already had one, 1 unreadable cover skipped, \
-         1 without a cover online, 1 failed"
+        summary,
+        BulkSummary {
+            uploaded: 3,
+            already_had_cover: 2,
+            unreadable: 1,
+            no_cover_online: 1,
+            failed: 1,
+            not_handled: 0,
+        }
     );
 }
 
@@ -566,9 +572,12 @@ fn bulk_stops_before_the_next_game_when_cancelled() {
     assert!(console.file(&cover_path(FIRST_TITLE)).is_some());
     assert!(console.file(&cover_path(SECOND_TITLE)).is_none());
     assert_eq!(
-        report.summary().to_string(),
-        "1 cover uploaded, 0 already had one, 0 unreadable covers skipped, \
-         0 without a cover online, 0 failed, 2 not handled"
+        report.summary(),
+        BulkSummary {
+            uploaded: 1,
+            not_handled: 2,
+            ..BulkSummary::default()
+        }
     );
 }
 

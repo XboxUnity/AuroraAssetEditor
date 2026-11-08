@@ -7,7 +7,7 @@ use aurora_ui::{ChoiceView, DialogKind, DialogModel, MainWindow, PickerGameView}
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 
 use crate::about::{BuildInfo, notices_text};
-use crate::app::{ABOUT_TITLE, App, BULK_TITLE, PickerContent, REFRESHING_TEXT};
+use crate::app::{ABOUT_TITLE, App, BULK_TITLE, PickerContent, REFRESHING_TEXT, source_name};
 use crate::dialogs::{BulkForm, ChoiceId, ConnectionForm, Modal, ModalAnswer, ModalField};
 use crate::status::Severity;
 
@@ -334,7 +334,7 @@ impl DialogContent {
         DialogContent {
             kind: DialogKind::Bulk,
             title: BULK_TITLE.to_owned(),
-            text: bulk_text(form.game_count),
+            text: bulk_text(form),
             bulk_source_index: i32::try_from(source_index).unwrap_or_default(),
             bulk_replace: form.replace_existing,
             ..shown
@@ -342,14 +342,24 @@ impl DialogContent {
     }
 }
 
-fn bulk_text(game_count: usize) -> String {
-    if game_count == 1 {
-        "Uploads a random cover from the source for the 1 game in the list if it has no cover on the console. Covers are not resized.".to_owned()
-    } else {
-        format!(
-            "Uploads a random cover from the source for each of the {game_count} games in the list that has no cover on the console. Covers are not resized."
-        )
+fn bulk_text(form: &BulkForm) -> String {
+    let source = source_name(form.source);
+    let games = match form.game_count {
+        1 => "the listed game".to_owned(),
+        count => format!("each of the {count} listed games"),
+    };
+    if form.replace_existing {
+        return format!(
+            "Downloads a random cover from {source} for {games} and saves it on the console, replacing any cover already there. Covers are not resized."
+        );
     }
+    let lacking = match form.game_count {
+        1 => "if it has",
+        _ => "that has",
+    };
+    format!(
+        "Downloads a random cover from {source} for {games} {lacking} no cover on the console, and saves it there. Covers are not resized."
+    )
 }
 
 /// The choice behind the dialog's button `index`.
