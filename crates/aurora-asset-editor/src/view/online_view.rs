@@ -168,13 +168,13 @@ fn image_key(state: &OnlineState, index: usize, image: ResultImage) -> ResultIma
     }
 }
 
-/// The hint while the grid is empty, except while a search runs (the status line says so then).
-fn empty_text(state: &OnlineState, searching: bool) -> &'static str {
-    if state.results.is_empty() && !searching {
-        EMPTY_GRID_TEXT
-    } else {
-        ""
+/// The text in place of an empty grid: the hint before the first search, how the latest search ended after
+/// it, and nothing while a search runs (the status line says so then).
+fn empty_text(state: &OnlineState, searching: bool) -> &str {
+    if !state.results.is_empty() || searching {
+        return "";
     }
+    state.search_end_text.as_deref().unwrap_or(EMPTY_GRID_TEXT)
 }
 
 fn placeholder(mode: SearchMode) -> &'static str {

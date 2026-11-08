@@ -80,7 +80,7 @@ pub const ONLINE: ScreenArea = ScreenArea {
         },
         Screen {
             name: "online-no-results",
-            description: "A search that found nothing: \"0 results for 4D5307E6\" over an empty grid.",
+            description: "A search that found nothing: \"0 results for 4D5307E6\" in the status line and in place of the grid.",
             stage: stage_no_results,
         },
         Screen {
@@ -95,7 +95,7 @@ pub const ONLINE: ScreenArea = ScreenArea {
         },
         Screen {
             name: "online-search-failed",
-            description: "The source answered HTTP 500: the status line shows the search failure in the error colour.",
+            description: "The source answered HTTP 500: the status line shows the search failure in the error colour, the grid the same text.",
             stage: stage_search_failed,
         },
         Screen {

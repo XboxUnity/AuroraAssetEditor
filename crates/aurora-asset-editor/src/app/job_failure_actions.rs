@@ -12,6 +12,11 @@ impl App {
         self.release_failed_job(job);
         let context = format!("{} {JOB_STOPPED_TEXT}", job.description());
         self.report_error(&context, panic);
+        if let FailedJob::OnlineSearch { generation } = job
+            && self.online.is_current(*generation)
+        {
+            self.online.end_search(&self.status.text);
+        }
     }
 
     fn release_failed_job(&mut self, job: &FailedJob) {

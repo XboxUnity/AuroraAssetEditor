@@ -7,7 +7,7 @@ use aurora_asset::{AssetKind, AssetSlot, Compression, ScreenshotNumber};
 use aurora_asset_editor::app::{App, BUSY_TEXT, Menu, NO_CONSOLE_TEXT, Page, SELECT_A_GAME_REASON};
 use aurora_asset_editor::console::{GameColumn, PresenceCell};
 use aurora_asset_editor::dialogs::ModalAnswer;
-use aurora_asset_editor::jobs::{ConsoleOutcome, JobOutcome};
+use aurora_asset_editor::jobs::{ConsoleOutcome, FailedJob, Job, JobOutcome, JobPanic, OnlineJob};
 use aurora_asset_editor::online::{SearchMode, TileImage};
 use aurora_asset_editor::settings::ThemeChoice;
 use aurora_asset_editor::view::{MainWindowView, OnlineImageCache, ResultImage, ResultImageKey};
@@ -26,6 +26,8 @@ use test_servers::{FakeConsole, FakeConsoleConfig, RecordedHttp, Route, RouteBeh
 
 const ARCHIVE_PATH: &str = "/download/xboxunity-covers-fulldump_202311/xboxunity-covers-fulldump/";
 const RESULTS_TITLE: &str = "0000A001";
+const NO_RESULTS_TITLE: &str = "0000A404";
+const FAILING_TITLE: &str = "0000A500";
 const EMPTY_GRID_TEXT: &str = "Search XboxUnity or the Internet Archive for covers";
 const FULL_WIDTH: u32 = 90;
 const FULL_HEIGHT: u32 = 60;
@@ -326,6 +328,67 @@ fn online_page_renders_states() {
         }
         assert_all_differ(&states, name);
     }
+}
+
+#[test]
+fn a_search_that_found_nothing_or_failed_leaves_its_status_in_the_grid() {
+    let server = RecordedHttp::start(vec![
+        route(
+            &format!("/api/Covers/{NO_RESULTS_TITLE}"),
+            200,
+            "application/json",
+            b"[]".to_vec(),
+        ),
+        route(
+            &format!("/api/Covers/{FAILING_TITLE}"),
+            500,
+            "text/plain",
+            b"broken".to_vec(),
+        ),
+    ]);
+    let mut harness = online_harness(&server, ThemeChoice::Dark);
+    let ui = Ui::start(&mut harness);
+
+    for title in [NO_RESULTS_TITLE, FAILING_TITLE] {
+        ui.act(|app| {
+            app.edit_search_text(title);
+            app.search_online();
+        });
+        harness.run_jobs();
+        ui.render();
+
+        let status = harness.app().status().text.clone();
+        assert_eq!(
+            ui.online().get_empty_text(),
+            status,
+            "after searching {title}"
+        );
+    }
+}
+
+#[test]
+fn a_search_job_that_stopped_leaves_its_status_in_the_grid() {
+    let mut harness = AppHarness::new();
+    harness.app().show_page(Page::Online);
+    let ui = Ui::start(&mut harness);
+    ui.act(|app| {
+        app.edit_search_text(RESULTS_TITLE);
+        app.search_online();
+    });
+    let job = harness.take_next_job();
+    let Some(Job::Online(OnlineJob::Search { generation, .. })) = job else {
+        panic!("the next job is not an online search: {job:?}");
+    };
+
+    ui.act(|app| {
+        app.on_job_outcome(JobOutcome::Failed {
+            job: FailedJob::OnlineSearch { generation },
+            panic: JobPanic::from_payload(&"the search broke"),
+        });
+    });
+
+    let status = harness.app().status().text.clone();
+    assert_eq!(ui.online().get_empty_text(), status);
 }
 
 #[test]

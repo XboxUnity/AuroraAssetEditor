@@ -224,6 +224,7 @@ impl App {
             }
             Err(error) => self.report_error(SEARCH_FAILED, &error),
         }
+        self.online.end_search(&self.status.text);
     }
 
     /// Thumbnails wait behind everything the user asks for.

@@ -14,6 +14,8 @@ pub struct OnlineState {
     pub selected: Option<usize>,
     /// What the latest search looked for, as shown in the status line.
     pub last_query: Option<String>,
+    /// What the status line said when the latest search ended; the grid shows it when nothing was found.
+    pub search_end_text: Option<String>,
     /// The search whose results are current; answers of an earlier search, and the images of its results,
     /// are stale.
     search_gate: SearchGate,
@@ -31,6 +33,7 @@ impl OnlineState {
             results: Vec::new(),
             selected: None,
             last_query: None,
+            search_end_text: None,
             search_gate: SearchGate::default(),
             searched_source: CoverSource::XboxUnity,
         }
@@ -54,8 +57,14 @@ impl OnlineState {
         self.results.clear();
         self.selected = None;
         self.last_query = Some(query_text.to_owned());
+        self.search_end_text = None;
         self.searched_source = self.source;
         generation
+    }
+
+    /// Records how the current search ended, as the status line says it.
+    pub(crate) fn end_search(&mut self, status_text: &str) {
+        self.search_end_text = Some(status_text.to_owned());
     }
 
     pub fn searched_source(&self) -> CoverSource {
