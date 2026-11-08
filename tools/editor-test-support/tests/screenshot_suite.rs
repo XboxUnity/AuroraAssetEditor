@@ -17,6 +17,9 @@ const OTHER_PLATFORM: &str = "other-platform";
 const AREA_TITLE: &str = "Menus under test";
 const SCREEN_A_DESCRIPTION: &str = "The gear menu open";
 const ESCAPED_DESCRIPTION: &str = "a < b & c";
+const MARKUP_AREA_TITLE: &str = "Area <b> & \"quoted\"";
+const MARKUP_LABEL: &str = "label <i> & \"quoted\"";
+const MARKUP_PANIC: &str = "bad <tag> & \"quoted\"";
 const ALL_IMAGES: [&str; 4] = ["a-dark", "a-light", "b-dark", "b-light"];
 
 static STAGING_THREADS: Mutex<Vec<ThreadId>> = Mutex::new(Vec::new());
@@ -48,6 +51,10 @@ fn stage_gear_menu_in_dark_only(theme: ThemeChoice) -> Scene {
 
 fn stage_panicking(_theme: ThemeChoice) -> Scene {
     panic!("boom")
+}
+
+fn stage_panicking_with_markup(_theme: ThemeChoice) -> Scene {
+    panic!("{MARKUP_PANIC}")
 }
 
 fn record_thread() {
@@ -168,6 +175,54 @@ const SCREEN_WITH_MARKUP: &[ScreenArea] = &[ScreenArea {
         description: ESCAPED_DESCRIPTION,
         stage: stage_gear_menu,
     }],
+}];
+/// An unchanged screen and a failing one, in an area whose title has markup.
+const MARKUP_AREA_SCREENS: &[ScreenArea] = &[ScreenArea {
+    title: MARKUP_AREA_TITLE,
+    screens: &[
+        SCREEN_A,
+        Screen {
+            name: "broken",
+            description: "Staging panics with markup",
+            stage: stage_panicking_with_markup,
+        },
+    ],
+}];
+/// A run before `SECTIONS_AFTER`: it has the screens that end up changed, unchanged and removed.
+const SECTIONS_BEFORE: &[ScreenArea] = &[ScreenArea {
+    title: AREA_TITLE,
+    screens: &[
+        SCREEN_A,
+        SCREEN_B,
+        Screen {
+            name: "gone",
+            description: "A screen removed later",
+            stage: stage_open_menu,
+        },
+    ],
+}];
+/// Against `SECTIONS_BEFORE`: a unchanged, b changed in the dark theme, c new, gone removed and
+/// broken failing, so every section of the sheet is filled.
+const SECTIONS_AFTER: &[ScreenArea] = &[ScreenArea {
+    title: AREA_TITLE,
+    screens: &[
+        SCREEN_A,
+        Screen {
+            name: "b",
+            description: "The open menu open",
+            stage: stage_gear_menu_in_dark_only,
+        },
+        Screen {
+            name: "c",
+            description: "A new screen",
+            stage: stage_gear_menu,
+        },
+        Screen {
+            name: "broken",
+            description: "Staging panics",
+            stage: stage_panicking,
+        },
+    ],
 }];
 const REPORT_BLOCKING_SCREENS: &[ScreenArea] = &[ScreenArea {
     title: AREA_TITLE,
@@ -864,6 +919,57 @@ fn contact_sheet_escapes_text() {
     assert!(!sheet.contains(ESCAPED_DESCRIPTION), "{sheet}");
 }
 
+#[test]
+fn contact_sheet_escapes_area_label_and_error_text() {
+    let folders = SuiteFolders::new();
+    folders.run_labelled(MARKUP_LABEL, None, MARKUP_AREA_SCREENS);
+
+    let report = folders.run(MARKUP_AREA_SCREENS);
+
+    let sheet = folders.sheet(&report);
+    let summary = format!("<summary>{} (", escaped(MARKUP_AREA_TITLE));
+    for (raw, shown) in [
+        (MARKUP_AREA_TITLE, escaped(MARKUP_AREA_TITLE)),
+        (MARKUP_LABEL, escaped(MARKUP_LABEL)),
+        (MARKUP_PANIC, escaped(MARKUP_PANIC)),
+    ] {
+        assert!(sheet.contains(&shown), "{shown}: {sheet}");
+        assert!(!sheet.contains(raw), "{raw}: {sheet}");
+    }
+    assert!(sheet.contains(&summary), "{summary}: {sheet}");
+}
+
+#[test]
+fn contact_sheet_orders_every_section_and_links_to_it() {
+    let folders = SuiteFolders::new();
+    folders.run(SECTIONS_BEFORE);
+
+    let report = folders.run(SECTIONS_AFTER);
+
+    let sheet = folders.sheet(&report);
+    assert_in_order(
+        &sheet,
+        &[
+            "id=\"errors\"",
+            "id=\"changed\"",
+            "id=\"new\"",
+            "id=\"removed\"",
+            "id=\"unchanged\"",
+        ],
+    );
+    assert_in_order(
+        &sheet,
+        &[
+            "href=\"#errors\">Errors (1)",
+            "href=\"#changed\">Changed (1)",
+            "href=\"#new\">New (1)",
+            "href=\"#removed\">Removed (2)",
+            "href=\"#unchanged\">Unchanged (1)",
+            "id=\"errors\"",
+        ],
+    );
+}
+
 /// Each needle appears in the sheet's body after the one before it. The search starts after the
 /// style, whose class names would otherwise match first.
 fn assert_in_order(sheet: &str, needles: &[&str]) {
@@ -1025,13 +1131,20 @@ fn sheet_names_what_it_compared_with() {
 #[test]
 fn empty_sections_are_left_out() {
     let folders = SuiteFolders::new();
-    folders.run(TWO_SCREENS);
+    let first = folders.run(TWO_SCREENS);
+    let first_sheet = folders.sheet(&first);
+    assert!(!first_sheet.contains("id=\"unchanged\""), "{first_sheet}");
+    assert!(
+        !first_sheet.contains("href=\"#unchanged\""),
+        "{first_sheet}"
+    );
 
     let report = folders.run(TWO_SCREENS);
 
     let sheet = folders.sheet(&report);
     for id in ["errors", "changed", "new", "removed"] {
         assert!(!sheet.contains(&format!("id=\"{id}\"")), "{id}: {sheet}");
+        assert!(!sheet.contains(&format!("href=\"#{id}\"")), "{id}: {sheet}");
     }
     assert!(sheet.contains("id=\"unchanged\""), "{sheet}");
 }

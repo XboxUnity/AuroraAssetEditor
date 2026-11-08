@@ -115,10 +115,10 @@ impl ScreenshotSuite {
             .to_owned()
     }
 
-    /// The earlier report and sheet go first and the output folder is prepared next; a failure in either
-    /// stops the run before anything is rendered. Whatever happens after that, the run ends by
-    /// writing the sheet, the text report and the manifest, so a failed run is still a baseline
-    /// for the next one.
+    /// The earlier report and sheet go first and the output folder is prepared next; a failure
+    /// in either stops the run before anything is rendered. Whatever happens after that, the run
+    /// ends by writing the sheet, the text report and the manifest, so a failed run is still a
+    /// baseline for the next one.
     pub fn run(&self, areas: &[ScreenArea]) -> SuiteReport {
         let mut report = SuiteReport {
             folder: self.folders.current(),
