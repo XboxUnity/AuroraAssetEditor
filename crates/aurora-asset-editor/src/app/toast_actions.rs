@@ -12,8 +12,8 @@ impl App {
         self.toasts.dismiss(id);
     }
 
-    /// The outcome of an action that wrote something (a file, the console, the editor's pages, the clipboard):
-    /// in the status line and in a toast.
+    /// The outcome of a save, an export, a console transfer (a download into the editor included), a bulk
+    /// run or a clipboard copy: in the status line and in a toast.
     pub(super) fn report_done(&mut self, text: String) {
         self.toasts.push(text.clone(), Severity::Info);
         self.status = StatusLine::info(text);
