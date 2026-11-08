@@ -84,7 +84,7 @@ impl fmt::Display for ConsoleError {
             }
             Self::LoginRejected { code } => write!(
                 f,
-                "the console rejected the login (reply {code}), check the FTP user name and password"
+                "the console rejected the login (reply {code}), check the FTP username and password"
             ),
             Self::TooManyConnections => write!(
                 f,
