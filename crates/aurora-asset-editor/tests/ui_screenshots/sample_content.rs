@@ -3,10 +3,10 @@ use std::io::Cursor;
 use std::path::PathBuf;
 use std::sync::OnceLock;
 
-use aurora_asset::{AssetFile, AssetSlot, Compression, TextureHeader, encode};
+use aurora_asset::{AssetFile, AssetSlot, Compression, EncodedTexture, TextureHeader, encode};
 use aurora_asset_editor::app::CurrentGame;
 use aurora_console::{FtpSettings, Game, GameIds, HexId};
-use editor_test_support::{AppHarness, Scene, asset_file_with};
+use editor_test_support::{AppHarness, FsdBuilder, Scene, asset_file_with};
 use image::{ImageFormat, Rgba, RgbaImage};
 use tempfile::TempDir;
 
@@ -139,6 +139,18 @@ const BASE_CHANNEL_RANGE: u8 = 160;
 const GRADIENT_BANDS: u32 = 12;
 /// How much lighter the top-left quarter is, so a flipped or rotated image shows.
 const LIGHT_QUARTER_BOOST: u8 = 48;
+
+const TEXT_FILE_CONTENT: &[u8] = b"These are notes, not an asset file.";
+const TRUNCATED_ENTRY: u8 = 2;
+const SOUND_ENTRY: u8 = 3;
+const SOUND_ENTRY_SEED: u8 = 6;
+const ENTRY_SIZE: (u32, u32) = (16, 16);
+const TRUNCATED_SIZE: (u32, u32) = (16, 16);
+const TRUNCATED_SEED: u8 = 9;
+/// Fewer bytes than the texture's pixels need, so decoding it fails.
+const TRUNCATED_DATA_LEN: usize = 4;
+const FSD_SCREENSHOT_SIZE: (u32, u32) = (20, 12);
+const FSD_SCREENSHOT_SEED: u8 = 8;
 
 /// The asset files the asset page screens load.
 #[derive(Clone, Copy)]
@@ -312,4 +324,53 @@ fn write_to_scene_folder(scene: &mut Scene, file_name: &str, bytes: &[u8]) -> Pa
     fs::write(&path, bytes).expect("the sample file can be written");
     scene.keep_alive(folder);
     path
+}
+
+/// A text file named `file_name`: not an image, not an `.asset` file, whatever its name says.
+pub fn text_file(scene: &mut Scene, file_name: &str) -> PathBuf {
+    write_to_scene_folder(scene, file_name, TEXT_FILE_CONTENT)
+}
+
+/// A screenshots file whose entry 2 has a texture too short for its header and whose entry 3 is
+/// sound, so loading drops the first and reports it.
+pub fn undecodable_entry_asset() -> Vec<u8> {
+    let truncated_slot = AssetSlot::screenshot(TRUNCATED_ENTRY).expect("a screenshot position");
+    let sound_slot = AssetSlot::screenshot(SOUND_ENTRY).expect("a screenshot position");
+    let mut file = AssetFile::new();
+    file.set(truncated_slot, Some(truncated_texture()));
+    file.set(
+        sound_slot,
+        Some(
+            encode(
+                &sample_art(ENTRY_SIZE.0, ENTRY_SIZE.1, SOUND_ENTRY_SEED),
+                Compression::None,
+            )
+            .expect("a small image encodes"),
+        ),
+    );
+    file.to_bytes()
+}
+
+/// An FSD file holding `count` screenshots.
+pub fn fsd_with_screenshots(count: usize) -> Vec<u8> {
+    let screenshot = png_bytes(&sample_art(
+        FSD_SCREENSHOT_SIZE.0,
+        FSD_SCREENSHOT_SIZE.1,
+        FSD_SCREENSHOT_SEED,
+    ));
+    (0..count)
+        .fold(FsdBuilder::new(), |builder, _| {
+            builder.screenshot(&screenshot)
+        })
+        .build()
+}
+
+fn truncated_texture() -> EncodedTexture {
+    let mut texture = encode(
+        &sample_art(TRUNCATED_SIZE.0, TRUNCATED_SIZE.1, TRUNCATED_SEED),
+        Compression::Dxt,
+    )
+    .expect("a small image encodes");
+    texture.data.truncate(TRUNCATED_DATA_LEN);
+    texture
 }

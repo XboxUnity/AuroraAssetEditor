@@ -3,6 +3,7 @@
 
 mod asset_page_screens;
 mod console_screens;
+mod editor_dialog_screens;
 mod online_screens;
 mod sample_content;
 mod screenshot_page_screens;
@@ -26,6 +27,7 @@ const AREAS: &[ScreenArea] = &[
     screenshot_page_screens::SCREENSHOT_PAGE,
     online_screens::ONLINE,
     console_screens::CONSOLE,
+    editor_dialog_screens::EDITOR_DIALOGS,
 ];
 
 /// A screen name starts with what it shows, so a sorted listing of `fixtures/ui` groups related
