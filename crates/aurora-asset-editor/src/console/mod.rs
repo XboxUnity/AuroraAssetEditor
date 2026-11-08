@@ -8,6 +8,7 @@ mod online_cover_provider;
 mod port_text;
 mod presence_cell;
 mod presence_gate;
+mod refresh_origin;
 
 pub use connection_failure::is_connection_failure;
 pub use console_link::ConsoleLink;
@@ -19,3 +20,4 @@ pub use online_cover_provider::{CoverProviderError, OnlineCoverProvider};
 pub use port_text::port_text_for_save;
 pub use presence_cell::PresenceCell;
 pub use presence_gate::PresenceGate;
+pub use refresh_origin::RefreshOrigin;

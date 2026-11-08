@@ -1,5 +1,6 @@
 use aurora_console::Game;
 
+use crate::console::RefreshOrigin;
 use crate::dialogs::GamePicker;
 
 use super::{App, PickerContent};
@@ -71,13 +72,14 @@ impl App {
     }
 
     /// Opening a dialog with a picker lists the console's games when this session has not listed them yet,
-    /// with the Console page's Refresh.
+    /// as the Console page's Refresh does, except that a connection failure is shown beside the dialog
+    /// instead of in a dialog of its own.
     pub(super) fn load_games_for_picker(&mut self) {
         let listed_or_listing = self.console.last_refresh.is_some() || self.console.is_refreshing();
         if self.console.settings.is_none() || listed_or_listing {
             return;
         }
-        self.refresh_games();
+        self.list_games(RefreshOrigin::GamePicker);
     }
 
     fn picker_matches(&self) -> Vec<&Game> {

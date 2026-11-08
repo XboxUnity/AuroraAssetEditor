@@ -5,7 +5,9 @@ use aurora_console::{
     GameFilter, GameIds, GameListing,
 };
 
-use crate::console::{ConsoleLink, ConsoleState, GameColumn, PresenceCell, is_connection_failure};
+use crate::console::{
+    ConsoleLink, ConsoleState, GameColumn, PresenceCell, RefreshOrigin, is_connection_failure,
+};
 use crate::dialogs::{ConnectionForm, Modal};
 use crate::jobs::{ConsoleJob, ConsoleJobKind, ConsoleOutcome, ConsoleRequest, Job, JobPriority};
 use crate::logging::error_chain;
@@ -85,8 +87,13 @@ impl App {
         }
     }
 
-    /// Clears the table and lists the console's games again.
+    /// The Console page's Refresh: clears the table and lists the console's games again.
     pub fn refresh_games(&mut self) {
+        self.list_games(RefreshOrigin::ConsolePage);
+    }
+
+    /// Clears the table and lists the console's games again for `origin`.
+    pub(super) fn list_games(&mut self, origin: RefreshOrigin) {
         let Some(settings) = self.console.settings.clone() else {
             self.status = StatusLine::info(NO_CONSOLE_TEXT);
             return;
@@ -95,7 +102,7 @@ impl App {
             return;
         }
         self.console.table.clear();
-        let generation = self.console.start_refresh();
+        let generation = self.console.start_refresh(origin);
         self.active_work.console = Some(ConsoleActivity::Refreshing);
         self.status = StatusLine::info(REFRESHING_TEXT);
         self.submit_console_job(
@@ -291,7 +298,13 @@ impl App {
             self.report_console_error(REFRESH_FAILED, error);
             return;
         }
-        self.show_connection_failed(error);
+        match self.console.refresh_origin() {
+            RefreshOrigin::ConsolePage => self.show_connection_failed(error),
+            RefreshOrigin::GamePicker => {
+                self.console.link = ConsoleLink::Failed;
+                self.report_console_error(CONNECTION_FAILED_PREFIX, error);
+            }
+        }
     }
 
     /// The link is down: the status line and the "Connection failed" dialog say so; the dialog is the message,

@@ -41,7 +41,7 @@ pub const CONSOLE_DIALOGS: ScreenArea = ScreenArea {
         },
         Screen {
             name: "dialog-upload-target-manual",
-            description: "\"Save all assets to console\" after listing the console's games failed: only the ID boxes, the error in the status line; the \"Connection failed\" dialog waits behind it.",
+            description: "\"Save all assets to console\" after listing the console's games failed: only the ID boxes, the error in the status line and in a red toast; no \"Connection failed\" dialog waits behind it.",
             stage: stage_upload_target_manual,
         },
         Screen {

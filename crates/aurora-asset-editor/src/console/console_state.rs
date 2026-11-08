@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use aurora_console::FtpSettings;
 use chrono::{DateTime, Local};
 
-use super::{ConsoleLink, GameTable, PresenceGate};
+use super::{ConsoleLink, GameTable, PresenceGate, RefreshOrigin};
 
 /// The console page's state: the connection settings of this session, what is known about the link, and
 /// the game table.
@@ -17,6 +17,8 @@ pub struct ConsoleState {
     presence_gate: PresenceGate,
     /// The generation of the refresh that is running, if one is.
     running_refresh: Option<u64>,
+    /// What started the last refresh.
+    refresh_origin: RefreshOrigin,
     /// The stop flag of the bulk run in progress.
     bulk_stop: Option<Arc<AtomicBool>>,
 }
@@ -35,6 +37,7 @@ impl ConsoleState {
             last_refresh: None,
             presence_gate: PresenceGate::default(),
             running_refresh: None,
+            refresh_origin: RefreshOrigin::default(),
             bulk_stop: None,
         }
     }
@@ -48,10 +51,15 @@ impl ConsoleState {
         &self.presence_gate
     }
 
-    pub(crate) fn start_refresh(&mut self) -> u64 {
+    pub(crate) fn start_refresh(&mut self, origin: RefreshOrigin) -> u64 {
         let generation = self.presence_gate.start_refresh();
         self.running_refresh = Some(generation);
+        self.refresh_origin = origin;
         generation
+    }
+
+    pub fn refresh_origin(&self) -> RefreshOrigin {
+        self.refresh_origin
     }
 
     pub fn is_refreshing(&self) -> bool {

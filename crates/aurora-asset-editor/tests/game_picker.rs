@@ -1,9 +1,11 @@
 use aurora_asset_editor::app::{App, BUSY_TEXT, CurrentGame, PickerContent};
 use aurora_asset_editor::dialogs::{Modal, ModalAnswer, ModalField};
 use aurora_asset_editor::jobs::{ConsoleJob, ConsoleOutcome, ConsoleRequest, Job, JobOutcome};
+use aurora_asset_editor::status::Severity;
 use aurora_console::{ConsoleError, FtpSettings, Game, GameIds, GameListing, HexId};
 use editor_test_support::AppHarness;
 
+const CONNECTION_FAILED_TEXT: &str = "FTP Connection could not be established: ";
 /// The code a console answers a wrong username or password with.
 const LOGIN_REJECTED_CODE: u32 = 530;
 
@@ -227,7 +229,7 @@ fn an_unlisted_console_is_listed_once_while_the_boxes_work() {
 }
 
 #[test]
-fn a_failed_listing_keeps_the_dialog_and_its_boxes() {
+fn a_failed_listing_keeps_the_dialog_and_its_boxes_and_says_so_beside_it() {
     let mut harness = console_harness();
     harness.app().save_all_to_console();
     assert!(is_refresh(harness.take_next_job()));
@@ -247,13 +249,27 @@ fn a_failed_listing_keeps_the_dialog_and_its_boxes() {
             None,
             "only the ID boxes are left"
         );
+        let status = app.status().clone();
+        assert_eq!(status.severity, Severity::Error);
+        assert!(
+            status.text.starts_with(CONNECTION_FAILED_TEXT),
+            "{}",
+            status.text
+        );
+        let toasts: Vec<(String, Severity)> = app
+            .toasts()
+            .iter()
+            .map(|toast| (toast.text.clone(), toast.severity))
+            .collect();
+        assert_eq!(toasts, [(status.text, Severity::Error)]);
 
         app.edit_modal_field(ModalField::UploadTitleId, "4D5307E6");
         app.edit_modal_field(ModalField::UploadDatabaseId, "00000001");
         app.answer_modal(ModalAnswer::Accept);
-        assert!(
-            matches!(app.modal(), Some(Modal::Message { .. })),
-            "the connection failure waited behind the dialog"
+        assert_eq!(
+            app.modal(),
+            None,
+            "no \"Connection failed\" dialog waited behind it"
         );
     }
     let app = harness.app();
