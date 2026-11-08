@@ -1,5 +1,6 @@
 use std::fs;
 use std::io::Cursor;
+use std::ops::RangeInclusive;
 use std::path::PathBuf;
 use std::sync::OnceLock;
 
@@ -140,6 +141,18 @@ const BASE_CHANNEL_RANGE: u8 = 160;
 const GRADIENT_BANDS: u32 = 12;
 /// How much lighter the top-left quarter is, so a flipped or rotated image shows.
 const LIGHT_QUARTER_BOOST: u8 = 48;
+/// DXT keeps red and blue in 5 bits and green in 6, so a channel holds 32 or 64 levels; a colour on those
+/// levels needs no dithering between two of them.
+const RED_BLUE_STEPS: u32 = 31;
+const GREEN_STEPS: u32 = 63;
+/// DXT stores the pixels in blocks of 4x4.
+const DXT_BLOCK_SIDE: u32 = 4;
+/// Even in a flat block, the encoder stores a green level in the middle of each third of the range as a
+/// pattern of two neighbouring levels; the art leaves those levels out.
+const GREEN_THIRD: u32 = 21;
+const SPLIT_GREEN_STEPS: RangeInclusive<u32> = 9..=12;
+/// Split levels up to here move down to the level below the range, the others up to the one above.
+const SPLIT_GREEN_MIDDLE: u32 = 10;
 
 const TEXT_FILE_CONTENT: &[u8] = b"These are notes, not an asset file.";
 const TRUNCATED_ENTRY: u8 = 2;
@@ -164,7 +177,10 @@ pub enum SampleAsset {
 }
 
 /// A banded gradient from left to right between two colours derived from `seed`, the top-left quarter
-/// lighter. Integer arithmetic only, so the pixels are the same on every machine.
+/// (the left half of the bands, the upper half of the rows) lighter. Integer arithmetic only, so the
+/// pixels are the same on every machine. Bands and quarter follow DXT's 4x4 blocks and every colour is
+/// one DXT stores exactly, so each block of a DXT sample is one exact colour and decodes to the same
+/// flat bands.
 pub fn sample_art(width: u32, height: u32, seed: u8) -> RgbaImage {
     let start = [
         base_channel(seed, 67, 40),
@@ -172,11 +188,12 @@ pub fn sample_art(width: u32, height: u32, seed: u8) -> RgbaImage {
         base_channel(seed, 29, 160),
     ];
     let end = start.map(|channel| u8::MAX - channel);
+    let block_columns = width.div_ceil(DXT_BLOCK_SIDE);
+    let light_rows = height / 2 / DXT_BLOCK_SIDE * DXT_BLOCK_SIDE;
     RgbaImage::from_fn(width, height, |x, y| {
-        let smooth = x * FULL_CHANNEL / (width - 1);
-        let along =
-            smooth * GRADIENT_BANDS / (FULL_CHANNEL + 1) * FULL_CHANNEL / (GRADIENT_BANDS - 1);
-        let in_light_quarter = x < width / 2 && y < height / 2;
+        let band = x / DXT_BLOCK_SIDE * GRADIENT_BANDS / block_columns;
+        let along = band * FULL_CHANNEL / (GRADIENT_BANDS - 1);
+        let in_light_quarter = band < GRADIENT_BANDS / 2 && y < light_rows;
         let channel = |index: usize| {
             let mixed = (u32::from(start[index]) * (FULL_CHANNEL - along)
                 + u32::from(end[index]) * along)
@@ -188,8 +205,42 @@ pub fn sample_art(width: u32, height: u32, seed: u8) -> RgbaImage {
                 mixed
             }
         };
-        Rgba([channel(0), channel(1), channel(2), u8::MAX])
+        Rgba([
+            on_dxt_step(channel(0), RED_BLUE_STEPS),
+            green_on_dxt_step(channel(1)),
+            on_dxt_step(channel(2), RED_BLUE_STEPS),
+            u8::MAX,
+        ])
     })
+}
+
+/// The nearest of the values a DXT colour channel with `steps + 1` levels can hold.
+fn on_dxt_step(value: u8, steps: u32) -> u8 {
+    let step = (u32::from(value) * steps + FULL_CHANNEL / 2) / FULL_CHANNEL;
+    dxt_step_value(step, steps)
+}
+
+/// Like `on_dxt_step`, skipping the green steps the encoder splits.
+fn green_on_dxt_step(value: u8) -> u8 {
+    let step = (u32::from(value) * GREEN_STEPS + FULL_CHANNEL / 2) / FULL_CHANNEL;
+    let within_third = step % GREEN_THIRD;
+    let step = if SPLIT_GREEN_STEPS.contains(&within_third) {
+        let third_start = step - within_third;
+        if within_third <= SPLIT_GREEN_MIDDLE {
+            third_start + SPLIT_GREEN_STEPS.start() - 1
+        } else {
+            third_start + SPLIT_GREEN_STEPS.end() + 1
+        }
+    } else {
+        step
+    };
+    dxt_step_value(step, GREEN_STEPS)
+}
+
+/// The channel value the decoder gives step `step` of `steps`.
+fn dxt_step_value(step: u32, steps: u32) -> u8 {
+    u8::try_from((step * FULL_CHANNEL + steps / 2) / steps)
+        .expect("a step is at most a full channel")
 }
 
 /// A channel of a seed's start colour, kept clear of black and white so every seed reads as colour
@@ -374,4 +425,22 @@ fn truncated_texture() -> EncodedTexture {
     .expect("a small image encodes");
     texture.data.truncate(TRUNCATED_DATA_LEN);
     texture
+}
+
+#[test]
+fn dxt_samples_decode_to_the_art_they_were_made_from() {
+    let samples = [
+        (COVER_SIZE, COVER_SEED),
+        (ICON_SIZE, ICON_SEED),
+        (BANNER_SIZE, BANNER_SEED),
+    ];
+    for ((width, height), seed) in samples {
+        let art = sample_art(width, height, seed);
+        let texture = encode(&art, Compression::Dxt).expect("the sample encodes");
+        let decoded = aurora_asset::decode(&texture).expect("the sample decodes");
+        assert!(
+            decoded == art,
+            "the {width}x{height} sample of seed {seed} changed in DXT"
+        );
+    }
 }
