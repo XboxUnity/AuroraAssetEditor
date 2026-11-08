@@ -4,13 +4,13 @@ use std::rc::Rc;
 use aurora_asset::{AssetSlot, SCREENSHOT_COUNT, ScreenshotNumber, TextureHeader};
 use aurora_image::ImageTarget;
 use aurora_ui::{EditorModel, MainWindow, ScreenshotTile, SlotView};
-use slint::{ComponentHandle, Image, ModelRc, Rgba8Pixel, SharedPixelBuffer, VecModel};
+use slint::{ComponentHandle, Image, Rgba8Pixel, SharedPixelBuffer};
 
 use crate::app::App;
 use crate::editor::{AssetDocument, SlotPreview, texture_caption};
 
-use super::ImageCache;
 use super::shell_view::{Refresh, action_runner};
+use super::{ImageCache, ScreenshotTiles, TileContent};
 
 /// Connects the asset pages' buttons, the screenshot strip and drag-reorder to `app`.
 pub(super) fn connect_editor(window: &MainWindow, app: &Rc<RefCell<App>>, refresh: &Refresh) {
@@ -55,7 +55,12 @@ pub(super) fn connect_editor(window: &MainWindow, app: &Rc<RefCell<App>>, refres
     });
 }
 
-pub(super) fn render_editor(window: &MainWindow, app: &App, images: &mut ImageCache) {
+pub(super) fn render_editor(
+    window: &MainWindow,
+    app: &App,
+    images: &mut ImageCache,
+    tiles: &mut ScreenshotTiles,
+) {
     let editor = window.global::<EditorModel>();
     let pages = app.pages();
     editor.set_cover(slot_view(&pages.cover, AssetSlot::Cover, images));
@@ -76,12 +81,10 @@ pub(super) fn render_editor(window: &MainWindow, app: &App, images: &mut ImageCa
     editor.set_selected_screenshot(i32::from(selected.get()));
     let position_count = shown_position_count(screenshots);
     editor.set_screenshot_position_count(i32::try_from(position_count).unwrap_or(i32::MAX));
-    editor.set_screenshot_tiles(screenshot_tiles(
-        screenshots,
-        position_count,
-        selected,
-        images,
-    ));
+    tiles.show(
+        tile_contents(screenshots, position_count, selected),
+        |content| screenshot_tile(screenshots, content, images),
+    );
     editor.set_drop_hover(app.drop_hover());
 }
 
@@ -101,35 +104,45 @@ fn slot_view(document: &AssetDocument, slot: AssetSlot, images: &mut ImageCache)
 }
 
 /// Positions 1 to the last filled one, then the "+" tile for the position after it while there is one.
-fn screenshot_tiles(
+fn tile_contents(
     screenshots: &AssetDocument,
     shown_count: usize,
     selected: ScreenshotNumber,
-    images: &mut ImageCache,
-) -> ModelRc<ScreenshotTile> {
-    let mut tiles: Vec<ScreenshotTile> = ScreenshotNumber::ALL[..shown_count]
+) -> Vec<TileContent> {
+    let content = |number: ScreenshotNumber, is_next_free: bool| TileContent {
+        number,
+        image_revision: screenshots.revision(AssetSlot::Screenshot(number)),
+        filled: is_filled(screenshots, number),
+        selected: number == selected,
+        is_next_free,
+    };
+    let mut contents: Vec<TileContent> = ScreenshotNumber::ALL[..shown_count]
         .iter()
-        .map(|number| {
-            let slot = AssetSlot::Screenshot(*number);
-            ScreenshotTile {
-                number: i32::from(number.get()),
-                image: slot_image(screenshots, slot, images),
-                filled: is_filled(screenshots, *number),
-                selected: *number == selected,
-                is_next_free: false,
-            }
-        })
+        .map(|number| content(*number, false))
         .collect();
     if let Some(next_free) = ScreenshotNumber::ALL.get(shown_count) {
-        tiles.push(ScreenshotTile {
-            number: i32::from(next_free.get()),
-            image: Image::default(),
-            filled: false,
-            selected: *next_free == selected,
-            is_next_free: true,
-        });
+        contents.push(content(*next_free, true));
     }
-    ModelRc::new(VecModel::from(tiles))
+    contents
+}
+
+fn screenshot_tile(
+    screenshots: &AssetDocument,
+    content: &TileContent,
+    images: &mut ImageCache,
+) -> ScreenshotTile {
+    let image = if content.is_next_free {
+        Image::default()
+    } else {
+        slot_image(screenshots, AssetSlot::Screenshot(content.number), images)
+    };
+    ScreenshotTile {
+        number: i32::from(content.number.get()),
+        image,
+        filled: content.filled,
+        selected: content.selected,
+        is_next_free: content.is_next_free,
+    }
 }
 
 /// Positions 1 to the last filled one; 0 when no screenshot is filled.

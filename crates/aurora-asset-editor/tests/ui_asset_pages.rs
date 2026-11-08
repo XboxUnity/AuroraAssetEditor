@@ -578,6 +578,41 @@ fn dragging_shows_the_insertion_bar_and_a_short_move_selects() {
 }
 
 #[test]
+fn a_render_during_a_drag_keeps_the_drag() {
+    let mut harness = harness_with_theme(ThemeChoice::Dark);
+    load_screenshots(&mut harness, &[(1, RED), (2, GREEN), (3, BLUE)]);
+    let ui = Ui::start(&mut harness);
+    let first_preview = screenshot_preview(&ui.app.borrow(), 1);
+    let thumbs = ui.elements("ScreenshotStrip::thumb");
+    let start = centre(&thumbs[0]);
+    let target = centre(&thumbs[2]);
+    let button = PointerEventButton::Left;
+
+    ui.dispatch(WindowEvent::PointerMoved { position: start });
+    ui.dispatch(WindowEvent::PointerPressed {
+        position: start,
+        button,
+    });
+    ui.dispatch(WindowEvent::PointerMoved { position: target });
+    // What the app does after any job outcome, such as a bulk run's progress, which leaves the editor unlocked.
+    ui.render();
+    ui.dispatch(WindowEvent::PointerReleased {
+        position: target,
+        button,
+    });
+
+    assert!(
+        ui.elements("ScreenshotStrip::insertion-bar").is_empty(),
+        "the drag ended"
+    );
+    assert_eq!(
+        screenshot_preview(&ui.app.borrow(), 3),
+        first_preview,
+        "the dragged screenshot moved"
+    );
+}
+
+#[test]
 fn drop_hover_highlights_page() {
     let mut harness = harness_with_theme(ThemeChoice::Dark);
     let ui = Ui::start(&mut harness);

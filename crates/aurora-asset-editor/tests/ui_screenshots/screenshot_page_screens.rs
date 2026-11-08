@@ -3,8 +3,8 @@ use aurora_asset_editor::app::Page;
 use aurora_asset_editor::settings::ThemeChoice;
 use editor_test_support::{AppHarness, Scene, Screen, ScreenArea};
 use i_slint_backend_testing::ElementHandle;
+use slint::LogicalPosition;
 use slint::platform::{PointerEventButton, WindowEvent};
-use slint::{ComponentHandle, LogicalPosition};
 
 use crate::sample_content::{
     halo_3, load_asset_file, png_file, sample_art, sample_screenshots_bytes,
@@ -123,15 +123,12 @@ fn stage_dragging(theme: ThemeChoice) -> Scene {
     let thumbs = scene.elements("ScreenshotStrip::thumb");
     let start = centre_of(&thumbs[0]);
     let target = centre_of(&thumbs[2]);
-    // `Scene::dispatch` renders after every event, and a render rebuilds the strip's thumbnails, which
-    // drops the drag in progress; the events go straight to the window, as in `ui_asset_pages.rs`.
-    let window = scene.window().window();
-    window.dispatch_event(WindowEvent::PointerMoved { position: start });
-    window.dispatch_event(WindowEvent::PointerPressed {
+    scene.dispatch(WindowEvent::PointerMoved { position: start });
+    scene.dispatch(WindowEvent::PointerPressed {
         position: start,
         button: PointerEventButton::Left,
     });
-    window.dispatch_event(WindowEvent::PointerMoved { position: target });
+    scene.dispatch(WindowEvent::PointerMoved { position: target });
     scene.keep_pointer_in_place();
     scene
 }
