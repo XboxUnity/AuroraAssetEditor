@@ -35,7 +35,9 @@ export global Theme {
     out property <color> danger: #dc2626;
     out property <color> link-ok: dark ? #22c55e : #16a34a;
     out property <color> link-failed: dark ? #f87171 : #b91c1c;
-    // A toast's card, tinted by its outcome; its border is the outcome's colour (`link-ok`, `error-text`).
+    // A toast's card, tinted by its outcome; its border and icon are the outcome's colour (`toast-success`,
+    // `error-text`). The light theme's green is darker than `link-ok`, which is too faint on the pale green card.
+    out property <color> toast-success: dark ? #22c55e : #15803d;
     out property <color> toast-success-background: dark ? #1d3327 : #e8f6ee;
     out property <color> toast-error-background: dark ? #3a1f22 : #fdecec;
 

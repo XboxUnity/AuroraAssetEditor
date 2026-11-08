@@ -9,7 +9,7 @@ export component Toast inherits Rectangle {
     callback dismissed();
 
     property <color> foreground: error ? Theme.error-text : Theme.text;
-    property <color> state-colour: error ? Theme.error-text : Theme.link-ok;
+    property <color> state-colour: error ? Theme.error-text : Theme.toast-success;
 
     max-width: Theme.toast-max-width;
     background: error ? Theme.toast-error-background : Theme.toast-success-background;
