@@ -121,11 +121,20 @@ export component AboutDialog inherits DialogFrame {
                     border-color: Theme.border;
                     border-radius: Theme.dialog-radius;
 
-                    notices-list := ListView {
-                        for line in DialogModel.about-notices: Text {
-                            text: line == "" ? " " : line;
-                            color: Theme.text-muted;
-                            wrap: word-wrap;
+                    // The text sits inside the border as in a text field.
+                    VerticalLayout {
+                        padding: Theme.field-padding-x;
+
+                        notices-list := ListView {
+                            // Lines wrap at the list's width and a word longer than a line breaks, so the list
+                            // never scrolls sideways. Left to itself, a ListView widens to its longest word.
+                            content-width: self.visible-width;
+
+                            for line in DialogModel.about-notices: Text {
+                                text: line == "" ? " " : line;
+                                color: Theme.text-muted;
+                                wrap: word-wrap;
+                            }
                         }
                     }
                 }

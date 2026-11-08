@@ -13,7 +13,7 @@ use editor_test_support::{AppHarness, HeadlessUi};
 use i_slint_backend_testing::ElementHandle;
 use image::RgbaImage;
 use slint::platform::{Key, PointerEventButton, WindowEvent};
-use slint::{ComponentHandle, LogicalSize, SharedString};
+use slint::{ComponentHandle, LogicalPosition, LogicalSize, SharedString};
 
 /// Set to a folder to keep the rendered dialog as PNG files for a look.
 const SNAPSHOT_DIR_VARIABLE: &str = "AURORA_UI_SNAPSHOT_DIR";
@@ -23,6 +23,8 @@ const MIN_FOREGROUND_COLOURS: usize = 2;
 const CARD_PROBE_GAP: f32 = 4.0;
 const DATE_EXAMPLE: &str = "2026-11-07T10:00:00Z";
 const MINIMUM_WINDOW: (f32, f32) = (760.0, 500.0);
+/// A sideways wheel turn, more than any overhang a line of the notices could have.
+const SIDEWAYS_SCROLL: f32 = 200.0;
 /// Copy build info, Third-party notices, then the notices list.
 const NOTICES_TAB_STOPS: usize = 3;
 const THEMES: [(ThemeChoice, &str); 2] =
@@ -382,6 +384,44 @@ fn expanded_notices_fit_the_minimum_window_and_scroll_with_the_keys() {
         "Up and PageUp scroll back"
     );
     assert!(ui.app.borrow().modal().is_some());
+}
+
+#[test]
+fn notices_list_does_not_scroll_sideways() {
+    let mut harness = AppHarness::new();
+    let ui = Ui::start(&mut harness, ThemeChoice::Dark);
+    ui.app.borrow_mut().show_about();
+    ui.app.borrow_mut().toggle_about_notices();
+    ui.render();
+
+    let list = ui.element("AboutDialog::notices-keys");
+    let (position, size) = (list.absolute_position(), list.size());
+    let crop = |image: &RgbaImage| {
+        image::imageops::crop_imm(
+            image,
+            position.x as u32,
+            position.y as u32,
+            size.width as u32,
+            size.height as u32,
+        )
+        .to_image()
+    };
+    let before = crop(&ui.snapshot());
+    ui.view
+        .window()
+        .window()
+        .dispatch_event(WindowEvent::PointerScrolled {
+            position: LogicalPosition::new(
+                position.x + size.width / 2.0,
+                position.y + size.height / 2.0,
+            ),
+            delta_x: -SIDEWAYS_SCROLL,
+            delta_y: 0.0,
+        });
+    assert!(
+        crop(&ui.snapshot()).as_raw() == before.as_raw(),
+        "the notices moved sideways"
+    );
 }
 
 fn keep_snapshot(image: &RgbaImage, name: &str) {
