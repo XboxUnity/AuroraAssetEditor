@@ -439,11 +439,11 @@ fn about_card_fits_the_default_window_with_the_notices_open() {
             body.size().height
         );
         let widget = ui.element(ABOUT_SLINT_ID);
-        let widget_right = widget.absolute_position().x + widget.size().width;
-        let body_right = body.absolute_position().x + body.size().width;
+        let widget_bottom = widget.absolute_position().y + widget.size().height;
+        let body_bottom = body.absolute_position().y + body.size().height;
         assert!(
-            widget_right <= body_right,
-            "AboutSlint ends at {widget_right}, the card's body at {body_right}"
+            widget_bottom <= body_bottom,
+            "run URL {run_url:?}: AboutSlint ends at {widget_bottom}, the card's body at {body_bottom}"
         );
     }
 }
