@@ -35,5 +35,5 @@ pub use screenshots::{
     Screen, ScreenArea, ScreenExport, ScreenFilterOnCi, ScreenTextProblem, ScreenshotFolders,
     ScreenshotSuite, SuiteReport, TEST_ASSETS_VARIABLE, TestAssets, TestAssetsError,
     changed_pixels, check_screen_text, compare_pixels, current_platform, diff_image, image_name,
-    read_png, write_contact_sheet, write_opaque_png,
+    is_kebab_case, read_png, write_contact_sheet, write_opaque_png,
 };

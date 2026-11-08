@@ -33,18 +33,26 @@ pub(super) fn png_names(folder: &Path) -> io::Result<BTreeSet<String>> {
     Ok(names)
 }
 
+/// Lowercase letters and digits in words joined by single hyphens.
+pub fn is_kebab_case(name: &str) -> bool {
+    name.split('-').all(|word| {
+        !word.is_empty()
+            && word
+                .chars()
+                .all(|letter| letter.is_ascii_lowercase() || letter.is_ascii_digit())
+    })
+}
+
 /// Image names are lowercase kebab-case, so a name can never reach outside the folders.
 pub(super) fn validate_image_name(image: &str) -> io::Result<()> {
-    let is_kebab_case = !image.is_empty()
-        && image
-            .chars()
-            .all(|letter| letter.is_ascii_lowercase() || letter.is_ascii_digit() || letter == '-');
-    if is_kebab_case {
+    if is_kebab_case(image) {
         return Ok(());
     }
     Err(io::Error::new(
         io::ErrorKind::InvalidInput,
-        format!("the image name \"{image}\" is not lowercase kebab-case (a-z, 0-9 and -)"),
+        format!(
+            "the image name \"{image}\" is not lowercase kebab-case (words of a-z and 0-9 joined by single -)"
+        ),
     ))
 }
 
@@ -53,4 +61,23 @@ fn invalid_name(path: &Path) -> io::Error {
         io::ErrorKind::InvalidData,
         format!("the file name {} is not valid Unicode", path.display()),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn kebab_case_is_words_joined_by_single_hyphens() {
+        for name in ["a", "shell-main", "icon-banner-2", "a1-b2-c3"] {
+            assert!(is_kebab_case(name), "{name}");
+            assert!(validate_image_name(name).is_ok(), "{name}");
+        }
+        for name in [
+            "", "-", "a--b", "-a", "a-", "A", "a_b", "a b", "a/b", "..", "a.b",
+        ] {
+            assert!(!is_kebab_case(name), "{name}");
+            assert!(validate_image_name(name).is_err(), "{name}");
+        }
+    }
 }

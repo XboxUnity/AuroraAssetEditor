@@ -19,7 +19,9 @@ mod staged_outcomes;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
-use editor_test_support::{Screen, ScreenArea, ScreenExport, ScreenshotSuite, TestAssets};
+use editor_test_support::{
+    Screen, ScreenArea, ScreenExport, ScreenshotSuite, TestAssets, is_kebab_case,
+};
 
 /// The catalogue, one area per section of the contact sheet.
 const AREAS: &[ScreenArea] = &[
@@ -93,16 +95,6 @@ fn readme_images_folder() -> PathBuf {
 
 fn all_screens() -> impl Iterator<Item = &'static Screen> {
     AREAS.iter().flat_map(|area| area.screens.iter())
-}
-
-/// Lowercase letters and digits in words joined by single hyphens.
-fn is_kebab_case(name: &str) -> bool {
-    name.split('-').all(|word| {
-        !word.is_empty()
-            && word
-                .chars()
-                .all(|letter| letter.is_ascii_lowercase() || letter.is_ascii_digit())
-    })
 }
 
 fn starts_with_prefix(name: &str, prefix: &str) -> bool {
