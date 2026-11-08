@@ -7,7 +7,7 @@ use aurora_asset_editor::app::{App, CurrentGame, KindChoice, Page};
 use aurora_asset_editor::status::{MAX_TOASTS, Severity, TOAST_DURATION};
 use aurora_asset_editor::view::{APP_BUSY_RETRY, MainWindowView};
 use aurora_console::{GameIds, HexId, asset_folder};
-use aurora_ui::{MainWindow, ShellModel, ToastView};
+use aurora_ui::{MainWindow, ShellModel, Theme, ToastView};
 use editor_test_support::{AppHarness, HeadlessUi, PreviewJobs, asset_file_with};
 use i_slint_backend_testing::{ElementHandle, mock_elapsed_time};
 use image::Rgba;
@@ -16,6 +16,7 @@ use slint::{ComponentHandle, Model};
 use test_servers::{FakeConsole, FakeConsoleConfig};
 
 const TOAST_CARD: &str = "ToastStack::toast-card";
+const STATUS_LINE: &str = "MainWindow::status-line";
 const CLIPBOARD_FAILURE: &str = "clipboard is gone";
 const DARK_ERROR_TEXT: Rgba<u8> = Rgba([0xf8, 0x71, 0x71, 0xff]);
 const COLOUR_TOLERANCE: u8 = 24;
@@ -308,4 +309,24 @@ fn a_click_dismisses_a_toast_and_the_window_around_it_stays_usable() {
         1,
         "a click elsewhere leaves the toast"
     );
+}
+
+#[test]
+fn toasts_sit_a_margin_above_the_status_line_at_any_window_size() {
+    for size in [HeadlessUi::WINDOW_SIZE, HeadlessUi::MINIMUM_WINDOW_SIZE] {
+        let mut harness = game_harness();
+        let window = Window::start(&mut harness);
+        window.ui.show_at_size(window.view.window().window(), size);
+        copy_ids(&window, 1);
+
+        let card = &window.cards()[0];
+        let card_bottom = card.absolute_position().y + card.size().height;
+        let status_top = ElementHandle::find_by_element_id(window.view.window(), STATUS_LINE)
+            .next()
+            .expect("the window has a status line")
+            .absolute_position()
+            .y;
+        let margin = window.view.window().global::<Theme>().get_toast_margin();
+        assert_eq!(card_bottom + margin, status_top, "window size {size:?}");
+    }
 }

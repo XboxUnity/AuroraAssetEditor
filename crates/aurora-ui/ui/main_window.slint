@@ -96,7 +96,11 @@ export component MainWindow inherits Window {
     }
 
     // Over the dialogs too, so the outcome of a dialog's action shows; above the status line, which shows it as well.
+    // Placed at the top: an element given a size and no position is centred in its parent, which would move
+    // the stack down by half the status line's height.
     ToastStack {
+        x: 0;
+        y: 0;
         width: 100%;
         height: root.height - status-line.height;
     }
