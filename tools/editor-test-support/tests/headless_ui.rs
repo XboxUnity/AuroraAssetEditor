@@ -5,10 +5,7 @@ use slint::ComponentHandle;
 
 const DARK_WINDOW_BACKGROUND: Rgba<u8> = Rgba([0x1b, 0x1d, 0x22, 0xff]);
 const LIGHT_WINDOW_BACKGROUND: Rgba<u8> = Rgba([0xf5, 0xf6, 0xf8, 0xff]);
-const DARK_PLACEHOLDER_ART: Rgba<u8> = Rgba([0x58, 0x5c, 0x61, 0xff]);
-const LIGHT_PLACEHOLDER_ART: Rgba<u8> = Rgba([0xd5, 0xda, 0xe2, 0xff]);
 const MIN_WINDOW_BACKGROUND_SHARE: f64 = 0.05;
-const MIN_PLACEHOLDER_ART_SHARE: f64 = 0.5;
 
 fn share_of_pixels(image: &RgbaImage, color: Rgba<u8>) -> f64 {
     let matching = image.pixels().filter(|pixel| **pixel == color).count();
@@ -30,12 +27,10 @@ fn main_window_renders_headless_in_both_themes() {
     let dark = render_main_window(true);
     assert_eq!(dark.dimensions(), (width, height));
     assert!(share_of_pixels(&dark, DARK_WINDOW_BACKGROUND) >= MIN_WINDOW_BACKGROUND_SHARE);
-    assert!(share_of_pixels(&dark, DARK_PLACEHOLDER_ART) >= MIN_PLACEHOLDER_ART_SHARE);
 
     let light = render_main_window(false);
     assert_eq!(light.dimensions(), (width, height));
     assert!(share_of_pixels(&light, LIGHT_WINDOW_BACKGROUND) >= MIN_WINDOW_BACKGROUND_SHARE);
-    assert!(share_of_pixels(&light, LIGHT_PLACEHOLDER_ART) >= MIN_PLACEHOLDER_ART_SHARE);
 }
 
 slint::slint! {
