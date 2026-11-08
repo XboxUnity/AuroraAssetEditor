@@ -94,7 +94,7 @@ pub const CONSOLE: ScreenArea = ScreenArea {
         },
         Screen {
             name: "console-bulk-running",
-            description: "A bulk cover run at game 2 of 8: the status shows its progress with Stop, Refresh and Bulk actions… are disabled and so are the console actions (no game is selected either); the filters and the table stay usable.",
+            description: "A bulk cover run at game 2 of 8: the status line shows its progress, a thin rule, the status text and Stop; Refresh and Bulk actions… are disabled and so are the console actions (no game is selected either); the filters and the table stay usable.",
             stage: stage_bulk_running,
         },
     ],

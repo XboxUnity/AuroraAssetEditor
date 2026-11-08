@@ -17,12 +17,23 @@ export component StatusLine inherits Rectangle {
             padding-left: Theme.status-padding-x;
             padding-right: Theme.status-padding-x;
             spacing: Theme.status-gap;
-            if ShellModel.progress-text != "": Text {
+            // A running job's progress, set off from the status text by a rule as tall as its line.
+            if ShellModel.progress-text != "": HorizontalLayout {
                 horizontal-stretch: 0;
-                text: ShellModel.progress-text;
-                color: Theme.text-muted;
-                font-size: Theme.caption-font-size;
-                vertical-alignment: center;
+                spacing: Theme.status-gap;
+                progress-text := Text {
+                    text: ShellModel.progress-text;
+                    color: Theme.text-muted;
+                    font-size: Theme.caption-font-size;
+                    vertical-alignment: center;
+                }
+                Rectangle {
+                    width: Theme.border-width;
+                    Rectangle {
+                        height: progress-text.preferred-height;
+                        background: Theme.border;
+                    }
+                }
             }
             status-text := Text {
                 horizontal-stretch: 1;
