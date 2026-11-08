@@ -18,8 +18,8 @@ use super::preview_view::connect_previews;
 use super::shell_view::{Refresh, connect_shell, render_shell};
 use super::toast_view::{connect_toasts, render_toasts};
 use super::{
-    GameRows, ImageCache, OnlineImageCache, PickerRows, PictureId, Previews, ResultTiles,
-    ScreenshotTiles, ToastRows, ToastTimers,
+    GameRows, ImageCache, OnlineImageCache, PickerRows, PictureId, PlaceholderArt, Previews,
+    ResultTiles, ScreenshotTiles, ToastRows, ToastTimers,
 };
 
 /// The window: it shows what `App` holds and turns the window's callbacks into `App` calls.
@@ -27,6 +27,7 @@ pub struct MainWindowView {
     window: MainWindow,
     system_theme: Rc<Cell<SystemTheme>>,
     images: Rc<RefCell<ImageCache>>,
+    placeholders: Rc<RefCell<PlaceholderArt>>,
     online_images: Rc<RefCell<OnlineImageCache>>,
     previews: Rc<RefCell<Previews>>,
     /// Puts a new space of a preview area to use once it has held still.
@@ -62,6 +63,7 @@ impl MainWindowView {
             window,
             system_theme: Rc::new(Cell::new(SystemTheme::default())),
             images: Rc::new(RefCell::new(ImageCache::default())),
+            placeholders: Rc::new(RefCell::new(PlaceholderArt::default())),
             online_images: Rc::new(RefCell::new(OnlineImageCache::default())),
             previews: Rc::new(RefCell::new(Previews::new(preview_jobs))),
             space_settle_timer: Rc::new(Timer::default()),
@@ -102,6 +104,7 @@ impl MainWindowView {
         let weak_window = self.window.as_weak();
         let system_theme = Rc::clone(&self.system_theme);
         let images = Rc::clone(&self.images);
+        let placeholders = Rc::clone(&self.placeholders);
         let online_images = Rc::clone(&self.online_images);
         let previews = Rc::clone(&self.previews);
         let screenshot_tiles = Rc::clone(&self.screenshot_tiles);
@@ -114,6 +117,7 @@ impl MainWindowView {
             if let Some(window) = weak_window.upgrade() {
                 let caches = Caches {
                     editor: &mut images.borrow_mut(),
+                    placeholders: &mut placeholders.borrow_mut(),
                     online: &mut online_images.borrow_mut(),
                     previews: &mut previews.borrow_mut(),
                     screenshot_tiles: &mut screenshot_tiles.borrow_mut(),
@@ -144,6 +148,7 @@ impl MainWindowView {
     pub fn render(&self, app: &App) {
         let caches = Caches {
             editor: &mut self.images.borrow_mut(),
+            placeholders: &mut self.placeholders.borrow_mut(),
             online: &mut self.online_images.borrow_mut(),
             previews: &mut self.previews.borrow_mut(),
             screenshot_tiles: &mut self.screenshot_tiles.borrow_mut(),
@@ -161,6 +166,7 @@ impl MainWindowView {
 /// the toasts' timers.
 struct Caches<'a> {
     editor: &'a mut ImageCache,
+    placeholders: &'a mut PlaceholderArt,
     online: &'a mut OnlineImageCache,
     previews: &'a mut Previews,
     screenshot_tiles: &'a mut ScreenshotTiles,
@@ -175,6 +181,7 @@ fn render_window(window: &MainWindow, app: &App, system_theme: SystemTheme, cach
     render_shell(window, app, system_theme);
     let mut editor_pictures = EditorPictures {
         originals: caches.editor,
+        placeholders: caches.placeholders,
         previews: caches.previews,
     };
     render_editor(window, app, &mut editor_pictures, caches.screenshot_tiles);

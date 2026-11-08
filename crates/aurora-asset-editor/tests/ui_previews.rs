@@ -25,6 +25,8 @@ const COVER_SIZE: (u32, u32) = (900, 600);
 /// Smaller than its slot, so it is shown larger.
 const ICON_SIZE: (u32, u32) = (64, 64);
 const BANNER_SIZE: (u32, u32) = (420, 96);
+/// The old app's banner placeholder art is a pixel shorter than a banner.
+const PLACEHOLDER_BANNER_SIZE: (u32, u32) = (420, 95);
 /// Steps of a drag on the window's edge, each shorter than the wait for a space to settle.
 const DRAG_SIZES: [(f32, f32); 4] = [
     (980.0, 660.0),
@@ -58,6 +60,8 @@ impl Ui {
             app,
         };
         started.render();
+        // The first page's empty slot shows its placeholder art, resized like any picture.
+        assert_eq!(started.settle_and_resize(), 1, "the cover's art");
         started
     }
 
@@ -91,6 +95,33 @@ impl Ui {
             .unwrap_or_else(|| panic!("the page has a slot {index}"))
             .size();
         (size.width.floor() as u32, size.height.floor() as u32)
+    }
+
+    /// The space an empty slot gives its placeholder art, like `slot_space`.
+    fn placeholder_space(&self, index: usize) -> (u32, u32) {
+        let arts: Vec<ElementHandle> =
+            ElementHandle::find_by_element_id(self.view.window(), "DropSlot::placeholder-art")
+                .collect();
+        let size = arts
+            .get(index)
+            .unwrap_or_else(|| panic!("the page has an empty slot {index}"))
+            .size();
+        (size.width.floor() as u32, size.height.floor() as u32)
+    }
+
+    /// The size the window draws each placeholder art at, in the order the page shows them.
+    fn drawn_placeholder_sizes(&self) -> Vec<(u32, u32)> {
+        ElementHandle::find_by_element_id(self.view.window(), "DropSlot::placeholder-art")
+            .map(|art| {
+                let picture = art
+                    .query_descendants()
+                    .match_id("PreviewImage::picture")
+                    .find_first()
+                    .expect("the art is drawn by a picture");
+                let size = picture.size();
+                (size.width.round() as u32, size.height.round() as u32)
+            })
+            .collect()
     }
 
     /// The size the window draws the picture of each slot at, in the order the page shows them.
@@ -210,6 +241,29 @@ fn a_resize_of_the_window_resizes_each_picture_once_after_it_settles() {
     let banner_size = preview_size(BANNER_SIZE, ui.slot_space(1));
     assert_eq!(size_of(&ui.model().get_icon().image), icon_size);
     assert_eq!(size_of(&ui.model().get_banner().image), banner_size);
+}
+
+#[test]
+fn placeholder_art_reaches_the_window_at_the_size_it_is_shown() {
+    let mut harness = AppHarness::new();
+    let ui = Ui::start(&mut harness);
+
+    ui.show_page(Page::IconBanner);
+    assert_eq!(ui.settle_and_resize(), 2, "the icon's and the banner's art");
+
+    let icon_size = preview_size(ICON_SIZE, ui.placeholder_space(0));
+    assert!(icon_size.0 > ICON_SIZE.0, "the icon's art is shown larger");
+    assert_eq!(size_of(&ui.model().get_icon().placeholder), icon_size);
+    let banner_art = size_of(&ui.model().get_banner().placeholder);
+    assert_eq!(
+        banner_art,
+        preview_size(PLACEHOLDER_BANNER_SIZE, ui.placeholder_space(1))
+    );
+    assert_eq!(
+        ui.drawn_placeholder_sizes(),
+        vec![icon_size, banner_art],
+        "drawn pixel for pixel"
+    );
 }
 
 #[test]

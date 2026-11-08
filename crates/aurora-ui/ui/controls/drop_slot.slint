@@ -6,6 +6,7 @@ import { PreviewImage } from "preview_image.slint";
 // The preview area of an asset page: the image scaled to fit, or the placeholder art with the drop hint.
 export component DropSlot inherits Rectangle {
     in property <PreviewArea> area;
+    in property <PreviewArea> placeholder-area;
     in property <image> image;
     in property <bool> has-image;
     in property <bool> unsupported;
@@ -49,13 +50,14 @@ export component DropSlot inherits Rectangle {
     if !filled: VerticalLayout {
         padding: Theme.slot-content-padding;
         spacing: Theme.drop-hint-gap;
-        placeholder-art := Image {
+        // A bitmap, so the view resizes it to its space like a picture.
+        placeholder-art := PreviewImage {
             vertical-stretch: 1;
             // The art's own size would otherwise become the page's minimum size.
             preferred-width: 0;
             preferred-height: 0;
+            area: placeholder-area;
             source: placeholder;
-            image-fit: contain;
             colorize: Theme.placeholder-art;
         }
         drop-hint := Text {

@@ -11,8 +11,8 @@ use crate::editor::{AssetDocument, SlotPreview, texture_caption};
 
 use super::shell_view::{Refresh, action_runner};
 use super::{
-    ImageCache, PictureId, Previews, ScreenshotTileContent, ScreenshotTiles, ShownPicture,
-    slint_image,
+    ImageCache, PictureId, Placeholder, PlaceholderArt, Previews, ScreenshotTileContent,
+    ScreenshotTiles, ShownPicture, slint_image,
 };
 
 /// Connects the asset pages' buttons, the screenshot strip and drag-reorder to `app`.
@@ -58,9 +58,11 @@ pub(super) fn connect_editor(window: &MainWindow, app: &Rc<RefCell<App>>, refres
     });
 }
 
-/// The images that make the editor's pictures: each slot's pixels as loaded, and their resized copies.
+/// The images that make the editor's pictures: each slot's pixels as loaded, the placeholder art, and their
+/// resized copies.
 pub(super) struct EditorPictures<'a> {
     pub originals: &'a mut ImageCache,
+    pub placeholders: &'a mut PlaceholderArt,
     pub previews: &'a mut Previews,
 }
 
@@ -131,13 +133,23 @@ fn slot_view(
     let preview = document.preview(slot);
     let header = document.texture_header(slot);
     let picture = slot_picture(document, slot, area, pictures);
+    let unsupported = matches!(preview, SlotPreview::Unsupported(_));
+    // Only an empty slot shows its art, so only then is the art resized.
+    let placeholder = match (&picture, unsupported) {
+        (None, false) => Placeholder::of_slot(slot)
+            .and_then(|placeholder| pictures.placeholders.show(placeholder, pictures.previews)),
+        _ => None,
+    };
     SlotView {
         slot_index: slot_index(slot),
         title: slot_title(slot).into(),
         caption: slot_caption(slot, header).into(),
         has_image: picture.is_some(),
         image: picture.map(|picture| picture.image).unwrap_or_default(),
-        unsupported: matches!(preview, SlotPreview::Unsupported(_)),
+        placeholder: placeholder
+            .map(|placeholder| placeholder.image)
+            .unwrap_or_default(),
+        unsupported,
         can_export: matches!(preview, SlotPreview::Pixels(_)),
         can_remove: header.is_some(),
     }

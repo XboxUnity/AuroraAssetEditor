@@ -7,13 +7,13 @@ import { ImagePanel } from "image_panel.slint";
 export component AssetPage inherits VerticalLayout {
     in property <SlotView> view;
     in property <PreviewArea> area;
-    in property <image> placeholder;
+    in property <PreviewArea> placeholder-area;
 
     padding: Theme.body-padding;
 
     panel := ImagePanel {
         view: view;
         area: area;
-        placeholder: placeholder;
+        placeholder-area: placeholder-area;
     }
 }

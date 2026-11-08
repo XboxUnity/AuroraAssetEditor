@@ -8,6 +8,8 @@ import { PreviewModel } from "../model/preview_model.slint";
 export component PreviewImage {
     in property <PreviewArea> area;
     in property <image> source;
+    // Draws the picture's shape in this colour, as an Image's `colorize` does; none when transparent.
+    in property <brush> colorize;
 
     property <int> area-width: floor(root.width / 1phx);
     property <int> area-height: floor(root.height / 1phx);
@@ -42,5 +44,6 @@ export component PreviewImage {
         height: fits-area ? picture-height : root.height;
         source: root.source;
         image-fit: contain;
+        colorize: root.colorize;
     }
 }

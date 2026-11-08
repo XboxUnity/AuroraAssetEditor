@@ -1,9 +1,11 @@
-// One image slot as a page shows it. `slot-index` is the entry number the editor callbacks take.
+// One image slot as a page shows it. `slot-index` is the entry number the editor callbacks take. `placeholder`
+// is the art an empty slot shows.
 export struct SlotView {
     slot-index: int,
     title: string,
     caption: string,
     image: image,
+    placeholder: image,
     has-image: bool,
     unsupported: bool,
     can-export: bool,

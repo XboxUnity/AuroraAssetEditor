@@ -15,14 +15,14 @@ export component PageHost inherits Rectangle {
         height: 100%;
         view: EditorModel.cover;
         area: PreviewArea.cover;
-        placeholder: @image-url("../placeholders/cover.png");
+        placeholder-area: PreviewArea.cover-placeholder;
     }
     if ShellModel.page == PageId.background: background-page := AssetPage {
         width: 100%;
         height: 100%;
         view: EditorModel.background;
         area: PreviewArea.background;
-        placeholder: @image-url("../placeholders/background.png");
+        placeholder-area: PreviewArea.background-placeholder;
     }
     if ShellModel.page == PageId.icon-banner: icon-banner-page := IconBannerPage {
         width: 100%;

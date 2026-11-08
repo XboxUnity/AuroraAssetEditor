@@ -10,7 +10,7 @@ import { Theme } from "../theme/theme.slint";
 export component ImagePanel inherits VerticalLayout {
     in property <SlotView> view;
     in property <PreviewArea> area;
-    in property <image> placeholder;
+    in property <PreviewArea> placeholder-area;
     // Only the Screenshots page has Add.
     in property <bool> has-add-button;
 
@@ -71,7 +71,8 @@ export component ImagePanel inherits VerticalLayout {
         image: view.image;
         has-image: view.has-image;
         unsupported: view.unsupported;
-        placeholder: placeholder;
+        placeholder-area: placeholder-area;
+        placeholder: view.placeholder;
         highlighted: EditorModel.drop-hover;
     }
 }

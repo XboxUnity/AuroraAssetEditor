@@ -10,11 +10,11 @@ export component IconBannerPage inherits VerticalLayout {
     icon-panel := ImagePanel {
         view: EditorModel.icon;
         area: PreviewArea.icon;
-        placeholder: @image-url("../placeholders/icon.png");
+        placeholder-area: PreviewArea.icon-placeholder;
     }
     banner-panel := ImagePanel {
         view: EditorModel.banner;
         area: PreviewArea.banner;
-        placeholder: @image-url("../placeholders/banner.png");
+        placeholder-area: PreviewArea.banner-placeholder;
     }
 }

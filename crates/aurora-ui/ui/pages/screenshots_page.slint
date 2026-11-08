@@ -11,7 +11,7 @@ export component ScreenshotsPage inherits VerticalLayout {
     panel := ImagePanel {
         view: EditorModel.screenshot;
         area: PreviewArea.screenshot;
-        placeholder: @image-url("../placeholders/screenshot.png");
+        placeholder-area: PreviewArea.screenshot-placeholder;
         has-add-button: true;
     }
     strip := ScreenshotStrip {
