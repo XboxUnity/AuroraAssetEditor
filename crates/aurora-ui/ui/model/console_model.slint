@@ -32,4 +32,6 @@ export global ConsoleModel {
     callback select-first();
     callback select-last();
     callback open-in-editor();
+    // A double-click on a row, or Return on the selected one: selects the row and opens its game in the editor.
+    callback open-game(int);
 }

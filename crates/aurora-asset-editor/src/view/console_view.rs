@@ -72,6 +72,13 @@ pub(super) fn connect_console(window: &MainWindow, app: &Rc<RefCell<App>>, refre
     console.on_open_in_editor(move || act(&mut |app| app.open_in_editor()));
 
     let act = action_runner(app, refresh);
+    console.on_open_game(move |row| {
+        if let Some(row) = row_of(row) {
+            act(&mut |app| app.open_game_in_editor(row));
+        }
+    });
+
+    let act = action_runner(app, refresh);
     console.on_move_selection(move |step| {
         let step = isize::try_from(step).unwrap_or_default();
         act(&mut |app| app.move_game_selection(step));

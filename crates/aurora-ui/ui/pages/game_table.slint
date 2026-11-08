@@ -5,7 +5,8 @@ import { GameHeaderCell } from "game_header_cell.slint";
 import { GameRow } from "game_row.slint";
 
 // The console's games: a header that sorts, the rows that select, and Up, Down, Home and End to move the
-// selection once the table has focus (a click on a row, or Tab).
+// selection once the table has focus (a click on a row, or Tab). A double-click on a row, or Return on the
+// selected one, opens its game in the editor.
 export component GameTable inherits Rectangle {
     property <int> selected-row: ConsoleModel.selected-row;
     property <length> list-content-y: list.content-y;
@@ -59,6 +60,10 @@ export component GameTable inherits Rectangle {
             }
             if event.text == Key.End {
                 ConsoleModel.select-last();
+                return accept;
+            }
+            if event.text == Key.Return && selected-row >= 0 {
+                ConsoleModel.open-game(selected-row);
                 return accept;
             }
             reject
@@ -134,6 +139,9 @@ export component GameTable inherits Rectangle {
                     clicked => {
                         keys.focus();
                         ConsoleModel.select(index);
+                    }
+                    double-clicked => {
+                        ConsoleModel.open-game(index);
                     }
                 }
             }

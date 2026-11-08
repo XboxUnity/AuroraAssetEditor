@@ -2,12 +2,19 @@ use std::cell::{Cell, RefCell};
 use std::io::Cursor;
 use std::path::PathBuf;
 use std::rc::Rc;
+use std::time::Duration;
 
 use aurora_asset::{AssetKind, AssetSlot, Compression, ScreenshotNumber};
-use aurora_asset_editor::app::{App, BUSY_TEXT, Menu, NO_CONSOLE_TEXT, Page, SELECT_A_GAME_REASON};
+use aurora_asset_editor::app::{
+    App, BUSY_TEXT, KindChoice, Menu, NO_CONSOLE_TEXT, Page, SELECT_A_GAME_REASON,
+};
 use aurora_asset_editor::console::{GameColumn, PresenceCell};
 use aurora_asset_editor::dialogs::ModalAnswer;
-use aurora_asset_editor::jobs::{ConsoleOutcome, FailedJob, Job, JobOutcome, JobPanic, OnlineJob};
+use aurora_asset_editor::editor::decode_kind;
+use aurora_asset_editor::jobs::{
+    AfterDownload, ConsoleJob, ConsoleOutcome, ConsoleRequest, DownloadScope, FailedJob, Job,
+    JobOutcome, JobPanic, KindDownload, OnlineJob,
+};
 use aurora_asset_editor::online::{SearchMode, TileImage};
 use aurora_asset_editor::settings::ThemeChoice;
 use aurora_asset_editor::view::{MainWindowView, OnlineImageCache, ResultImage, ResultImageKey};
@@ -49,6 +56,8 @@ const DARK_WINDOW_BACKGROUND: image::Rgba<u8> = image::Rgba([0x1b, 0x1d, 0x22, 0
 const OUTLINE_PROBE: f32 = 3.0;
 const OUTLINE_REACH: f32 = 4.0;
 const GAP_PROBE: f32 = 1.0;
+/// Longer than any double-click interval.
+const SEPARATE_CLICKS_GAP: Duration = Duration::from_secs(2);
 const THEMES: [(ThemeChoice, &str); 2] =
     [(ThemeChoice::Dark, "dark"), (ThemeChoice::Light, "light")];
 
@@ -862,6 +871,8 @@ fn game_actions_need_the_selected_row_on_screen() {
     );
 
     ui.act(|app| app.set_game_filter("", ""));
+    // A while after the first click, as when a user types the filter, so the two clicks are no double-click.
+    i_slint_backend_testing::mock_elapsed_time(SEPARATE_CLICKS_GAP);
     ui.click_label_in("banana", "ConsolePage::game-table");
     for button in game_buttons {
         assert!(ui.enabled(button), "{button} is enabled again");
@@ -1302,4 +1313,127 @@ fn long_and_non_latin_titles_render_without_panic() {
     );
     ui.act(|app| app.select_game(0));
     ui.snapshot();
+}
+
+/// Two clicks on the row labelled `title`, close enough in time to count as a double-click.
+fn double_click_row(ui: &Ui, title: &str) {
+    let row = ui.labelled_in(title, "ConsolePage::game-table");
+    row.mock_single_click(PointerEventButton::Left);
+    row.mock_single_click(PointerEventButton::Left);
+}
+
+/// Drops the refresh and presence checks a staged listing queued, so a test sees only what it queues.
+fn drop_queued_jobs(harness: &mut AppHarness) {
+    while harness.take_next_job().is_some() {}
+}
+
+/// The IDs and scope of the console download queued next.
+fn next_download(harness: &mut AppHarness) -> (GameIds, DownloadScope, AfterDownload) {
+    match harness.take_next_job() {
+        Some(Job::Console(ConsoleRequest {
+            job: ConsoleJob::Download { ids, scope, after },
+            ..
+        })) => (ids, scope, after),
+        other => panic!("the next job is not a console download: {other:?}"),
+    }
+}
+
+/// A console with a game listed for each of `mixed_games`, and the jobs that listing queued dropped.
+fn ui_with_mixed_games(harness: &mut AppHarness) -> Ui {
+    let ui = Ui::start(harness);
+    ui.act(|app| show_games(app, mixed_games()));
+    drop_queued_jobs(harness);
+    ui
+}
+
+#[test]
+fn double_clicking_a_row_opens_its_game_in_the_editor() {
+    let mut harness = console_harness(ThemeChoice::Dark);
+    let ui = ui_with_mixed_games(&mut harness);
+    let apple = mixed_games()[1].clone();
+
+    double_click_row(&ui, "Apple");
+
+    assert_eq!(
+        harness.app().current_game().map(|game| game.ids.clone()),
+        Some(apple.ids.clone())
+    );
+    assert_eq!(harness.queued_jobs(), 1, "one download, queued once");
+    let (ids, scope, after) = next_download(&mut harness);
+    assert_eq!(ids, apple.ids);
+    assert_eq!(scope, DownloadScope::FullSet);
+    assert_eq!(after, AfterDownload::OpenFirstLoaded);
+
+    let cover = asset_file_with(&[(
+        AssetSlot::Cover,
+        RgbaImage::from_pixel(8, 8, image::Rgba([10, 40, 90, 255])),
+        Compression::None,
+    )]);
+    let results = AssetKind::ALL
+        .into_iter()
+        .map(|kind| KindDownload {
+            kind,
+            result: Ok(
+                (kind == AssetKind::Cover).then(|| Box::new(decode_kind(&cover, AssetKind::Cover)))
+            ),
+        })
+        .collect();
+    ui.act(|app| {
+        app.on_job_outcome(JobOutcome::Console(ConsoleOutcome::Downloaded {
+            ids,
+            scope,
+            after,
+            results,
+        }));
+    });
+    assert_eq!(harness.app().page(), Page::Cover);
+    assert!(harness.app().pages().cover.has_content());
+}
+
+#[test]
+fn double_clicking_a_row_while_the_console_is_busy_queues_nothing() {
+    let mut harness = console_harness(ThemeChoice::Dark);
+    let ui = ui_with_mixed_games(&mut harness);
+    ui.click_label_in("banana", "ConsolePage::game-table");
+    ui.act(|app| app.download(KindChoice::One(AssetKind::Cover)));
+    assert_eq!(harness.queued_jobs(), 1);
+
+    double_click_row(&ui, "Apple");
+
+    assert_eq!(harness.queued_jobs(), 1, "the double-click queued nothing");
+    assert_eq!(harness.app().status().text, BUSY_TEXT);
+    assert_eq!(harness.app().page(), Page::Console);
+}
+
+#[test]
+fn a_single_click_on_a_row_only_selects_it() {
+    let mut harness = console_harness(ThemeChoice::Dark);
+    let ui = ui_with_mixed_games(&mut harness);
+
+    ui.click_label_in("Apple", "ConsolePage::game-table");
+
+    assert_eq!(
+        harness
+            .app()
+            .current_game()
+            .map(|game| game.title.clone())
+            .as_deref(),
+        Some("Apple")
+    );
+    assert_eq!(harness.queued_jobs(), 0);
+    assert_eq!(harness.app().page(), Page::Console);
+}
+
+#[test]
+fn return_on_the_selected_row_opens_its_game_in_the_editor() {
+    let mut harness = console_harness(ThemeChoice::Dark);
+    let ui = ui_with_mixed_games(&mut harness);
+    ui.click_label_in("cherry", "ConsolePage::game-table");
+    assert_eq!(harness.queued_jobs(), 0);
+
+    ui.press(Key::Return);
+
+    let (ids, scope, _) = next_download(&mut harness);
+    assert_eq!(ids, mixed_games()[2].ids);
+    assert_eq!(scope, DownloadScope::FullSet);
 }

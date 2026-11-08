@@ -52,6 +52,15 @@ impl App {
         self.start_download(DownloadScope::FullSet, AfterDownload::OpenFirstLoaded);
     }
 
+    /// A double-click on a row, or Return on the selected one: selects the row's game and opens it like
+    /// "Open in editor", refused the same way while the console or the editor is busy.
+    pub fn open_game_in_editor(&mut self, visible_row: usize) {
+        self.select_game(visible_row);
+        if self.console.table.selected_visible_row() == Some(visible_row) {
+            self.open_in_editor();
+        }
+    }
+
     /// "Download": `All` replaces every page with the full set and stays on the console page; one kind
     /// replaces and opens its page.
     pub fn download(&mut self, choice: KindChoice) {

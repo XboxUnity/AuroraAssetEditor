@@ -6,6 +6,7 @@ import { AssetMarks } from "asset_marks.slint";
 export component GameRow inherits Rectangle {
     in property <GameRowView> view;
     callback clicked();
+    callback double-clicked();
 
     property <color> foreground: view.selected ? Theme.text-strong : Theme.text;
 
@@ -72,6 +73,9 @@ export component GameRow inherits Rectangle {
     TouchArea {
         clicked => {
             clicked();
+        }
+        double-clicked => {
+            double-clicked();
         }
     }
 }
