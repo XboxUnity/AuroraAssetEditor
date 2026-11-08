@@ -6,8 +6,11 @@ use aurora_ui::MainWindow;
 use i_slint_backend_testing::{ElementHandle, ElementRoot};
 use ttf_parser::Face;
 
-/// Texts that differ between machines: the test servers' address and the OS's wording of an `io::Error`.
-pub const FORBIDDEN_SCREEN_TEXT: [&str; 3] = ["127.0.0.1", "localhost", "os error"];
+use crate::STAGED_CONSOLE_HOST;
+
+/// Texts that differ between machines: the local host's name and the OS's wording of an `io::Error`.
+/// Addresses are checked separately: only the staged console's may appear.
+pub const FORBIDDEN_SCREEN_TEXT: [&str; 2] = ["localhost", "os error"];
 
 /// The two faces the UI draws its text with; `main_window.slint` imports the same files.
 const INTER_FONTS: [&[u8]; 2] = [
@@ -134,6 +137,14 @@ fn problems_in(text: &str, folders: &[MachineFolder]) -> Vec<String> {
         .filter(|forbidden| text.contains(*forbidden))
         .map(|forbidden| format!("\"{text}\" contains \"{forbidden}\""))
         .collect();
+    for address in addresses_in(text)
+        .into_iter()
+        .filter(|address| *address != STAGED_CONSOLE_HOST)
+    {
+        problems.push(format!(
+            "\"{text}\" shows the address {address}; screens show only the staged console {STAGED_CONSOLE_HOST}"
+        ));
+    }
     for folder in folders.iter().filter(|folder| folder.is_in(text)) {
         problems.push(format!(
             "\"{text}\" contains the {} \"{}\"",
@@ -147,6 +158,24 @@ fn problems_in(text: &str, folders: &[MachineFolder]) -> Vec<String> {
         ));
     }
     problems
+}
+
+/// The IPv4 addresses in `text`: four groups of 1 to 3 digits (each at most 255) joined by single dots, with
+/// no digit or dot directly before or after.
+fn addresses_in(text: &str) -> Vec<&str> {
+    text.split(|character: char| !character.is_ascii_digit() && character != '.')
+        .filter(|run| is_address(run))
+        .collect()
+}
+
+fn is_address(run: &str) -> bool {
+    let groups: Vec<&str> = run.split('.').collect();
+    groups.len() == 4
+        && groups.iter().all(|group| {
+            (1..=3).contains(&group.len())
+                && group.bytes().all(|byte| byte.is_ascii_digit())
+                && group.parse::<u8>().is_ok()
+        })
 }
 
 /// The characters of `text` that are missing from either Inter face, each named once. Control characters
@@ -179,6 +208,15 @@ mod tests {
     #[test]
     fn a_screen_without_text_fails_the_check() {
         assert_eq!(problems_on_screen(&[], &[]), vec![NO_SCREEN_TEXT]);
+    }
+
+    #[test]
+    fn addresses_are_found_in_text() {
+        assert_eq!(addresses_in("192.168.1.50:21 · xboxftp"), ["192.168.1.50"]);
+        assert!(addresses_in("Slint 1.18.1").is_empty());
+        assert!(addresses_in("1.2.3.4.5").is_empty());
+        assert!(addresses_in("999.1.1.1").is_empty());
+        assert!(addresses_in("192.168.1.").is_empty());
     }
 
     #[test]

@@ -7,16 +7,13 @@ use std::sync::OnceLock;
 use aurora_asset::{AssetFile, AssetSlot, Compression, EncodedTexture, TextureHeader, encode};
 use aurora_asset_editor::app::CurrentGame;
 use aurora_console::{FtpSettings, Game, GameIds, HexId};
-use editor_test_support::{AppHarness, FsdBuilder, Scene, asset_file_with};
+use editor_test_support::{AppHarness, FsdBuilder, STAGED_CONSOLE_HOST, Scene, asset_file_with};
 use image::{ImageFormat, Rgba, RgbaImage};
 use tempfile::TempDir;
 
 const HALO_3_TITLE: &str = "Halo 3";
 const HALO_3_TITLE_ID: &str = "4D5307E6";
 const HALO_3_DATABASE_ID: i64 = 1;
-/// A fixed address on the test subnet: the console is never contacted, and a live test server's
-/// address would differ from run to run on screen.
-const CONSOLE_HOST: &str = "192.168.1.50";
 const CONSOLE_PORT: &str = "21";
 
 /// The game the catalogue's "game" means.
@@ -50,7 +47,7 @@ pub fn sample_games() -> Vec<Game> {
 pub fn console_harness() -> AppHarness {
     let mut harness = AppHarness::new();
     harness.with_ftp_settings(FtpSettings {
-        host: CONSOLE_HOST.to_owned(),
+        host: STAGED_CONSOLE_HOST.to_owned(),
         port: CONSOLE_PORT.to_owned(),
         ..FtpSettings::default()
     });

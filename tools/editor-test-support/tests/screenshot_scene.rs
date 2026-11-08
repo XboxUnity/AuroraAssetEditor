@@ -5,9 +5,12 @@ use aurora_asset::AssetSlot;
 use aurora_asset_editor::app::{CurrentGame, Menu, Page};
 use aurora_asset_editor::jobs::{Job, OnlineJob};
 use aurora_asset_editor::settings::ThemeChoice;
+use aurora_console::FtpSettings;
 use aurora_console::{GameIds, HexId};
 use aurora_ui::ConsoleModel;
-use editor_test_support::{AppHarness, HeadlessUi, Scene, ScreenTextProblem, check_screen_text};
+use editor_test_support::{
+    AppHarness, HeadlessUi, STAGED_CONSOLE_HOST, Scene, ScreenTextProblem, check_screen_text,
+};
 use i_slint_backend_testing::ElementHandle;
 use image::{Rgba, RgbaImage};
 use slint::platform::WindowEvent;
@@ -224,6 +227,35 @@ fn screen_text_check_rejects_a_local_address() {
     let scene = scene_with_game("127.0.0.1");
 
     assert_names(&screen_text_problem(&scene), "127.0.0.1");
+}
+
+#[test]
+fn screen_text_check_rejects_an_address_other_than_the_staged_console() {
+    let scene = scene_with_game("Console 192.168.1.77");
+
+    assert_names(&screen_text_problem(&scene), "192.168.1.77");
+}
+
+#[test]
+fn screen_text_check_accepts_the_staged_console() {
+    let mut harness = AppHarness::new();
+    harness.with_ftp_settings(FtpSettings {
+        host: STAGED_CONSOLE_HOST.to_owned(),
+        port: "21".to_owned(),
+        ..FtpSettings::default()
+    });
+    let scene = Scene::start(harness, ThemeChoice::Dark);
+    scene.act(|app| app.show_page(Page::Console));
+
+    assert!(
+        ElementHandle::find_by_accessible_label(scene.window(), "192.168.1.50:21 · xboxftp")
+            .next()
+            .is_some(),
+        "the console chip shows the staged address"
+    );
+    if let Err(problem) = check_screen_text(scene.window()) {
+        panic!("{problem}");
+    }
 }
 
 #[test]

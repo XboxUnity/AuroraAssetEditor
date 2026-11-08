@@ -11,7 +11,9 @@ mod queued_runner;
 mod sample_assets;
 mod screenshots;
 
-pub use app_harness::{AppHarness, OutcomeStage, TEST_SUBNET_PREFIX, test_build_info};
+pub use app_harness::{
+    AppHarness, OutcomeStage, STAGED_CONSOLE_HOST, TEST_SUBNET_PREFIX, test_build_info,
+};
 pub use asset_fixtures::{
     BACKGROUND, BANNER, BOXART, COVER, FsdBuilder, ICON, PREVIEW, SCREENSHOT, SLOT,
 };

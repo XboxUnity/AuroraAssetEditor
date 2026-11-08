@@ -23,6 +23,8 @@ use crate::{
 };
 
 pub const TEST_SUBNET_PREFIX: &str = "192.168.1.";
+/// The one console address a screen may show; the console is never contacted.
+pub const STAGED_CONSOLE_HOST: &str = "192.168.1.50";
 const TEST_ONLINE_TIMEOUT: Duration = Duration::from_secs(5);
 /// Port 9 (discard) has no listener, so a request that is not routed to a test server is refused (on Windows
 /// a refused connect takes about 2 s).
