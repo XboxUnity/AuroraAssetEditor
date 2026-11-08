@@ -1,5 +1,6 @@
 //! The README's screens: staged as their counterparts in the catalogue are, with the user's real
-//! art in place of the generated samples.
+//! art in place of the generated samples. NeverDead is the current game on every screen, with its
+//! full set loaded.
 
 use aurora_asset::AssetKind;
 use aurora_asset_editor::app::Page;
@@ -32,58 +33,60 @@ const FIRST_RESULT: usize = 0;
 pub const README_SCREENS: &[Screen] = &[
     Screen {
         name: "cover",
-        description: "The Cover page with NeverDead current and its cover loaded.",
+        description: "The Cover page with NeverDead's full set loaded.",
         stage: stage_cover,
     },
     Screen {
         name: "screenshots",
-        description: "The Screenshots page with NeverDead current and its two screenshots in the strip, the first selected.",
+        description: "The Screenshots page with NeverDead's full set loaded: its two screenshots in the strip, the first selected.",
         stage: stage_screenshots,
     },
     Screen {
         name: "console",
-        description: "The Console page listing the real console's games with their asset marks, NeverDead selected.",
+        description: "The Console page listing the real console's games with their asset marks, NeverDead selected and its full set loaded.",
         stage: stage_console,
     },
     Screen {
         name: "online",
-        description: "The Online page after a TitleID search for NeverDead, its one cover selected and shown in full.",
+        description: "The Online page after a TitleID search for NeverDead, its one cover selected and shown in full, NeverDead's full set loaded.",
         stage: stage_online,
     },
 ];
 
-/// The given page with NeverDead current and `bytes` opened as its `kind` file.
-fn readme_game_on_page(theme: ThemeChoice, page: Page, kind: AssetKind, bytes: &[u8]) -> Scene {
-    let game = readme_current_game();
-    let file_name = asset_file_name(kind, &game.ids.title_id);
+/// Makes NeverDead the current game and opens every one of its asset files, `last` last, so the
+/// status line names that file.
+fn load_readme_game(scene: &mut Scene, last: AssetKind) {
+    let game = readme_game();
+    scene.act(|app| app.set_current_game(Some(readme_current_game())));
+    let others = AssetKind::ALL.into_iter().filter(|kind| *kind != last);
+    for kind in others.chain([last]) {
+        let file_name = asset_file_name(kind, &game.ids.title_id);
+        load_asset_file(scene, &file_name, &asset_bytes(&game, kind));
+    }
+}
+
+/// NeverDead's full set on the page that shows `kind`.
+fn readme_game_on_page(theme: ThemeChoice, page: Page, kind: AssetKind) -> Scene {
     let mut scene = Scene::start(AppHarness::new(), theme);
-    scene.act(|app| {
-        app.set_current_game(Some(game));
-        app.show_page(page);
-    });
-    load_asset_file(&mut scene, &file_name, bytes);
+    load_readme_game(&mut scene, kind);
+    scene.act(|app| app.show_page(page));
     scene
 }
 
 fn stage_cover(theme: ThemeChoice) -> Scene {
-    let cover = asset_bytes(&readme_game(), AssetKind::Cover);
-    readme_game_on_page(theme, Page::Cover, AssetKind::Cover, &cover)
+    readme_game_on_page(theme, Page::Cover, AssetKind::Cover)
 }
 
 fn stage_screenshots(theme: ThemeChoice) -> Scene {
-    let screenshots = asset_bytes(&readme_game(), AssetKind::Screenshots);
-    readme_game_on_page(
-        theme,
-        Page::Screenshots,
-        AssetKind::Screenshots,
-        &screenshots,
-    )
+    readme_game_on_page(theme, Page::Screenshots, AssetKind::Screenshots)
 }
 
 fn stage_console(theme: ThemeChoice) -> Scene {
     let games = console_games();
-    let scene = start_console(theme);
+    let mut scene = start_console(theme);
+    load_readme_game(&mut scene, AssetKind::Cover);
     scene.act(|app| {
+        app.show_page(Page::Console);
         show_games(app, games.clone());
         for game in &games {
             let presence = test_assets()
@@ -100,6 +103,8 @@ fn stage_online(theme: ThemeChoice) -> Scene {
     let server = RecordedHttp::start(readme_cover_routes());
     let mut scene = start_online(Some(&server), theme);
     scene.keep_alive(server);
+    load_readme_game(&mut scene, AssetKind::Cover);
+    scene.act(|app| app.show_page(Page::Online));
     search_for_title_id(&scene, README_GAME_TITLE_ID);
     scene.run_jobs();
     select_result_at(&mut scene, FIRST_RESULT);
