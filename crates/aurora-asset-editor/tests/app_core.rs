@@ -495,6 +495,21 @@ fn panicked_load_releases_the_editor_and_is_shown() {
     assert!(log.contains(text), "{log}");
 }
 
+/// Replace, Add, image drops and Use as Cover all end in an import job; their other failures show in dialogs.
+#[test]
+fn a_panicked_image_import_gets_a_red_toast() {
+    let mut harness = AppHarness::new();
+
+    harness.app().on_job_outcome(JobOutcome::Failed {
+        job: FailedJob::Import,
+        panic: job_panic("index out of bounds"),
+    });
+
+    let text = "Importing images stopped because of an internal error: index out of bounds";
+    assert_eq!(harness.app().status(), &StatusLine::error(text));
+    assert_eq!(error_toasts(&mut harness), [text]);
+}
+
 #[test]
 fn panicked_console_job_releases_the_console_actions() {
     let mut harness = AppHarness::new();
