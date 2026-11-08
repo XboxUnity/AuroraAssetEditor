@@ -37,6 +37,15 @@ fn stage_open_menu(theme: ThemeChoice) -> Scene {
     menu_scene(theme, Menu::Open)
 }
 
+/// Shows the gear menu in the dark theme only, so a screen staged by it differs from the open
+/// menu in one theme.
+fn stage_gear_menu_in_dark_only(theme: ThemeChoice) -> Scene {
+    match theme {
+        ThemeChoice::Dark => menu_scene(theme, Menu::Gear),
+        _ => menu_scene(theme, Menu::Open),
+    }
+}
+
 fn stage_panicking(_theme: ThemeChoice) -> Scene {
     panic!("boom")
 }
@@ -91,6 +100,34 @@ const SCREEN_A_CHANGED: &[ScreenArea] = &[ScreenArea {
             stage: stage_open_menu,
         },
         SCREEN_B,
+    ],
+}];
+/// `TWO_SCREENS` after screen b changed in the dark theme only and a screen c appeared.
+const B_CHANGED_IN_DARK_AND_C_NEW: &[ScreenArea] = &[ScreenArea {
+    title: AREA_TITLE,
+    screens: &[
+        SCREEN_A,
+        Screen {
+            name: "b",
+            description: "The open menu open",
+            stage: stage_gear_menu_in_dark_only,
+        },
+        Screen {
+            name: "c",
+            description: "A new screen",
+            stage: stage_gear_menu,
+        },
+    ],
+}];
+const A_AND_GONE: &[ScreenArea] = &[ScreenArea {
+    title: AREA_TITLE,
+    screens: &[
+        SCREEN_A,
+        Screen {
+            name: "gone",
+            description: "A screen removed later",
+            stage: stage_open_menu,
+        },
     ],
 }];
 const ONLY_SCREEN_A: &[ScreenArea] = &[ScreenArea {
@@ -825,4 +862,176 @@ fn contact_sheet_escapes_text() {
     let sheet = folders.sheet(&report);
     assert!(sheet.contains("a &lt; b &amp; c"), "{sheet}");
     assert!(!sheet.contains(ESCAPED_DESCRIPTION), "{sheet}");
+}
+
+/// Each needle appears in the sheet's body after the one before it. The search starts after the
+/// style, whose class names would otherwise match first.
+fn assert_in_order(sheet: &str, needles: &[&str]) {
+    let body_start = sheet
+        .find("</style>")
+        .expect("the sheet has a style element");
+    let mut from = body_start;
+    for needle in needles {
+        match sheet[from..].find(needle) {
+            Some(offset) => from += offset + needle.len(),
+            None => panic!("{needle} is missing or out of order in {needles:?}: {sheet}"),
+        }
+    }
+}
+
+#[test]
+fn contact_sheet_lists_changed_screens_first() {
+    let folders = SuiteFolders::new();
+    folders.run(TWO_SCREENS);
+
+    let report = folders.run(B_CHANGED_IN_DARK_AND_C_NEW);
+
+    assert_in_order(
+        &folders.sheet(&report),
+        &[
+            "id=\"changed\"",
+            "id=\"b-dark\"",
+            "id=\"new\"",
+            "id=\"c-dark\"",
+            "id=\"unchanged\"",
+            "id=\"a-dark\"",
+        ],
+    );
+}
+
+#[test]
+fn changed_image_shows_baseline_current_and_diff() {
+    let folders = SuiteFolders::new();
+    folders.run(TWO_SCREENS);
+
+    let report = folders.run(B_CHANGED_IN_DARK_AND_C_NEW);
+
+    let sheet = folders.sheet(&report);
+    for text in [
+        "baseline/b-dark.png",
+        "images/b-dark.png",
+        "diff/b-dark.png",
+        "badge-changed",
+        "pixels differ",
+    ] {
+        assert!(sheet.contains(text), "{text}: {sheet}");
+    }
+}
+
+#[test]
+fn a_screen_shows_both_themes_in_its_section() {
+    let folders = SuiteFolders::new();
+    folders.run(TWO_SCREENS);
+
+    let report = folders.run(B_CHANGED_IN_DARK_AND_C_NEW);
+
+    assert_eq!(image(&report, "b-light").change, ImageChange::Unchanged);
+    assert_in_order(
+        &folders.sheet(&report),
+        &[
+            "id=\"changed\"",
+            "id=\"b-light\"",
+            "badge-unchanged",
+            "id=\"new\"",
+        ],
+    );
+}
+
+#[test]
+fn removed_image_shows_its_baseline_copy() {
+    let folders = SuiteFolders::new();
+    folders.run(A_AND_GONE);
+
+    let report = folders.run(ONLY_SCREEN_A);
+
+    assert_in_order(
+        &folders.sheet(&report),
+        &["id=\"removed\"", "baseline/gone-dark.png"],
+    );
+}
+
+#[test]
+fn unreadable_baseline_shows_the_reason_with_the_changes() {
+    let folders = SuiteFolders::new();
+    folders.run(TWO_SCREENS);
+    fs::write(
+        folders.current().join("images").join("a-dark.png"),
+        b"not a png",
+    )
+    .expect("the first run's image is overwritten");
+
+    let report = folders.run(TWO_SCREENS);
+
+    let ImageChange::BaselineUnreadable(reason) = &image(&report, "a-dark").change else {
+        panic!("a-dark has an unreadable baseline: {report}");
+    };
+    let sheet = folders.sheet(&report);
+    assert_in_order(&sheet, &["id=\"changed\"", &escaped(reason)]);
+    assert_in_order(&sheet, &["id=\"changed\"", "badge-unreadable-baseline"]);
+}
+
+/// The text as the sheet shows it inside an element.
+fn escaped(text: &str) -> String {
+    text.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#39;")
+}
+
+#[test]
+fn unchanged_screens_are_folded_away() {
+    let folders = SuiteFolders::new();
+    folders.run(TWO_SCREENS);
+
+    let report = folders.run(TWO_SCREENS);
+
+    let sheet = folders.sheet(&report);
+    assert_in_order(&sheet, &["<details", "id=\"a-dark\""]);
+    assert!(!sheet.contains("<details open"), "{sheet}");
+    assert!(
+        !sheet.contains("<details class=\"unchanged-area\" open"),
+        "{sheet}"
+    );
+}
+
+#[test]
+fn error_image_shows_its_message_and_no_image() {
+    let folders = SuiteFolders::new();
+
+    let report = folders.run(ONE_BROKEN_SCREEN);
+
+    let sheet = folders.sheet(&report);
+    assert_in_order(&sheet, &["id=\"errors\"", "boom", "id=\"new\""]);
+    assert!(!sheet.contains("images/broken-dark.png"), "{sheet}");
+}
+
+#[test]
+fn sheet_names_what_it_compared_with() {
+    let folders = SuiteFolders::new();
+    let first = folders.run_labelled("first run label", None, TWO_SCREENS);
+    assert!(
+        folders
+            .sheet(&first)
+            .contains("No baseline: every image is new")
+    );
+
+    let second = folders.run_labelled("second", None, TWO_SCREENS);
+
+    let sheet = folders.sheet(&second);
+    assert_in_order(&sheet, &["Compared with", "first run label"]);
+}
+
+#[test]
+fn empty_sections_are_left_out() {
+    let folders = SuiteFolders::new();
+    folders.run(TWO_SCREENS);
+
+    let report = folders.run(TWO_SCREENS);
+
+    let sheet = folders.sheet(&report);
+    for id in ["errors", "changed", "new", "removed"] {
+        assert!(!sheet.contains(&format!("id=\"{id}\"")), "{id}: {sheet}");
+    }
+    assert!(sheet.contains("id=\"unchanged\""), "{sheet}");
 }
