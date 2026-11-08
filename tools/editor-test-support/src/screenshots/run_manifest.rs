@@ -1,8 +1,8 @@
+use std::error::Error;
+use std::fmt;
 use std::fs;
 use std::io;
-use std::path::Path;
-
-use super::manifest_error::ManifestError;
+use std::path::{Path, PathBuf};
 
 pub const MANIFEST_FILE: &str = "manifest.txt";
 pub const MANIFEST_FORMAT: u32 = 1;
@@ -71,9 +71,8 @@ impl RunManifest {
 
     pub fn write(&self, folder: &Path) -> io::Result<()> {
         let path = folder.join(MANIFEST_FILE);
-        fs::create_dir_all(folder)?;
-        fs::write(&path, self.to_text())
-            .map_err(|error| io::Error::new(error.kind(), format!("{}: {error}", path.display())))
+        fs::create_dir_all(folder).map_err(|error| with_path(folder, error))?;
+        fs::write(&path, self.to_text()).map_err(|error| with_path(&path, error))
     }
 
     pub fn read(folder: &Path) -> Result<RunManifest, ManifestError> {
@@ -84,6 +83,54 @@ impl RunManifest {
                 Err(ManifestError::Missing(path))
             }
             Err(error) => Err(ManifestError::Unreadable { path, error }),
+        }
+    }
+}
+
+fn with_path(path: &Path, error: io::Error) -> io::Error {
+    io::Error::new(error.kind(), format!("{}: {error}", path.display()))
+}
+
+#[derive(Debug)]
+pub enum ManifestError {
+    Missing(PathBuf),
+    Unreadable { path: PathBuf, error: io::Error },
+    UnknownFormat(String),
+    BadLine { line: usize, text: String },
+    MissingField(&'static str),
+}
+
+impl fmt::Display for ManifestError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Missing(path) => {
+                write!(formatter, "{MANIFEST_FILE} is missing: {}", path.display())
+            }
+            Self::Unreadable { path, error } => write!(
+                formatter,
+                "{MANIFEST_FILE} could not be read ({}): {error}",
+                path.display()
+            ),
+            Self::UnknownFormat(found) => write!(
+                formatter,
+                "{MANIFEST_FILE} has format {found}, this tool reads format {MANIFEST_FORMAT}"
+            ),
+            Self::BadLine { line, text } => write!(
+                formatter,
+                "{MANIFEST_FILE} line {line} is not a \"key: value\" line with a known key used once: {text}"
+            ),
+            Self::MissingField(field) => {
+                write!(formatter, "{MANIFEST_FILE} has no \"{field}\" line")
+            }
+        }
+    }
+}
+
+impl Error for ManifestError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::Unreadable { error, .. } => Some(error),
+            _ => None,
         }
     }
 }

@@ -22,7 +22,8 @@ pub fn current_platform() -> String {
 }
 
 /// The folder one run writes into: `images/<image>.png` for every image, and for an image that
-/// changed also `baseline/<image>.png` (the baseline's file) and `diff/<image>.png`.
+/// changed also `baseline/<image>.png` (the baseline's file) and `diff/<image>.png`; for a removed
+/// image only `baseline/<image>.png`.
 #[derive(Debug, Clone)]
 pub struct RunFolder {
     folder: PathBuf,
@@ -121,15 +122,22 @@ fn failure(action: &str, path: &Path, error: impl Display) -> String {
     format!("Could not {action} {}: {error}", path.display())
 }
 
-/// Copies `source` to `target`, creating the folder of `target`; an error names the path it
-/// concerns and keeps its kind.
+/// Copies the baseline's file `source` to `target`, creating the folder of `target`. An error
+/// says what was being copied and names both paths, and keeps its kind.
 fn copy_file(source: &Path, target: &Path) -> io::Result<()> {
     if let Some(folder) = target.parent() {
         fs::create_dir_all(folder).map_err(|error| with_path(folder, error))?;
     }
-    fs::copy(source, target)
-        .map(|_| ())
-        .map_err(|error| with_path(source, error))
+    fs::copy(source, target).map(|_| ()).map_err(|error| {
+        io::Error::new(
+            error.kind(),
+            format!(
+                "Could not copy the baseline image {} to {}: {error}",
+                source.display(),
+                target.display()
+            ),
+        )
+    })
 }
 
 fn with_path(path: &Path, error: io::Error) -> io::Error {

@@ -92,6 +92,48 @@ fn manifest_with_an_unknown_line_is_refused() {
 }
 
 #[test]
+fn manifest_with_a_repeated_key_is_refused() {
+    let text = "format: 1
+platform: test-platform
+label: local run
+rendered: now
+platform: other
+";
+
+    let Err(error) = RunManifest::from_text(text) else {
+        panic!("a repeated key must be refused");
+    };
+
+    assert!(matches!(error, ManifestError::BadLine { line: 5, .. }));
+    assert!(error.to_string().contains("used once"), "{error}");
+}
+
+#[test]
+fn manifest_without_a_required_line_is_refused() {
+    let full = manifest(PLATFORM, None).to_text();
+    for key in ["format", "platform", "label", "rendered"] {
+        let without: String = full
+            .lines()
+            .filter(|line| !line.starts_with(&format!("{key}: ")))
+            .map(|line| {
+                format!(
+                    "{line}
+"
+                )
+            })
+            .collect();
+
+        assert!(
+            matches!(
+                RunManifest::from_text(&without),
+                Err(ManifestError::MissingField(missing)) if missing == key
+            ),
+            "dropping {key} was not refused"
+        );
+    }
+}
+
+#[test]
 fn baseline_of_another_platform_is_refused() {
     let folder = temp_dir();
     manifest("other-platform", None)
@@ -210,10 +252,12 @@ fn changed_image_keeps_the_baseline_and_a_diff() {
     };
     assert_eq!(difference.count, 1);
     assert_eq!(
-        fs::read(run.baseline_copy_path(IMAGE)).expect("the baseline copy is written"),
+        fs::read(run.folder().join("baseline").join("x.png"))
+            .expect("the baseline copy is written to baseline/"),
         fs::read(baseline.image_path(IMAGE)).expect("the baseline image is readable")
     );
-    let diff = read_png(&run.diff_path(IMAGE)).expect("the diff is written");
+    let diff =
+        read_png(&run.folder().join("diff").join("x.png")).expect("the diff is written to diff/");
     assert_eq!(diff.width(), 3 * 6 + 2 * DIFF_PANEL_GAP);
 }
 
@@ -259,6 +303,62 @@ fn unreadable_baseline_image_is_flagged_not_failed() {
     );
     assert!(!change.is_failure());
     assert!(run.image_path(IMAGE).is_file());
+}
+
+#[test]
+fn baseline_image_that_cannot_be_opened_is_flagged_not_failed() {
+    let folder = temp_dir();
+    let baseline = write_baseline(folder.path(), None);
+    fs::create_dir_all(baseline.image_path(IMAGE)).expect("a folder takes the place of the image");
+    let run = run_folder(folder.path());
+
+    let change = run.record(IMAGE, &plain_image(), Some(&baseline));
+
+    let ImageChange::BaselineUnreadable(text) = &change else {
+        panic!("a baseline image that cannot be read must be flagged, got {change:?}");
+    };
+    assert!(
+        text.contains(&baseline.image_path(IMAGE).display().to_string()),
+        "{text}"
+    );
+    assert!(!change.is_failure());
+    assert!(run.image_path(IMAGE).is_file());
+}
+
+#[test]
+fn failed_baseline_copy_names_the_action_and_both_files() {
+    let folder = temp_dir();
+    let baseline = write_baseline(folder.path(), Some(&plain_image()));
+    let run = run_folder(folder.path());
+    fs::create_dir_all(run.baseline_copy_path(IMAGE)).expect("a folder blocks the copy");
+
+    let change = run.record(IMAGE, &image_with_changed_pixel(), Some(&baseline));
+
+    let ImageChange::Error(text) = &change else {
+        panic!("a baseline copy that fails must be an error, got {change:?}");
+    };
+    assert!(text.contains("Could not copy the baseline image"), "{text}");
+    assert!(
+        text.contains(&baseline.image_path(IMAGE).display().to_string()),
+        "{text}"
+    );
+    assert!(
+        text.contains(&run.baseline_copy_path(IMAGE).display().to_string()),
+        "{text}"
+    );
+}
+
+#[test]
+fn manifest_write_names_the_path_it_could_not_use() {
+    let folder = temp_dir();
+    let blocker = folder.path().join("blocker");
+    fs::write(&blocker, b"a file").expect("a file is written");
+
+    let error = manifest(PLATFORM, None)
+        .write(&blocker.join("run"))
+        .expect_err("a folder below a file cannot be created");
+
+    assert!(error.to_string().contains("blocker"), "{error}");
 }
 
 #[test]
