@@ -28,3 +28,14 @@ lto = "fat"
 codegen-units = 1
 strip = true
 panic = "unwind"
+
+# oxipng optimises the README screenshots; unoptimised it takes a minute where it otherwise takes
+# seconds. Only the screenshot tests use it.
+[profile.dev.package.oxipng]
+opt-level = 3
+
+[profile.dev.package.libdeflate-sys]
+opt-level = 3
+
+[profile.dev.package.libdeflater]
+opt-level = 3

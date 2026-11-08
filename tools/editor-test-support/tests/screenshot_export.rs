@@ -102,6 +102,29 @@ fn every_screen_is_written_in_both_themes() {
 }
 
 #[test]
+fn exported_image_is_optimised_without_changing_its_pixels() {
+    let folder = TempDir::new().expect("a temp folder");
+    let plain_folder = TempDir::new().expect("a temp folder");
+    let captured = capture(stage_gear_menu, ThemeChoice::Dark);
+    let plain = image_path(plain_folder.path(), "a-dark");
+    write_opaque_png(&plain, &captured).expect("the plain PNG is written");
+
+    let report = export(folder.path(), TWO_SCREENS);
+
+    assert!(report.passed(), "{report}");
+    let optimised = image_path(folder.path(), "a-dark");
+    let before = read_png(&plain).expect("the plain PNG decodes");
+    let after = read_png(&optimised).expect("the optimised PNG decodes");
+    assert!(before == captured, "the plain PNG is not the capture");
+    assert!(after == before, "optimising changed the pixels");
+    let (plain_size, optimised_size) = (read_bytes(&plain).len(), read_bytes(&optimised).len());
+    assert!(
+        optimised_size < plain_size,
+        "the export is {optimised_size} bytes, the plain PNG {plain_size}"
+    );
+}
+
+#[test]
 fn unchanged_image_keeps_its_bytes() {
     let folder = TempDir::new().expect("a temp folder");
     let first = export(folder.path(), TWO_SCREENS);

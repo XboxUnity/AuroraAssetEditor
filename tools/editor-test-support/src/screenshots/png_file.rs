@@ -12,21 +12,28 @@ const TEMPORARY_SUFFIX: &str = ".partial";
 
 /// Writes `image` as an RGB8 PNG, as small as the encoder can make it: every run's images go into
 /// the release zip and the README images into git. Refuses an image with any translucent pixel,
-/// which RGB cannot hold.
-///
-/// The PNG is encoded in memory and moved into place from a temporary file next to `path`, so a
-/// failure never leaves a half-written file at `path` and never changes a file already there.
+/// which RGB cannot hold. The file is written as `write_replacing` writes it.
 pub fn write_opaque_png(path: &Path, image: &RgbaImage) -> Result<(), PngFileError> {
+    let bytes = opaque_png_bytes(image)?;
+    write_replacing(path, &bytes)
+}
+
+/// The PNG `write_opaque_png` writes, in memory.
+pub(super) fn opaque_png_bytes(image: &RgbaImage) -> Result<Vec<u8>, PngFileError> {
     if let Some((x, y)) = first_translucent_pixel(image) {
         return Err(PngFileError::NotOpaque { x, y });
     }
-    let bytes = encode_rgb_png(image)?;
+    encode_rgb_png(image)
+}
 
+/// Moves `bytes` into place at `path` from a temporary file next to it, so a failure never leaves a
+/// half-written file and never changes a file already there.
+pub(super) fn write_replacing(path: &Path, bytes: &[u8]) -> Result<(), PngFileError> {
     if let Some(folder) = path.parent() {
         fs::create_dir_all(folder)?;
     }
     let temporary_path = temporary_path_beside(path);
-    if let Err(error) = fs::write(&temporary_path, &bytes) {
+    if let Err(error) = fs::write(&temporary_path, bytes) {
         return Err(remove_temporary_file(&temporary_path, error));
     }
     if let Err(error) = fs::rename(&temporary_path, path) {

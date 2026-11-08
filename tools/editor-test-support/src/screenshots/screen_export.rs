@@ -3,15 +3,17 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use image::{ImageError, RgbaImage};
+use oxipng::Options;
 
 use super::capture_thread::capture_on_own_thread;
 use super::image_files::{png_path, validate_image_name};
-use super::png_file::{PngFileError, read_png, write_opaque_png};
+use super::png_file::{PngFileError, opaque_png_bytes, read_png, write_replacing};
 use super::screen::{SCREEN_THEMES, Screen, image_name};
 
-/// Writes screens into a folder of committed images, such as the README's. A file whose pixels
-/// equal the new capture keeps its bytes, so re-exporting an unchanged screen changes nothing in
-/// git. Files of the folder that are not images of these screens are left alone.
+/// Writes screens into a folder of committed images, such as the README's, each optimised
+/// losslessly. A file whose pixels equal the new capture keeps its bytes, so re-exporting an
+/// unchanged screen changes nothing in git. Files of the folder that are not images of these
+/// screens are left alone.
 pub struct ScreenExport {
     folder: PathBuf,
 }
@@ -63,10 +65,19 @@ impl ScreenExport {
         if holds_pixels(&path, capture)? {
             return Ok(ExportOutcome::Kept);
         }
-        write_opaque_png(&path, capture)
+        let png = optimised_png(capture)?;
+        write_replacing(&path, &png)
             .map_err(|error| format!("could not write {}: {error}", path.display()))?;
         Ok(ExportOutcome::Written)
     }
+}
+
+/// `capture` as the suite encodes it, then made smaller by oxipng with the same pixels. Its highest
+/// preset: the images are committed and rarely rewritten, so the smallest file is worth the time.
+fn optimised_png(capture: &RgbaImage) -> Result<Vec<u8>, String> {
+    let png = opaque_png_bytes(capture).map_err(|error| error.to_string())?;
+    oxipng::optimize_from_memory(&png, &Options::max_compression())
+        .map_err(|error| format!("could not optimise the PNG: {error}"))
 }
 
 /// Whether `path` holds a PNG of exactly `capture`. A file that is not there, or is not a PNG
