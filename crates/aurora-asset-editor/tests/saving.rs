@@ -352,6 +352,30 @@ fn save_all_never_overwrites_with_empty() {
 }
 
 #[test]
+fn save_all_that_writes_nothing_shows_no_toast() {
+    let target = TempDir::new().unwrap();
+    for name in [
+        "GC4D5307E6.asset",
+        "BK4D5307E6.asset",
+        "GL4D5307E6.asset",
+        "SS4D5307E6.asset",
+    ] {
+        fs::write(target.path().join(name), name.as_bytes()).unwrap();
+    }
+    let mut harness = AppHarness::new();
+    harness.app().set_current_game(Some(halo_3()));
+
+    save_all(&mut harness, target.path());
+
+    assert!(
+        harness.app().status().text.starts_with("Nothing to save"),
+        "{}",
+        harness.app().status().text
+    );
+    assert_eq!(harness.app().toasts().iter().count(), 0);
+}
+
+#[test]
 fn save_all_title_id_prompt_rules() {
     let target = TempDir::new().unwrap();
     let mut harness = AppHarness::new();

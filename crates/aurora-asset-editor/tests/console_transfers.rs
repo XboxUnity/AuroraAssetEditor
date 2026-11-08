@@ -160,6 +160,7 @@ fn missing_console_asset_shows_message() {
     let app = &mut *harness.app();
     assert_eq!(app.status().text, "No cover asset on console");
     assert_eq!(app.status().severity, Severity::Info);
+    assert_eq!(app.toasts().iter().count(), 0, "nothing was written");
     assert!(!app.pages().cover.has_content());
     assert_eq!(app.page(), Page::Console);
 }

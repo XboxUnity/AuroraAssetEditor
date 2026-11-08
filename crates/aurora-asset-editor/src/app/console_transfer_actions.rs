@@ -315,7 +315,8 @@ impl App {
                     self.report_done(format!("Downloaded {} from the console", kind_name(kind)));
                 }
                 Ok(None) => {
-                    self.report_done(format!("No {} asset on console", kind_name(kind)));
+                    self.status =
+                        StatusLine::info(format!("No {} asset on console", kind_name(kind)));
                 }
                 Err(error) => self.report_download_failure(kind, &error),
             }

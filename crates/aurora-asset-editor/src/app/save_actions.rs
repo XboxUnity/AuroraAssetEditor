@@ -82,6 +82,12 @@ impl App {
             return;
         };
         match self.save_keeping_selection(|pages| save_all_to_folder(pages, &folder, &title_id)) {
+            Ok(written) if written.is_empty() => {
+                self.status = StatusLine::info(format!(
+                    "Nothing to save: every page is empty and {} already has its files",
+                    folder.display()
+                ));
+            }
             Ok(written) => {
                 self.report_done(format!(
                     "Saved {} asset files to {}",
