@@ -150,9 +150,15 @@ export component AboutDialog inherits DialogFrame {
             }
 
             // The licence asks for the widget, not for a size: at its smallest the card fits the default window
-            // with the notices open.
-            about-slint := AboutSlint {
-                height: self.min-height;
+            // with the notices open. Opening slint.dev is the widget's own click, so the widget is only as wide as
+            // its badge and a click beside the badge does nothing.
+            HorizontalLayout {
+                alignment: center;
+
+                about-slint := AboutSlint {
+                    width: Theme.about-slint-width;
+                    height: self.min-height;
+                }
             }
         }
     }

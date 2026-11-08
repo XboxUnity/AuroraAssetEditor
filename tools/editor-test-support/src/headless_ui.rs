@@ -1,12 +1,17 @@
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
+use std::rc::Rc;
 
 use i_slint_backend_testing::{TestingBackend, TestingBackendOptions};
 use image::RgbaImage;
 use slint::platform::WindowEvent;
 use slint::{LogicalSize, SharedString, Window};
 
+/// Where the testing backend records the URL the UI last asked the platform to open.
+type OpenedUrl = Rc<RefCell<Option<SharedString>>>;
+
 thread_local! {
     static BACKEND_INSTALLED: Cell<bool> = const { Cell::new(false) };
+    static OPENED_URL: RefCell<Option<OpenedUrl>> = const { RefCell::new(None) };
 }
 
 /// Renders Slint windows without a display: the Slint testing backend with the software
@@ -25,6 +30,7 @@ impl HeadlessUi {
                 threading: false,
                 renderer_name: Some("software".into()),
             });
+            OPENED_URL.set(Some(Rc::clone(&backend.open_url)));
             slint::platform::set_platform(Box::new(backend))
                 .expect("no other Slint platform is installed on a test thread");
             BACKEND_INSTALLED.set(true);
@@ -49,6 +55,16 @@ impl HeadlessUi {
             .expect("the software renderer can always take a snapshot");
         RgbaImage::from_raw(pixels.width(), pixels.height(), pixels.as_bytes().to_vec())
             .expect("a snapshot holds width x height RGBA pixels")
+    }
+
+    /// The URL the UI asked the platform to open since the last call, if any.
+    pub fn take_opened_url(&self) -> Option<SharedString> {
+        OPENED_URL.with_borrow(|opened| {
+            opened
+                .as_ref()
+                .expect("the backend is installed by HeadlessUi::new")
+                .take()
+        })
     }
 
     pub fn type_text(&self, window: &Window, text: &str) {

@@ -21,6 +21,8 @@ const ABOUT_SLINT_ID: &str = "AboutDialog::about-slint";
 /// The widget draws its logo and text in at least this many colours besides the card's.
 const MIN_FOREGROUND_COLOURS: usize = 2;
 const CARD_PROBE_GAP: f32 = 4.0;
+/// What the AboutSlint widget opens when clicked.
+const SLINT_URL: &str = "https://slint.dev";
 const DATE_EXAMPLE: &str = "2026-11-07T10:00:00Z";
 const MINIMUM_WINDOW: (f32, f32) = (760.0, 500.0);
 /// As long as a GitHub Actions run address gets.
@@ -182,6 +184,14 @@ impl Ui {
         window.dispatch_event(WindowEvent::KeyReleased { text });
     }
 
+    fn click_at(&self, position: LogicalPosition) {
+        let window = self.view.window().window();
+        let button = PointerEventButton::Left;
+        window.dispatch_event(WindowEvent::PointerPressed { position, button });
+        window.dispatch_event(WindowEvent::PointerReleased { position, button });
+        window.dispatch_event(WindowEvent::PointerExited);
+    }
+
     fn element(&self, id: &str) -> ElementHandle {
         ElementHandle::find_by_element_id(self.view.window(), id)
             .next()
@@ -237,6 +247,34 @@ fn about_dialog_renders_with_about_slint() {
             foreground.len()
         );
     }
+}
+
+#[test]
+fn only_the_slint_badge_opens_slint_dev() {
+    let mut harness = AppHarness::new();
+    let ui = Ui::start(&mut harness, ThemeChoice::Dark);
+    ui.app.borrow_mut().show_about();
+    ui.render();
+    let widget = ui.element(ABOUT_SLINT_ID);
+    let (position, size) = (widget.absolute_position(), widget.size());
+    let badge_row = position.y + size.height / 2.0;
+    let body = ui.element("AboutDialog::body");
+    let beside_badge = LogicalPosition::new(body.absolute_position().x + CARD_PROBE_GAP, badge_row);
+    let on_badge = LogicalPosition::new(position.x + size.width / 2.0, badge_row);
+
+    ui.click_at(beside_badge);
+    assert_eq!(
+        ui.ui.take_opened_url(),
+        None,
+        "a click beside the badge opened a URL"
+    );
+
+    ui.click_at(on_badge);
+    assert_eq!(
+        ui.ui.take_opened_url().as_deref(),
+        Some(SLINT_URL),
+        "a click on the badge opens slint.dev"
+    );
 }
 
 #[test]

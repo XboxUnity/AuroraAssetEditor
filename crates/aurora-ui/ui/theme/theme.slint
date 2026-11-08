@@ -140,6 +140,12 @@ export global Theme {
     // window with the notices open.
     out property <length> about-frame-height: 130px;
     out property <length> notices-height: 200px;
+    // Slint's AboutSlint widget at its minimum height draws its 212 x 97 badge 48 px tall inside a 12 px padding
+    // (Slint 1.18.1). At this width the widget, and so its click area, is no wider than the badge and its padding.
+    out property <length> about-slint-badge-height: 48px;
+    out property <float> about-slint-badge-aspect: 212 / 97;
+    out property <length> about-slint-padding: 12px;
+    out property <length> about-slint-width: about-slint-badge-height * about-slint-badge-aspect + 2 * about-slint-padding;
     out property <length> dialog-radius: 8px;
     out property <length> dialog-padding: 16px;
     out property <length> dialog-gap: 12px;
