@@ -13,8 +13,8 @@ const OUTPUT_FOLDER: &str = "target/ui-screenshots";
 const REPORT_FILE: &str = "report.txt";
 const CONTACT_SHEET_FILE: &str = "index.html";
 
-const EDITOR_PACKAGE: &str = "aurora-asset-editor";
-const SCREENSHOT_TEST_TARGET: &str = "ui_screenshots";
+pub(crate) const EDITOR_PACKAGE: &str = "aurora-asset-editor";
+pub(crate) const SCREENSHOT_TEST_TARGET: &str = "ui_screenshots";
 
 pub const USAGE_LINE: &str =
     "cargo xtask ui-screenshots [--baseline <folder>] [--label <text>] [--only <text>]";

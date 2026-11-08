@@ -4,14 +4,14 @@ use std::process::Command;
 
 use anyhow::{Context, Result, bail};
 
+use crate::ui_screenshots::{EDITOR_PACKAGE, SCREENSHOT_TEST_TARGET};
+
 // The variable name and the text below mirror `editor-test-support`, which xtask does not depend on.
 const ASSETS_VARIABLE: &str = "AURORA_TEST_ASSETS";
 const NOT_SET_TEXT: &str = "AURORA_TEST_ASSETS is not set. The README screenshots show real game art from a \
      folder kept outside the repository: set AURORA_TEST_ASSETS to a folder holding \
      GameData/<TitleID>_<DatabaseID>/ and DataBases/content.db, pulled from an Aurora console.";
 
-const EDITOR_PACKAGE: &str = "aurora-asset-editor";
-const SCREENSHOT_TEST_TARGET: &str = "ui_screenshots";
 const README_IMAGE_TEST: &str = "render_readme_images";
 const README_IMAGES_FOLDER: &str = "docs/images/readme";
 
@@ -86,7 +86,9 @@ mod tests {
     #[test]
     fn unset_asset_folder_names_the_variable() {
         for value in [None, Some(OsStr::new(""))] {
-            let message = check_asset_folder(value).unwrap_err().to_string();
+            let message = check_asset_folder(value)
+                .expect_err("an unset variable is refused")
+                .to_string();
             assert!(message.contains("AURORA_TEST_ASSETS"), "{message}");
             assert!(message.contains("DataBases/content.db"), "{message}");
         }
@@ -94,9 +96,9 @@ mod tests {
 
     #[test]
     fn asset_folder_that_is_not_a_folder_is_refused() {
-        let file = tempfile::NamedTempFile::new().unwrap();
+        let file = tempfile::NamedTempFile::new().expect("a temp file");
         let message = check_asset_folder(Some(file.path().as_os_str()))
-            .unwrap_err()
+            .expect_err("a file is not an asset folder")
             .to_string();
         assert!(message.contains("AURORA_TEST_ASSETS"), "{message}");
         assert!(
@@ -107,9 +109,10 @@ mod tests {
 
     #[test]
     fn asset_folder_is_accepted() {
-        let folder = tempfile::tempdir().unwrap();
+        let folder = tempfile::tempdir().expect("a temp folder");
         assert_eq!(
-            check_asset_folder(Some(folder.path().as_os_str())).unwrap(),
+            check_asset_folder(Some(folder.path().as_os_str()))
+                .expect("an existing folder is accepted"),
             folder.path()
         );
     }

@@ -11,7 +11,8 @@ use image::{ExtendedColorType, ImageEncoder, ImageFormat, ImageReader, Rgb, RgbI
 const TEMPORARY_SUFFIX: &str = ".partial";
 
 /// Writes `image` as an RGB8 PNG, as small as the encoder can make it: every run's images go into
-/// the release zip and the README images into git. Refuses an image with any translucent pixel,
+/// the release zip. The README images start from the same encoding (`opaque_png_bytes`) and are
+/// then optimised by `ScreenExport`. Refuses an image with any translucent pixel,
 /// which RGB cannot hold. The file is written as `write_replacing` writes it.
 pub fn write_opaque_png(path: &Path, image: &RgbaImage) -> Result<(), PngFileError> {
     let bytes = opaque_png_bytes(image)?;
