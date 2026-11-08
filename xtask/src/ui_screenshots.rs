@@ -3,7 +3,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use anyhow::{Context, Result, anyhow, bail};
+use anyhow::{Context, Result, bail};
 
 // These names and the platform rule mirror `editor-test-support`, which xtask does not depend on.
 const BASELINE_VARIABLE: &str = "AURORA_UI_BASELINE";
@@ -34,7 +34,7 @@ pub fn parse_options(arguments: &[&str]) -> Result<ScreenshotOptions> {
             bail!("unknown argument `{flag}`\nusage: {USAGE_LINE}");
         }
         let value = match remaining.next() {
-            Some(&value) if !value.is_empty() => value,
+            Some(&value) if !value.is_empty() && !value.starts_with("--") => value,
             _ => bail!("{flag} needs a value\nusage: {USAGE_LINE}"),
         };
         let already_given = match flag {
@@ -106,7 +106,7 @@ fn remove_earlier_file(path: &Path) -> Result<()> {
     match fs::remove_file(path) {
         Ok(()) => Ok(()),
         Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
-        Err(error) => Err(anyhow!("could not remove {}: {error}", path.display())),
+        Err(error) => Err(error).with_context(|| format!("could not remove {}", path.display())),
     }
 }
 
@@ -114,7 +114,7 @@ fn remove_earlier_file(path: &Path) -> Result<()> {
 /// test output above says why. The report itself ends with the contact sheet's URL.
 fn print_report(report: &Path) {
     match fs::read_to_string(report) {
-        Ok(text) => println!("{text}"),
+        Ok(text) => print!("{text}"),
         Err(error) if error.kind() == io::ErrorKind::NotFound => {
             println!("Report: not written by this run, see the test output above");
         }
@@ -168,10 +168,22 @@ mod tests {
 
     #[test]
     fn a_flag_given_twice_is_refused() {
-        let message = parse_options(&["--only", "a", "--only", "b"])
+        for flag in ["--baseline", "--label", "--only"] {
+            let message = parse_options(&[flag, "a", flag, "b"])
+                .unwrap_err()
+                .to_string();
+            assert!(message.contains(flag), "{message}");
+            assert!(message.contains("twice"), "{message}");
+        }
+    }
+
+    #[test]
+    fn a_value_that_looks_like_a_flag_is_refused() {
+        let message = parse_options(&["--baseline", "--only"])
             .unwrap_err()
             .to_string();
-        assert!(message.contains("--only"), "{message}");
+        assert!(message.contains("--baseline needs a value"), "{message}");
+        assert!(message.contains(USAGE_LINE), "{message}");
     }
 
     #[test]
