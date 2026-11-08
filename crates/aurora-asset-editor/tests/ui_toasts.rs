@@ -230,6 +230,28 @@ fn a_toast_is_gone_after_four_seconds() {
 }
 
 #[test]
+fn each_toast_ends_four_seconds_after_it_showed_whatever_renders_since() {
+    let mut harness = game_harness();
+    let window = Window::start(&mut harness);
+    let half = TOAST_DURATION / 2;
+    window.act(App::copy_title_id);
+    mock_elapsed_time(half);
+
+    window.act(App::copy_database_id);
+    window.render();
+    assert_eq!(window.toasts().len(), 2);
+
+    mock_elapsed_time(half);
+    assert_eq!(
+        window.toast_texts(),
+        ["Copied DatabaseID 00000012"],
+        "the first ends on its own time, not 4 s after the last render"
+    );
+    mock_elapsed_time(half);
+    assert!(window.toasts().is_empty(), "the second ends 2 s later");
+}
+
+#[test]
 fn four_quick_toasts_keep_only_the_newest_three() {
     let mut harness = game_harness();
     let window = Window::start(&mut harness);
