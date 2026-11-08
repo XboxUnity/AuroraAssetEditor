@@ -1,0 +1,25 @@
+import { ShellModel } from "../model/shell_model.slint";
+import { Theme } from "../theme/theme.slint";
+import { Toast } from "toast.slint";
+
+// The toasts in the bottom right corner of this area, newest at the bottom. Only the toasts take clicks; the
+// window around them stays usable.
+export component ToastStack {
+    VerticalLayout {
+        x: root.width - self.width - Theme.toast-margin;
+        y: root.height - self.height - Theme.toast-margin;
+        width: Theme.toast-max-width;
+        height: self.preferred-height;
+        spacing: Theme.toast-gap;
+        for toast[index] in ShellModel.toasts: HorizontalLayout {
+            alignment: end;
+            toast-card := Toast {
+                text: toast.text;
+                error: toast.error;
+                dismissed => {
+                    ShellModel.dismiss-toast(index);
+                }
+            }
+        }
+    }
+}

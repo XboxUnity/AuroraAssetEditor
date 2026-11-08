@@ -312,14 +312,10 @@ impl App {
                     if after == AfterDownload::OpenFirstLoaded {
                         self.page = Page::of_kind(kind);
                     }
-                    self.status = StatusLine::info(format!(
-                        "Downloaded {} from the console",
-                        kind_name(kind)
-                    ));
+                    self.report_done(format!("Downloaded {} from the console", kind_name(kind)));
                 }
                 Ok(None) => {
-                    self.status =
-                        StatusLine::info(format!("No {} asset on console", kind_name(kind)));
+                    self.report_done(format!("No {} asset on console", kind_name(kind)));
                 }
                 Err(error) => self.report_download_failure(kind, &error),
             }
@@ -351,7 +347,7 @@ impl App {
             self.page = first_found.unwrap_or(Page::Cover);
         }
         let present = self.pages.present_types();
-        self.status = StatusLine::info(format!(
+        self.report_done(format!(
             "Loaded {} from the console{STATUS_SEPARATOR}{present} of {ASSET_TYPE_COUNT} asset types present",
             self.game_label(ids)
         ));
@@ -443,7 +439,7 @@ impl App {
                     self.report_console_error_noting(&context, &error, &note);
                 }
             }
-            None => self.status = StatusLine::info(success),
+            None => self.report_done(success),
         }
     }
 }

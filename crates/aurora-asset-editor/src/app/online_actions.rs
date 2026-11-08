@@ -353,7 +353,7 @@ impl App {
     /// status line says so.
     fn log_discarded(&mut self, context: &str, error: &(dyn Error + 'static)) {
         if let Some(log_failure) = self.record_error(context, error) {
-            self.status = StatusLine::error(log_failure);
+            self.report_failure(log_failure);
         }
     }
 }

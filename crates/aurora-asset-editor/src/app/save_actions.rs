@@ -42,7 +42,7 @@ impl App {
             return;
         };
         match self.save_keeping_selection(|pages| save_page(pages.get_mut(kind), &path)) {
-            Ok(()) => self.status = StatusLine::info(format!("Saved {}", file_display_name(&path))),
+            Ok(()) => self.report_done(format!("Saved {}", file_display_name(&path))),
             Err(error) => self.show_save_failure(&error.path, &error, &error.source, &[]),
         }
     }
@@ -83,7 +83,7 @@ impl App {
         };
         match self.save_keeping_selection(|pages| save_all_to_folder(pages, &folder, &title_id)) {
             Ok(written) => {
-                self.status = StatusLine::info(format!(
+                self.report_done(format!(
                     "Saved {} asset files to {}",
                     written.len(),
                     folder.display()
@@ -146,9 +146,7 @@ impl App {
     pub(super) fn write_image_file(&mut self, pixels: &RgbaImage, path: &Path) {
         match ExportFormat::from_path(path).encode(pixels) {
             Ok(bytes) => match fs::write(path, bytes) {
-                Ok(()) => {
-                    self.status = StatusLine::info(format!("Exported {}", file_display_name(path)));
-                }
+                Ok(()) => self.report_done(format!("Exported {}", file_display_name(path))),
                 Err(error) => self.show_save_failure(path, &error, &error, &[]),
             },
             Err(error) => self.show_save_failure(path, &error, &error, &[]),

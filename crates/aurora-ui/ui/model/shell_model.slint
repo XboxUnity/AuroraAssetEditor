@@ -3,6 +3,7 @@ import { MenuAction } from "menu_action.slint";
 import { MenuId } from "menu_id.slint";
 import { PageId } from "page_id.slint";
 import { ThemeOption } from "theme_option.slint";
+import { ToastView } from "toast_view.slint";
 
 export global ShellModel {
     in property <PageId> page;
@@ -21,6 +22,8 @@ export global ShellModel {
     in property <bool> status-is-error;
     in property <string> progress-text;
     in property <bool> bulk-stop-available;
+    // Oldest first.
+    in property <[ToastView]> toasts;
     in property <MenuId> open-menu;
     in property <string> save-to-console-reason;
     in property <bool> editor-locked;
@@ -34,6 +37,8 @@ export global ShellModel {
     callback menu-action(MenuAction);
     callback stop-bulk();
     callback show-about();
+    // The toast at this position, counted from the oldest, was clicked.
+    callback dismiss-toast(int);
 
     // The std widgets follow `Palette`, so the theme override reaches them too.
     changed color-scheme => {

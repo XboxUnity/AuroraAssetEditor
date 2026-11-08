@@ -11,6 +11,7 @@ use crate::jobs::{ConsoleJob, ConsoleJobKind, ConsoleOutcome, ConsoleRequest, Jo
 use crate::logging::error_chain;
 use crate::status::{ConsoleActivity, STATUS_SEPARATOR, Severity, StatusLine};
 
+use super::app::with_log_failure;
 use super::file_actions::BUSY_TEXT;
 use super::{App, CurrentGame};
 
@@ -74,12 +75,12 @@ impl App {
                 self.console.use_settings(settings);
                 self.modals.remove_connection_form();
             }
+            // The dialog stays open and shows the failure, so no toast.
             Err(error) => {
                 let text = format!("{CONNECTION_SAVE_FAILED}: {}", error_sentence(&error));
-                self.report_console_error(CONNECTION_SAVE_FAILED, &error);
-                if let Some(form) = self.modals.connection_form_mut() {
-                    form.test_status = Some((Severity::Error, text));
-                }
+                let log_failure = self.record_error(CONNECTION_SAVE_FAILED, &error);
+                self.status = StatusLine::error(with_log_failure(text.clone(), log_failure));
+                self.set_test_result(Severity::Error, &text);
             }
         }
     }
@@ -219,16 +220,22 @@ impl App {
                 let text = test_failure_text(&error);
                 let log_failure = self.record_error(CONNECTION_TEST_FAILED, &error);
                 self.console.link = ConsoleLink::Failed;
-                self.set_test_result(Severity::Error, &text);
-                self.set_error_status(text, log_failure);
+                if self.set_test_result(Severity::Error, &text) {
+                    self.status = StatusLine::error(with_log_failure(text, log_failure));
+                } else {
+                    self.set_error_status(text, log_failure);
+                }
             }
         }
     }
 
-    fn set_test_result(&mut self, severity: Severity, text: &str) {
-        if let Some(form) = self.modals.connection_form_mut() {
-            form.test_status = Some((severity, text.to_owned()));
-        }
+    /// Shows the result in the connection dialog; `false` when the dialog was closed meanwhile.
+    fn set_test_result(&mut self, severity: Severity, text: &str) -> bool {
+        let Some(form) = self.modals.connection_form_mut() else {
+            return false;
+        };
+        form.test_status = Some((severity, text.to_owned()));
+        true
     }
 
     /// Only new connection settings make a refresh stale (a refresh waits for the console to be free), so a
@@ -287,7 +294,8 @@ impl App {
         self.show_connection_failed(error);
     }
 
-    /// The link is down: the status line and the "Connection failed" dialog say so.
+    /// The link is down: the status line and the "Connection failed" dialog say so; the dialog is the message,
+    /// so no toast.
     pub(super) fn show_connection_failed(&mut self, error: &ConsoleError) {
         self.console.link = ConsoleLink::Failed;
         let text = format!("{CONNECTION_FAILED_PREFIX}: {}", error_sentence(error));
@@ -349,7 +357,7 @@ impl App {
             Err(error) => {
                 let context = format!("{PRESENCE_FAILED} for {}", ids.folder_name());
                 if let Some(log_failure) = self.record_error(&context, &error) {
-                    self.status = StatusLine::error(log_failure);
+                    self.report_failure(log_failure);
                 }
                 PresenceCell::Failed
             }
@@ -367,7 +375,7 @@ impl App {
     /// A result of a replaced job is not shown, but its failure is still written to `error.log`.
     fn log_superseded(&mut self, context: &str, error: &ConsoleError) {
         if let Some(log_failure) = self.record_error(context, error) {
-            self.status = StatusLine::error(log_failure);
+            self.report_failure(log_failure);
         }
     }
 

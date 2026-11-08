@@ -12,7 +12,7 @@ use crate::logging::error_chain;
 use crate::online::OnlineState;
 use crate::platform::{DialogError, OpenRequest, SaveRequest};
 use crate::settings::AppSettings;
-use crate::status::{ActiveWork, Locks, STATUS_SEPARATOR, StatusLine};
+use crate::status::{ActiveWork, Locks, STATUS_SEPARATOR, StatusLine, Toasts};
 
 use super::{AppEnvironment, CurrentGame, Menu, Page, PendingImportStatus, StartupProblem};
 
@@ -33,6 +33,7 @@ pub struct App {
     pub(super) console: ConsoleState,
     pub(super) online: OnlineState,
     pub(super) status: StatusLine,
+    pub(super) toasts: Toasts,
     pub(super) active_work: ActiveWork,
     pub(super) modals: ModalQueue,
     pub(super) selected_screenshot: ScreenshotNumber,
@@ -62,6 +63,7 @@ impl App {
             console,
             online: OnlineState::new(),
             status: StatusLine::ready(),
+            toasts: Toasts::default(),
             active_work: ActiveWork::default(),
             modals: ModalQueue::new(),
             selected_screenshot: ScreenshotNumber::ALL[0],
@@ -338,11 +340,16 @@ impl App {
             .map(|log_error| format!("{LOG_WRITE_FAILED}: {log_error}"))
     }
 
+    /// Shows `text`, and the failure to log it if there was one, in the status line and in a toast.
     pub(super) fn set_error_status(&mut self, text: String, log_failure: Option<String>) {
-        let text = match log_failure {
-            Some(log_failure) => format!("{text}{STATUS_SEPARATOR}{log_failure}"),
-            None => text,
-        };
-        self.status = StatusLine::error(text);
+        self.report_failure(with_log_failure(text, log_failure));
+    }
+}
+
+/// `text`, followed by the failure to write it to `error.log` when there was one.
+pub(super) fn with_log_failure(text: String, log_failure: Option<String>) -> String {
+    match log_failure {
+        Some(log_failure) => format!("{text}{STATUS_SEPARATOR}{log_failure}"),
+        None => text,
     }
 }

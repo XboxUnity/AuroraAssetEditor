@@ -128,11 +128,11 @@ impl App {
         });
     }
 
-    /// The summary as the status; an error when `error.log` could not be written.
+    /// The summary in the status line and a toast; an error when `error.log` could not be written.
     fn set_error_status_if(&mut self, summary: String, log_failure: Option<String>) {
         match log_failure {
             Some(_) => self.set_error_status(summary, log_failure),
-            None => self.status = StatusLine::info(summary),
+            None => self.report_done(summary),
         }
     }
 

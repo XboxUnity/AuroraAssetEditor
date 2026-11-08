@@ -15,6 +15,9 @@ mod result_tiles;
 mod screenshot_tiles;
 mod shell_view;
 mod slint_image;
+mod toast_rows;
+mod toast_timers;
+mod toast_view;
 
 pub use game_rows::GameRows;
 pub use image_cache::ImageCache;
@@ -28,3 +31,5 @@ pub use previews::{Previews, ShownPicture};
 pub use result_tiles::{ResultTileContent, ResultTiles};
 pub use screenshot_tiles::{ScreenshotTileContent, ScreenshotTiles};
 pub use slint_image::slint_image;
+pub use toast_rows::ToastRows;
+pub use toast_timers::ToastTimers;

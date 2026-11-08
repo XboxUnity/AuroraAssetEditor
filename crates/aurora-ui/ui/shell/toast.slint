@@ -1,0 +1,57 @@
+import { Icon } from "../controls/icon.slint";
+import { Theme } from "../theme/theme.slint";
+
+// The outcome of an action, on a card like a menu's. A click dismisses it before its time is up.
+export component Toast inherits Rectangle {
+    in property <string> text;
+    in property <bool> error;
+    callback dismissed();
+
+    property <color> foreground: error ? Theme.error-text : Theme.text;
+
+    max-width: Theme.toast-max-width;
+    background: Theme.dialog-background;
+    border-radius: Theme.dialog-radius;
+    border-width: Theme.border-width;
+    border-color: error ? Theme.error-text : Theme.border;
+    drop-shadow-blur: Theme.menu-shadow-blur;
+    drop-shadow-offset-y: Theme.menu-shadow-offset;
+    drop-shadow-color: Theme.menu-shadow;
+    accessible-role: AccessibleRole.text;
+    accessible-label: text;
+    accessible-live-region: error ? AccessibleLiveness.assertive : AccessibleLiveness.polite;
+    accessible-action-default => {
+        dismissed();
+    }
+
+    TouchArea {
+        clicked => {
+            dismissed();
+        }
+    }
+
+    HorizontalLayout {
+        padding-left: Theme.toast-padding-x;
+        padding-right: Theme.toast-padding-x;
+        padding-top: Theme.toast-padding-y;
+        padding-bottom: Theme.toast-padding-y;
+        spacing: Theme.toast-icon-gap;
+        // Beside the first line of a text that wraps.
+        VerticalLayout {
+            horizontal-stretch: 0;
+            alignment: start;
+            padding-top: Theme.toast-icon-offset;
+            Icon {
+                source: error ? @image-url("../icons/dot.svg") : @image-url("../icons/check.svg");
+                colorize: error ? Theme.error-text : Theme.link-ok;
+            }
+        }
+        toast-text := Text {
+            horizontal-stretch: 1;
+            text: text;
+            color: foreground;
+            wrap: word-wrap;
+            vertical-alignment: center;
+        }
+    }
+}

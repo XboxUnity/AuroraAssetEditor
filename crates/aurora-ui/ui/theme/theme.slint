@@ -175,4 +175,14 @@ export global Theme {
     out property <length> check-box-radius: 3px;
     out property <length> check-label-gap: 6px;
     out property <length> check-focus-inset: 3px;
+
+    // Toasts sit as far from the window's right edge and the status line as the page body from its edges.
+    out property <length> toast-max-width: dialog-width;
+    out property <length> toast-margin: body-padding;
+    out property <length> toast-gap: 6px;
+    out property <length> toast-padding-x: 10px;
+    out property <length> toast-padding-y: 8px;
+    out property <length> toast-icon-gap: 6px;
+    // Centres the icon on the first line of text: Inter 12 px at line height 1.35 is 16 px tall.
+    out property <length> toast-icon-offset: 1px;
 }

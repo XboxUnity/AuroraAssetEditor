@@ -1,7 +1,7 @@
 use aurora_asset_editor::app::App;
 use aurora_asset_editor::jobs::{
     ConsoleJob, ConsoleJobKind, ConsoleOutcome, ConsoleRequest, Job, JobOutcome, OnlineJob,
-    OnlineOutcome, Progress,
+    OnlineOutcome, Progress, TransferReport, UploadPurpose,
 };
 use aurora_console::{
     AssetPresence, AuroraRevision, BulkReport, ConsoleError, ConsoleStatus, Game, GameIds,
@@ -92,6 +92,14 @@ pub fn fail_running_refresh(app: &mut App, error: ConsoleError) {
     app.on_job_outcome(JobOutcome::Console(ConsoleOutcome::Refreshed {
         generation,
         result: Err(error),
+    }));
+}
+
+/// Ends an "Upload current" to the game with `ids` as `report` says, without contacting a console.
+pub fn finish_upload(app: &mut App, report: TransferReport) {
+    app.on_job_outcome(JobOutcome::Console(ConsoleOutcome::Uploaded {
+        report,
+        purpose: UploadPurpose::UploadCurrent,
     }));
 }
 

@@ -26,6 +26,7 @@ mod save_actions;
 mod settings_actions;
 mod shutdown_actions;
 mod startup_settings;
+mod toast_actions;
 
 pub use about_actions::{ABOUT_TITLE, COPY_BUILD_INFO_FAILED, OPEN_LOG_FOLDER_FAILED};
 pub use app::{App, DIALOG_FAILED_TITLE, LOG_WRITE_FAILED};

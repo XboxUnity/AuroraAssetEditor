@@ -19,11 +19,13 @@ import { ScreenshotTile } from "model/screenshot_tile.slint";
 import { ShellModel } from "model/shell_model.slint";
 import { SlotView } from "model/slot_view.slint";
 import { ThemeOption } from "model/theme_option.slint";
+import { ToastView } from "model/toast_view.slint";
 import { DialogHost } from "dialogs/dialog_host.slint";
 import { MenuOverlay } from "shell/menu_overlay.slint";
 import { PageHost } from "shell/page_host.slint";
 import { SideBar } from "shell/side_bar.slint";
 import { StatusLine } from "shell/status_line.slint";
+import { ToastStack } from "shell/toast_stack.slint";
 import { TopBar } from "shell/top_bar.slint";
 import { Theme } from "theme/theme.slint";
 
@@ -48,6 +50,7 @@ export {
     SlotView,
     Theme,
     ThemeOption,
+    ToastView,
 }
 
 export component MainWindow inherits Window {
@@ -90,5 +93,11 @@ export component MainWindow inherits Window {
     DialogHost {
         width: 100%;
         height: 100%;
+    }
+
+    // Over the dialogs too, so the outcome of a dialog's action shows; above the status line, which shows it as well.
+    ToastStack {
+        width: 100%;
+        height: root.height - status-line.height;
     }
 }

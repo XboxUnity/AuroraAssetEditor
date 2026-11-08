@@ -4,7 +4,6 @@ use std::fs;
 use crate::console::capitalize_first;
 use crate::dialogs::Modal;
 use crate::logging::error_chain;
-use crate::status::StatusLine;
 
 use super::App;
 
@@ -39,7 +38,7 @@ impl App {
         match self.environment.clipboard.set_text(&text) {
             Ok(()) => {
                 self.about_copied = true;
-                self.status = StatusLine::info(BUILD_INFO_COPIED_TEXT.to_owned());
+                self.report_done(BUILD_INFO_COPIED_TEXT.to_owned());
             }
             Err(error) => self.fail_over_about(COPY_BUILD_INFO_FAILED, &error),
         }

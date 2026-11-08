@@ -1,5 +1,3 @@
-use crate::status::StatusLine;
-
 use super::{App, CurrentGame};
 
 const TITLE_ID_LABEL: &str = "TitleID";
@@ -43,7 +41,7 @@ impl App {
 
     fn copy_id(&mut self, label: &str, id: &str) {
         match self.environment.clipboard.set_text(id) {
-            Ok(()) => self.status = StatusLine::info(format!("Copied {label} {id}")),
+            Ok(()) => self.report_done(format!("Copied {label} {id}")),
             Err(error) => self.report_error(&format!("Could not copy {label} {id}"), &error),
         }
     }

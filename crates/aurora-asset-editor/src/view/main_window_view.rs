@@ -1,7 +1,7 @@
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
-use aurora_ui::{ConsoleModel, DialogModel, EditorModel, MainWindow, OnlineModel};
+use aurora_ui::{ConsoleModel, DialogModel, EditorModel, MainWindow, OnlineModel, ShellModel};
 use slint::{ComponentHandle, Timer};
 
 use crate::app::App;
@@ -14,8 +14,10 @@ use super::editor_view::{EditorPictures, connect_editor, render_editor};
 use super::online_view::{OnlinePictures, connect_online, render_online};
 use super::preview_view::connect_previews;
 use super::shell_view::{Refresh, connect_shell, render_shell};
+use super::toast_view::{connect_toasts, render_toasts};
 use super::{
     GameRows, ImageCache, OnlineImageCache, PickerRows, Previews, ResultTiles, ScreenshotTiles,
+    ToastRows, ToastTimers,
 };
 
 /// The window: it shows what `App` holds and turns the window's callbacks into `App` calls.
@@ -31,6 +33,8 @@ pub struct MainWindowView {
     result_tiles: Rc<RefCell<ResultTiles>>,
     game_rows: Rc<RefCell<GameRows>>,
     picker_rows: Rc<RefCell<PickerRows>>,
+    toast_rows: Rc<RefCell<ToastRows>>,
+    toast_timers: Rc<RefCell<ToastTimers>>,
 }
 
 impl MainWindowView {
@@ -50,6 +54,8 @@ impl MainWindowView {
         window
             .global::<DialogModel>()
             .set_picker_games(picker_rows.model());
+        let toast_rows = ToastRows::default();
+        window.global::<ShellModel>().set_toasts(toast_rows.model());
         MainWindowView {
             window,
             system_theme: Rc::new(Cell::new(SystemTheme::default())),
@@ -61,6 +67,8 @@ impl MainWindowView {
             result_tiles: Rc::new(RefCell::new(result_tiles)),
             game_rows: Rc::new(RefCell::new(game_rows)),
             picker_rows: Rc::new(RefCell::new(picker_rows)),
+            toast_rows: Rc::new(RefCell::new(toast_rows)),
+            toast_timers: Rc::new(RefCell::new(ToastTimers::default())),
         }
     }
 
@@ -93,6 +101,8 @@ impl MainWindowView {
         let result_tiles = Rc::clone(&self.result_tiles);
         let game_rows = Rc::clone(&self.game_rows);
         let picker_rows = Rc::clone(&self.picker_rows);
+        let toast_rows = Rc::clone(&self.toast_rows);
+        let toast_timers = Rc::clone(&self.toast_timers);
         let refresh: Refresh = Rc::new(move |app: &App| {
             if let Some(window) = weak_window.upgrade() {
                 let caches = Caches {
@@ -103,6 +113,8 @@ impl MainWindowView {
                     result_tiles: &mut result_tiles.borrow_mut(),
                     game_rows: &mut game_rows.borrow_mut(),
                     picker_rows: &mut picker_rows.borrow_mut(),
+                    toast_rows: &mut toast_rows.borrow_mut(),
+                    toast_timers: &mut toast_timers.borrow_mut(),
                 };
                 render_window(&window, app, system_theme.get(), caches);
             }
@@ -112,6 +124,7 @@ impl MainWindowView {
         connect_online(&self.window, &app, &refresh);
         connect_console(&self.window, &app, &refresh);
         connect_dialogs(&self.window, &app, &refresh);
+        connect_toasts(&self.window, &app, &refresh, &self.toast_timers);
         connect_previews(
             &self.window,
             &app,
@@ -130,12 +143,15 @@ impl MainWindowView {
             result_tiles: &mut self.result_tiles.borrow_mut(),
             game_rows: &mut self.game_rows.borrow_mut(),
             picker_rows: &mut self.picker_rows.borrow_mut(),
+            toast_rows: &mut self.toast_rows.borrow_mut(),
+            toast_timers: &mut self.toast_timers.borrow_mut(),
         };
         render_window(&self.window, app, self.system_theme.get(), caches);
     }
 }
 
-/// What a render reuses from the renders before it: the converted and resized images and the repeated rows.
+/// What a render reuses from the renders before it: the converted and resized images, the repeated rows and
+/// the toasts' timers.
 struct Caches<'a> {
     editor: &'a mut ImageCache,
     online: &'a mut OnlineImageCache,
@@ -144,6 +160,8 @@ struct Caches<'a> {
     result_tiles: &'a mut ResultTiles,
     game_rows: &'a mut GameRows,
     picker_rows: &'a mut PickerRows,
+    toast_rows: &'a mut ToastRows,
+    toast_timers: &'a mut ToastTimers,
 }
 
 fn render_window(window: &MainWindow, app: &App, system_theme: SystemTheme, caches: Caches<'_>) {
@@ -161,4 +179,5 @@ fn render_window(window: &MainWindow, app: &App, system_theme: SystemTheme, cach
     caches.previews.forget_unshown();
     render_console(window, app, caches.game_rows);
     render_dialogs(window, app, caches.picker_rows);
+    render_toasts(app, caches.toast_rows, caches.toast_timers);
 }

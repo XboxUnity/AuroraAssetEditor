@@ -1,8 +1,12 @@
-use aurora_asset_editor::app::{Menu, SETTINGS_LOAD_FAILED, StartupProblem};
+use aurora_asset::AssetKind;
+use aurora_asset_editor::app::{Menu, Page, SETTINGS_LOAD_FAILED, StartupProblem};
+use aurora_asset_editor::jobs::TransferReport;
 use aurora_asset_editor::settings::ThemeChoice;
+use aurora_console::{ConsoleError, asset_folder};
 use editor_test_support::{AppHarness, Scene, Screen, ScreenArea};
 
-use crate::sample_content::{console_harness, halo_3};
+use crate::sample_content::{console_harness, halo_3, sample_games};
+use crate::staged_outcomes::{finish_upload, show_games};
 
 const CLIPBOARD_FAILURE: &str = "clipboard is gone";
 const SETTINGS_PARSE_ERROR: &str = "expected value at line 1 column 1";
@@ -49,6 +53,16 @@ pub const SHELL: ScreenArea = ScreenArea {
             name: "shell-status-startup-problem",
             description: "The status line showing the problem found at start: the settings could not be loaded, so the defaults are in use.",
             stage: stage_status_startup_problem,
+        },
+        Screen {
+            name: "shell-toast-success",
+            description: "The Console page right after the cover of Halo 3 was uploaded: \"Uploaded cover to the console\" in a toast at the bottom right as well as in the status line.",
+            stage: stage_toast_success,
+        },
+        Screen {
+            name: "shell-toast-error",
+            description: "The Console page right after the upload of Halo 3's cover failed because the console has no folder for the game: the error in a red toast at the bottom right and in red in the status line.",
+            stage: stage_toast_error,
         },
     ],
 };
@@ -116,4 +130,35 @@ fn stage_status_startup_problem(theme: ThemeChoice) -> Scene {
         error: SETTINGS_PARSE_ERROR.into(),
     });
     Scene::start(harness, theme)
+}
+
+/// The console page with the sample games listed and Halo 3, the first, selected.
+fn console_with_halo_selected(theme: ThemeChoice) -> Scene {
+    let scene = Scene::start(console_harness(), theme);
+    scene.act(|app| {
+        show_games(app, sample_games());
+        app.select_game(0);
+        app.show_page(Page::Console);
+    });
+    scene
+}
+
+fn stage_toast_success(theme: ThemeChoice) -> Scene {
+    let scene = console_with_halo_selected(theme);
+    let mut report = TransferReport::new(halo_3().ids);
+    report.done.push(AssetKind::Cover);
+    scene.act(|app| finish_upload(app, report));
+    scene
+}
+
+fn stage_toast_error(theme: ThemeChoice) -> Scene {
+    let scene = console_with_halo_selected(theme);
+    let ids = halo_3().ids;
+    let missing_folder = ConsoleError::MissingFolder {
+        path: asset_folder(&ids),
+    };
+    let mut report = TransferReport::new(ids);
+    report.failure = Some((AssetKind::Cover, missing_folder));
+    scene.act(|app| finish_upload(app, report));
+    scene
 }
