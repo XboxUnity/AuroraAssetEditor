@@ -36,6 +36,9 @@ export global Theme {
     out property <color> danger: #dc2626;
     out property <color> link-ok: dark ? #22c55e : #16a34a;
     out property <color> link-failed: dark ? #f87171 : #b91c1c;
+    // A toast's card, tinted by its outcome; its border is the outcome's colour (`link-ok`, `error-text`).
+    out property <color> toast-success-background: dark ? #1d3327 : #e8f6ee;
+    out property <color> toast-error-background: dark ? #3a1f22 : #fdecec;
 
     out property <string> font-family: "Inter";
     out property <length> font-size: 12px;
@@ -183,6 +186,4 @@ export global Theme {
     out property <length> toast-padding-x: 10px;
     out property <length> toast-padding-y: 8px;
     out property <length> toast-icon-gap: 6px;
-    // Centres the icon on the first line of text: Inter 12 px at line height 1.35 is 16 px tall.
-    out property <length> toast-icon-offset: 1px;
 }

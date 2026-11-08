@@ -1,19 +1,21 @@
 import { Icon } from "../controls/icon.slint";
 import { Theme } from "../theme/theme.slint";
 
-// The outcome of an action, on a card like a menu's. A click dismisses it before its time is up.
+// The outcome of an action, on a card tinted by it, with a shadow like a menu's. A click dismisses it before its
+// time is up.
 export component Toast inherits Rectangle {
     in property <string> text;
     in property <bool> error;
     callback dismissed();
 
     property <color> foreground: error ? Theme.error-text : Theme.text;
+    property <color> state-colour: error ? Theme.error-text : Theme.link-ok;
 
     max-width: Theme.toast-max-width;
-    background: Theme.dialog-background;
+    background: error ? Theme.toast-error-background : Theme.toast-success-background;
     border-radius: Theme.dialog-radius;
     border-width: Theme.border-width;
-    border-color: error ? Theme.error-text : Theme.border;
+    border-color: state-colour;
     drop-shadow-blur: Theme.menu-shadow-blur;
     drop-shadow-offset-y: Theme.menu-shadow-offset;
     drop-shadow-color: Theme.menu-shadow;
@@ -36,14 +38,13 @@ export component Toast inherits Rectangle {
         padding-top: Theme.toast-padding-y;
         padding-bottom: Theme.toast-padding-y;
         spacing: Theme.toast-icon-gap;
-        // Beside the first line of a text that wraps.
+        // In the middle of the toast, however many lines its text takes.
         VerticalLayout {
             horizontal-stretch: 0;
-            alignment: start;
-            padding-top: Theme.toast-icon-offset;
+            alignment: center;
             Icon {
-                source: error ? @image-url("../icons/dot.svg") : @image-url("../icons/check.svg");
-                colorize: error ? Theme.error-text : Theme.link-ok;
+                source: error ? @image-url("../icons/alert.svg") : @image-url("../icons/check.svg");
+                colorize: state-colour;
             }
         }
         toast-text := Text {
