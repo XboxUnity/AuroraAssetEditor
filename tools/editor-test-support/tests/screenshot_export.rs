@@ -182,9 +182,42 @@ fn an_unreadable_file_is_an_error_and_is_left_in_place() {
 
     assert!(!report.passed());
     assert_eq!(report.errors.len(), 1, "{report}");
-    assert!(report.errors[0].contains("a-dark"), "{report}");
+    let error = &report.errors[0];
+    assert!(error.starts_with("a-dark: could not read "), "{error}");
+    assert!(error.contains(&blocker.display().to_string()), "{error}");
     assert_eq!(report.written, ["a-light", "b-dark", "b-light"]);
     assert!(blocker.is_dir());
+}
+
+#[test]
+fn empty_file_is_rewritten() {
+    let folder = TempDir::new().expect("a temp folder");
+    let path = image_path(folder.path(), "a-dark");
+    fs::write(&path, b"").expect("the empty file is written");
+
+    let report = export(folder.path(), TWO_SCREENS);
+
+    assert!(report.passed(), "{report}");
+    assert!(report.written.contains(&"a-dark".to_owned()), "{report}");
+    let written = read_png(&path).expect("the image is a PNG");
+    assert!(written == capture(stage_gear_menu, ThemeChoice::Dark));
+}
+
+#[test]
+fn cut_off_png_is_rewritten() {
+    let folder = TempDir::new().expect("a temp folder");
+    let path = image_path(folder.path(), "a-dark");
+    write_opaque_png(&path, &capture(stage_open_menu, ThemeChoice::Dark))
+        .expect("the PNG is written");
+    let whole = read_bytes(&path);
+    fs::write(&path, &whole[..whole.len() / 2]).expect("the first half is written back");
+
+    let report = export(folder.path(), TWO_SCREENS);
+
+    assert!(report.passed(), "{report}");
+    assert!(report.written.contains(&"a-dark".to_owned()), "{report}");
+    let written = read_png(&path).expect("the image is a PNG");
+    assert!(written == capture(stage_gear_menu, ThemeChoice::Dark));
 }
 
 #[test]

@@ -69,12 +69,20 @@ impl ScreenExport {
     }
 }
 
-/// Whether `path` holds a PNG of exactly `capture`. A file that is not there, or is not a PNG,
-/// holds nothing and gets replaced; any other failure to read it is an error.
+/// Whether `path` holds a PNG of exactly `capture`. A file that is not there, or is not a PNG
+/// (including an empty or cut-off one), holds nothing and gets replaced; any other failure to read
+/// it is an error.
 fn holds_pixels(path: &Path, capture: &RgbaImage) -> Result<bool, String> {
     match read_png(path) {
         Ok(existing) => Ok(existing == *capture),
         Err(PngFileError::Io(error)) if error.kind() == io::ErrorKind::NotFound => Ok(false),
+        // The decoder reports both a file that ends early and a failed read as an I/O error; only
+        // the first means the file is not a PNG.
+        Err(PngFileError::Decode(ImageError::IoError(error)))
+            if error.kind() == io::ErrorKind::UnexpectedEof =>
+        {
+            Ok(false)
+        }
         Err(PngFileError::Decode(ImageError::IoError(error))) => Err(unreadable(path, &error)),
         Err(PngFileError::Decode(_)) => Ok(false),
         Err(error) => Err(unreadable(path, &error)),
