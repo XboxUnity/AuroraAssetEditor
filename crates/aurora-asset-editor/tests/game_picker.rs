@@ -1,6 +1,9 @@
-use aurora_asset_editor::app::{App, BUSY_TEXT, CurrentGame, PickerContent};
+use aurora_asset::AssetKind;
+use aurora_asset_editor::app::{App, BUSY_TEXT, CurrentGame, KindChoice, PickerContent};
 use aurora_asset_editor::dialogs::{Modal, ModalAnswer, ModalField};
-use aurora_asset_editor::jobs::{ConsoleJob, ConsoleOutcome, ConsoleRequest, Job, JobOutcome};
+use aurora_asset_editor::jobs::{
+    ConsoleJob, ConsoleOutcome, ConsoleRequest, Job, JobOutcome, TransferReport,
+};
 use aurora_asset_editor::status::Severity;
 use aurora_console::{ConsoleError, FtpSettings, Game, GameIds, GameListing, HexId};
 use editor_test_support::AppHarness;
@@ -307,4 +310,52 @@ fn without_a_console_the_prompt_has_only_its_box() {
     assert_eq!(harness.queued_jobs(), 0, "nothing to list the games from");
     assert_eq!(harness.app().game_picker_content(), None);
     assert!(matches!(harness.app().modal(), Some(Modal::TitleId { .. })));
+}
+
+#[test]
+fn a_dialog_opened_while_the_console_is_busy_lists_the_games_next_time() {
+    let mut harness = console_harness();
+    {
+        let app = &mut *harness.app();
+        app.set_current_game(Some(CurrentGame {
+            title: "Halo 3".to_owned(),
+            ids: games()[0].ids.clone(),
+        }));
+        app.remove_from_console(KindChoice::One(AssetKind::Cover));
+        app.answer_modal(ModalAnswer::Accept);
+    }
+    let remove = harness.take_next_job();
+    assert!(
+        matches!(
+            remove,
+            Some(Job::Console(ConsoleRequest {
+                job: ConsoleJob::Remove { .. },
+                ..
+            }))
+        ),
+        "the console is busy removing: {remove:?}"
+    );
+    let status_before = harness.app().status().clone();
+
+    harness.app().save_all_locally();
+
+    assert_eq!(harness.queued_jobs(), 0, "no listing is asked for");
+    {
+        let app = &mut *harness.app();
+        assert_eq!(app.status(), &status_before, "nothing is said");
+        assert!(matches!(app.modal(), Some(Modal::TitleId { .. })));
+        assert_eq!(app.game_picker_content(), None, "only the box shows");
+        app.edit_modal_field(ModalField::TitleId, "4D5307E6");
+        assert_eq!(save_all_title_id(app), "4D5307E6");
+
+        app.answer_modal(ModalAnswer::Cancel);
+        app.on_job_outcome(JobOutcome::Console(ConsoleOutcome::Removed(
+            TransferReport::new(games()[0].ids.clone()),
+        )));
+        app.save_all_locally();
+    }
+    assert!(
+        is_refresh(harness.take_next_job()),
+        "the next dialog lists the games"
+    );
 }

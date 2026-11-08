@@ -73,10 +73,12 @@ impl App {
 
     /// Opening a dialog with a picker lists the console's games when this session has not listed them yet,
     /// as the Console page's Refresh does, except that a connection failure is shown beside the dialog
-    /// instead of in a dialog of its own.
+    /// instead of in a dialog of its own. While other work holds the console (a listing that runs
+    /// included) the dialog opens without asking: it has its ID boxes, and the next dialog lists the games.
     pub(super) fn load_games_for_picker(&mut self) {
-        let listed_or_listing = self.console.last_refresh.is_some() || self.console.is_refreshing();
-        if self.console.settings.is_none() || listed_or_listing {
+        let listed = self.console.last_refresh.is_some();
+        let console_busy = self.active_work.console.is_some();
+        if self.console.settings.is_none() || listed || console_busy {
             return;
         }
         self.list_games(RefreshOrigin::GamePicker);
