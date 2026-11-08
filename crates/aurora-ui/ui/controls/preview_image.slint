@@ -13,8 +13,8 @@ export component PreviewImage {
     property <int> area-height: floor(root.height / 1phx);
     property <length> picture-width: source.width * 1phx;
     property <length> picture-height: source.height * 1phx;
-    // The view's copy fits the space and fills it in one direction, to the physical pixel.
     property <bool> view-listening: PreviewModel.view-listening;
+    // The view's copy fits the space and fills it in one direction, to the physical pixel.
     property <bool> fits-area: picture-width <= root.width && picture-height <= root.height
         && (picture-width > root.width - 1phx || picture-height > root.height - 1phx);
 
