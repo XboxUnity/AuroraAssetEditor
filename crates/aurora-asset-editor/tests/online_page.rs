@@ -72,7 +72,8 @@ fn image_route(path: &str, width: u32, height: u32, shade: u8) -> Route {
     route(path, 200, "image/png", png(width, height, shade))
 }
 
-/// One cover of an XboxUnity answer; its label is "Official cover for {name} Rating: 5".
+/// One cover of an XboxUnity answer; its label is "Official cover for {name}" and "Rating: 5" on two
+/// lines.
 struct Cover {
     name: &'static str,
     image: &'static str,
@@ -88,6 +89,11 @@ fn cover(name: &'static str, image: &'static str, thumbnail: Option<&'static str
 }
 
 fn label(name: &str) -> String {
+    format!("Official cover for {name}\nRating: 5")
+}
+
+/// How a message or the log names the cover: its label on one line.
+fn label_in_sentence(name: &str) -> String {
     format!("Official cover for {name} Rating: 5")
 }
 
@@ -477,8 +483,8 @@ fn thumbnails_load_lazily_and_failures_show_on_tile() {
     assert_eq!(requests_to(&server, "/image/bare.png"), 1);
     drop(app);
     let log = harness.error_log_text();
-    assert!(log.contains(&label("Broken")), "{log}");
-    assert!(!log.contains(&label("Fine")), "{log}");
+    assert!(log.contains(&label_in_sentence("Broken")), "{log}");
+    assert!(!log.contains(&label_in_sentence("Fine")), "{log}");
 }
 
 #[test]
@@ -717,7 +723,7 @@ fn use_as_cover_that_fails_to_encode_does_not_claim_success() {
     match harness.app().modal() {
         Some(Modal::Message { title, text }) => {
             assert_eq!(title, "Could not use image");
-            assert!(text.contains(&label("Wide")), "{text}");
+            assert!(text.contains(&label_in_sentence("Wide")), "{text}");
         }
         other => panic!("expected the image error dialog, got {other:?}"),
     }
@@ -785,7 +791,7 @@ fn undecodable_image_body_fails_the_tile_and_is_logged() {
     ));
     assert_eq!(harness.app().status().text, IMAGE_FAILED_TEXT);
     let log = harness.error_log_text();
-    assert!(log.contains(&label("Junk")), "{log}");
+    assert!(log.contains(&label_in_sentence("Junk")), "{log}");
     assert!(
         log.contains("not an image format the editor reads"),
         "{log}"

@@ -126,8 +126,8 @@ impl App {
         if self.refuse_while_busy() {
             return;
         }
-        let Some((label, bytes)) =
-            self.selected_full_image(|tile, bytes, _| (tile.result.label.clone(), bytes.to_vec()))
+        let Some((label, bytes)) = self
+            .selected_full_image(|tile, bytes, _| (tile.result.one_line_label(), bytes.to_vec()))
         else {
             log::warn!("Use as Cover was asked for while no result image is loaded");
             return;
@@ -268,7 +268,10 @@ impl App {
                 let context = match self.current_tile_mut(generation, index) {
                     Some(tile) => {
                         tile.thumbnail = TileImage::Failed;
-                        format!("Could not load the thumbnail of {}", tile.result.label)
+                        format!(
+                            "Could not load the thumbnail of {}",
+                            tile.result.one_line_label()
+                        )
                     }
                     None => SUPERSEDED_IMAGE_FAILED.to_owned(),
                 };
@@ -305,7 +308,10 @@ impl App {
             }
             Err(error) => {
                 tile.full = TileImage::Failed;
-                let context = format!("Could not load the image of {}", tile.result.label);
+                let context = format!(
+                    "Could not load the image of {}",
+                    tile.result.one_line_label()
+                );
                 let log_failure = self.record_error(&context, &error);
                 self.set_error_status(IMAGE_FAILED_TEXT.to_owned(), log_failure);
             }

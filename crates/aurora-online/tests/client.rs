@@ -102,7 +102,7 @@ fn xboxunity_title_query_requests_x08_path() {
     let recorded_entries: Vec<serde_json::Value> =
         serde_json::from_slice(&recorded("xboxunity_title_4D5307E6.json")).expect("JSON array");
     let first = &recorded_entries[0];
-    assert_eq!(covers[0].label, "Official cover for Halo 3 Rating: 5");
+    assert_eq!(covers[0].label, "Official cover for Halo 3\nRating: 5");
     assert_eq!(covers[0].image_url, first["url"].as_str().expect("url"));
     assert_eq!(
         covers[0].thumbnail_url.as_deref(),

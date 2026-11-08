@@ -73,7 +73,7 @@ impl CoverResult {
             .rating
             .map_or_else(|| NO_RATING.to_string(), |rating| rating.to_string());
         Some(CoverResult {
-            label: format!("{kind} for {name} Rating: {rating}"),
+            label: format!("{kind} for {name}\nRating: {rating}"),
             image_url,
             thumbnail_url: cover.thumbnail,
         })
@@ -125,12 +125,16 @@ mod tests {
         assert_eq!(
             covers[0],
             CoverResult {
-                label: "Official cover for Halo 3 Rating: 5".to_string(),
+                label: "Official cover for Halo 3\nRating: 5".to_string(),
                 image_url: "http://assets.xboxunity.net/api/boxart/225".to_string(),
                 thumbnail_url: Some("http://assets.xboxunity.net/api/boxartsm/225".to_string()),
             }
         );
-        assert_eq!(covers[1].label, "Cover for Halo 3 Rating: 4");
+        assert_eq!(covers[1].label, "Cover for Halo 3\nRating: 4");
+        assert_eq!(
+            covers[0].one_line_label(),
+            "Official cover for Halo 3 Rating: 5"
+        );
     }
 
     #[test]
@@ -156,9 +160,9 @@ mod tests {
 
         let covers = parse_xboxunity_covers(json).expect("both entries parse");
 
-        assert_eq!(covers[0].label, "Cover for  Rating: N/A");
+        assert_eq!(covers[0].label, "Cover for \nRating: N/A");
         assert_eq!(covers[0].thumbnail_url, None);
-        assert_eq!(covers[1].label, "Official cover for Num Rating: 4");
+        assert_eq!(covers[1].label, "Official cover for Num\nRating: 4");
         assert_eq!(covers[1].image_url, "u2");
     }
 
@@ -185,6 +189,6 @@ mod tests {
         let covers = parse_xboxunity_covers(&with_broken_entries).expect("the rest still parses");
 
         assert_eq!(covers.len(), recorded_count);
-        assert_eq!(covers[1].label, "Cover for Halo 3 Rating: 4");
+        assert_eq!(covers[1].label, "Cover for Halo 3\nRating: 4");
     }
 }
