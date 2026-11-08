@@ -17,7 +17,7 @@ use aurora_asset_editor::about::BuildInfo;
 use aurora_asset_editor::app::{
     App, AppEnvironment, LOG_WRITE_FAILED, StartupProblem, StartupSettings,
 };
-use aurora_asset_editor::jobs::{JobOutcome, JobWorkers, ThreadRunner};
+use aurora_asset_editor::jobs::{FailedJob, JobOutcome, JobWorkers, ThreadRunner};
 use aurora_asset_editor::logging::{ErrorLog, LogBridge, error_chain, install_panic_hook};
 use aurora_asset_editor::platform::{
     DropSignal, FileDropCollector, NativeFileDialogs, SystemClipboard, SystemClock,
@@ -254,7 +254,17 @@ fn receive_outcomes(
         while let Ok(outcome) = receiver.recv().await {
             match outcome {
                 JobOutcome::Preview(resized) => view.show_resized(resized),
-                outcome => app.borrow_mut().on_job_outcome(outcome),
+                outcome => {
+                    // The app reports the failure; the view asks for the picture again.
+                    if let JobOutcome::Failed {
+                        job: FailedJob::Preview { picture, area },
+                        ..
+                    } = &outcome
+                    {
+                        view.preview_failed(*picture, *area);
+                    }
+                    app.borrow_mut().on_job_outcome(outcome);
+                }
             }
             view.render(&app.borrow());
         }

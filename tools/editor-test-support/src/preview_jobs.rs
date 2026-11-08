@@ -40,6 +40,20 @@ impl PreviewJobs {
         }
         ran
     }
+
+    /// Hands every queued job back to `view` as failed, as `main` does with a preview job that panicked;
+    /// returns how many failed.
+    pub fn fail(&self, view: &MainWindowView) -> usize {
+        let mut failed = 0;
+        while let Some(job) = self.queue.next_job() {
+            let Job::Preview(preview) = job else {
+                panic!("a view submits only preview jobs, not {job:?}");
+            };
+            view.preview_failed(preview.picture, preview.area);
+            failed += 1;
+        }
+        failed
+    }
 }
 
 /// Lets the window report the space of every preview area and holds still until the view has settled the

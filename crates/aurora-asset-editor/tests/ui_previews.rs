@@ -213,6 +213,42 @@ fn a_resize_of_the_window_resizes_each_picture_once_after_it_settles() {
 }
 
 #[test]
+fn a_failed_resize_is_asked_for_again_once_per_size() {
+    let folder = TempDir::new().expect("tests need a temp folder");
+    let mut harness = AppHarness::new();
+    let ui = Ui::start(&mut harness);
+    load_icon_and_banner(&mut harness, &ui, folder.path());
+    ui.show_page(Page::IconBanner);
+    settle_preview_spaces();
+
+    assert_eq!(ui.previews.fail(&ui.view), 2, "the icon and the banner");
+    ui.render();
+    assert_eq!(ui.previews.fail(&ui.view), 2, "asked for again");
+    ui.render();
+    ui.render();
+    assert_eq!(
+        ui.previews.queued(),
+        0,
+        "a second failure at the same size is not retried"
+    );
+    assert_eq!(
+        size_of(&ui.model().get_icon().image),
+        ICON_SIZE,
+        "as loaded"
+    );
+
+    let (width, height) = DRAG_SIZES[0];
+    ui.view
+        .window()
+        .window()
+        .set_size(LogicalSize::new(width, height));
+    ui.render();
+    assert_eq!(ui.settle_and_resize(), 2, "a new size is asked for");
+    let icon_size = preview_size(ICON_SIZE, ui.slot_space(0));
+    assert_eq!(size_of(&ui.model().get_icon().image), icon_size);
+}
+
+#[test]
 fn resized_pictures_leave_the_saved_asset_unchanged() {
     let folder = TempDir::new().expect("tests need a temp folder");
     let mut harness = AppHarness::new();

@@ -26,12 +26,24 @@ pub struct Previews {
 /// An area as a map key: Slint's enums cannot be hashed, their variants can.
 type AreaKey = Discriminant<PreviewArea>;
 
-/// One picture in one area: its resized copy, the size last asked for, and whether the last render showed it.
+/// How often a copy at one size is asked for before failures at that size end the asking: a failure may be
+/// passing, but a picture that always fails must not keep the worker busy.
+const ATTEMPTS_PER_SIZE: u32 = 2;
+
+/// One picture in one area: its resized copy, the size last asked for, the failures at one size, and whether
+/// the last render showed it.
 #[derive(Default)]
 struct PreviewCopy {
     resized: Option<Image>,
     requested: Option<(u32, u32)>,
+    failures: Option<SizeFailures>,
     shown: bool,
+}
+
+/// The resizes to one size that failed.
+struct SizeFailures {
+    size: (u32, u32),
+    count: u32,
 }
 
 impl PreviewCopy {
@@ -40,7 +52,24 @@ impl PreviewCopy {
             .resized
             .as_ref()
             .map(|image| (image.size().width, image.size().height));
-        resized_size != Some(size) && self.requested != Some(size)
+        resized_size != Some(size) && self.requested != Some(size) && !self.gave_up_at(size)
+    }
+
+    fn gave_up_at(&self, size: (u32, u32)) -> bool {
+        self.failures
+            .as_ref()
+            .is_some_and(|failures| failures.size == size && failures.count >= ATTEMPTS_PER_SIZE)
+    }
+
+    /// The resize to the size last asked for failed.
+    fn record_failure(&mut self) {
+        let Some(size) = self.requested.take() else {
+            return;
+        };
+        match &mut self.failures {
+            Some(failures) if failures.size == size => failures.count += 1,
+            _ => self.failures = Some(SizeFailures { size, count: 1 }),
+        }
     }
 }
 
@@ -133,6 +162,15 @@ impl Previews {
             copy.requested = None;
         }
         copy.resized = Some(slint_image(&resized.pixels));
+    }
+
+    /// The resize of `picture` for `area` failed (the failure itself is reported by the app). The next
+    /// render asks for it again, once per size.
+    pub fn record_failure(&mut self, picture: PictureId, area: PreviewArea) {
+        match self.copies.get_mut(&(picture, mem::discriminant(&area))) {
+            Some(copy) => copy.record_failure(),
+            None => log::debug!("A preview failed after the window stopped showing its picture"),
+        }
     }
 
     /// Drops the copies of every picture the renders since the last call did not show.

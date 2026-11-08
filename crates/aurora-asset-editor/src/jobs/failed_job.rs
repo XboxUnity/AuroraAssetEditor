@@ -1,9 +1,12 @@
 use aurora_console::GameIds;
+use aurora_ui::PreviewArea;
+
+use crate::view::PictureId;
 
 use super::{ConsoleJob, ConsoleJobKind, Job, OnlineJob};
 
 /// A job that panicked, with what the app needs to release what the job held.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum FailedJob {
     Load,
     Import,
@@ -24,8 +27,11 @@ pub enum FailedJob {
         generation: u64,
         index: usize,
     },
-    /// Holds nothing of the app's: the view keeps showing the picture as it had it.
-    Preview,
+    /// Holds nothing of the app's. The view keeps showing the picture as it had it, and asks again once.
+    Preview {
+        picture: PictureId,
+        area: PreviewArea,
+    },
 }
 
 impl FailedJob {
@@ -57,7 +63,10 @@ impl FailedJob {
                 generation: *generation,
                 index: *index,
             },
-            Job::Preview(_) => FailedJob::Preview,
+            Job::Preview(preview) => FailedJob::Preview {
+                picture: preview.picture,
+                area: preview.area,
+            },
         }
     }
 
@@ -71,7 +80,7 @@ impl FailedJob {
             FailedJob::OnlineSearch { .. } => "The online search",
             FailedJob::OnlineThumbnail { .. } => "Loading a result's thumbnail",
             FailedJob::OnlineFull { .. } => "Loading a result's image",
-            FailedJob::Preview => "Resizing a preview",
+            FailedJob::Preview { .. } => "Resizing a preview",
         }
     }
 }

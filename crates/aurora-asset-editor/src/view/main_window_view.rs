@@ -1,7 +1,9 @@
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
-use aurora_ui::{ConsoleModel, DialogModel, EditorModel, MainWindow, OnlineModel, ShellModel};
+use aurora_ui::{
+    ConsoleModel, DialogModel, EditorModel, MainWindow, OnlineModel, PreviewArea, ShellModel,
+};
 use slint::{ComponentHandle, Timer};
 
 use crate::app::App;
@@ -16,8 +18,8 @@ use super::preview_view::connect_previews;
 use super::shell_view::{Refresh, connect_shell, render_shell};
 use super::toast_view::{connect_toasts, render_toasts};
 use super::{
-    GameRows, ImageCache, OnlineImageCache, PickerRows, Previews, ResultTiles, ScreenshotTiles,
-    ToastRows, ToastTimers,
+    GameRows, ImageCache, OnlineImageCache, PickerRows, PictureId, Previews, ResultTiles,
+    ScreenshotTiles, ToastRows, ToastTimers,
 };
 
 /// The window: it shows what `App` holds and turns the window's callbacks into `App` calls.
@@ -88,6 +90,11 @@ impl MainWindowView {
     /// A picture resized by a preview job; the next render shows it.
     pub fn show_resized(&self, resized: ResizedPreview) {
         self.previews.borrow_mut().store(resized);
+    }
+
+    /// A preview job for `picture` in `area` failed; the next render asks for the copy again, once per size.
+    pub fn preview_failed(&self, picture: PictureId, area: PreviewArea) {
+        self.previews.borrow_mut().record_failure(picture, area);
     }
 
     /// Every callback calls its `App` method, then renders.
