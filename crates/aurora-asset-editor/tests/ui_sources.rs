@@ -39,6 +39,12 @@ const SNAPSHOT_DIR_VARIABLE: &str = "AURORA_UI_SNAPSHOT_DIR";
 const ACCENT_PROBE_INSET: f32 = 3.0;
 /// The accent #3b82f6 has blue far above red; the neutral pill colours do not.
 const MAX_NEUTRAL_BLUE_CAST: u8 = 20;
+/// WCAG AA for text below 18 pt.
+const MIN_TEXT_CONTRAST: f64 = 4.5;
+/// Half the height of the rows searched for a centred caption's pixels.
+const TEXT_BAND_HALF_HEIGHT: f32 = 6.0;
+/// Inside an element's left edge, clear of its border and of its text.
+const BACKGROUND_PROBE_INSET: f32 = 3.0;
 const THEMES: [(ThemeChoice, &str); 2] =
     [(ThemeChoice::Dark, "dark"), (ThemeChoice::Light, "light")];
 
@@ -328,6 +334,71 @@ fn online_page_renders_states() {
         }
         assert_all_differ(&states, name);
     }
+}
+
+#[test]
+fn image_failures_are_readable_on_the_selected_background() {
+    let server = online_server();
+    for (theme, name) in THEMES {
+        let mut harness = online_harness(&server, theme);
+        let ui = Ui::start(&mut harness);
+        ui.act(|app| {
+            app.edit_search_text(RESULTS_TITLE);
+            app.search_online();
+        });
+        harness.run_jobs();
+        ui.render();
+        let broken = ui.online().get_tiles().row_data(2).expect("a third result");
+        ui.click_label_in(&broken.label, "OnlinePage::result-grid");
+        harness.run_jobs();
+        ui.render();
+        assert!(ui.online().get_selected_failed());
+
+        let snapshot = ui.snapshot();
+        let tile = ui.labelled_in(&broken.label, "OnlinePage::result-grid");
+        let preview = ui.element("OnlinePage::preview");
+        for (place, element) in [("tile", tile), ("preview", preview)] {
+            let contrast = centre_text_contrast(&snapshot, &element);
+            assert!(
+                contrast >= MIN_TEXT_CONTRAST,
+                "{name}: the failure on the selected {place} has contrast {contrast:.2}"
+            );
+        }
+    }
+}
+
+/// The highest contrast between a pixel of the text centred in `element` and the background at its left.
+fn centre_text_contrast(snapshot: &RgbaImage, element: &ElementHandle) -> f64 {
+    let (position, size) = (element.absolute_position(), element.size());
+    let centre_y = position.y + size.height / 2.0;
+    let background = *snapshot.get_pixel(
+        (position.x + BACKGROUND_PROBE_INSET) as u32,
+        centre_y as u32,
+    );
+    let rows = (centre_y - TEXT_BAND_HALF_HEIGHT) as u32..(centre_y + TEXT_BAND_HALF_HEIGHT) as u32;
+    let columns = position.x as u32..(position.x + size.width) as u32;
+    rows.flat_map(|y| columns.clone().map(move |x| (x, y)))
+        .map(|(x, y)| contrast_ratio(*snapshot.get_pixel(x, y), background))
+        .fold(1.0, f64::max)
+}
+
+/// The WCAG contrast ratio of two colours.
+fn contrast_ratio(first: image::Rgba<u8>, second: image::Rgba<u8>) -> f64 {
+    let (first, second) = (relative_luminance(first), relative_luminance(second));
+    let (lighter, darker) = (first.max(second), first.min(second));
+    (lighter + 0.05) / (darker + 0.05)
+}
+
+fn relative_luminance(colour: image::Rgba<u8>) -> f64 {
+    let [red, green, blue, _] = colour.0.map(|channel| {
+        let channel = f64::from(channel) / 255.0;
+        if channel <= 0.04045 {
+            channel / 12.92
+        } else {
+            ((channel + 0.055) / 1.055).powf(2.4)
+        }
+    });
+    0.2126 * red + 0.7152 * green + 0.0722 * blue
 }
 
 #[test]

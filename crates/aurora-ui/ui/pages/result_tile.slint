@@ -39,7 +39,8 @@ export component ResultTile inherits Rectangle {
         }
         if view.failed: failed-text := Text {
             text: "Failed to load image";
-            color: Theme.error-text;
+            // The error colour is too faint on the selected gradient, so the failure reads like the label there.
+            color: view.selected ? Theme.chip-text : Theme.error-text;
             font-size: Theme.caption-font-size;
             horizontal-alignment: center;
             wrap: word-wrap;
