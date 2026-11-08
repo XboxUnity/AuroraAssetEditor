@@ -15,10 +15,9 @@ export global Theme {
     // Neutral buttons in the body text colour, so an enabled one never reads as disabled.
     out property <color> pill-background: dark ? #353a44 : #e2e5ea;
     out property <color> pill-text: text;
-    // The track and unselected options of a segmented choice: quieter than a button, so the selected option,
-    // in the chip colours, stands out.
+    // The track of a segmented choice, quieter than a button; its unselected options are in the body text colour
+    // and the selected one in the chip colours.
     out property <color> segment-background: dark ? #2e323a : #e6e8ec;
-    out property <color> segment-text: dark ? #aaaabb : #4a5060;
     out property <color> accent: #3b82f6;
     out property <color> accent-text: #ffffff;
     out property <color> chip-background: dark ? #2e3a52 : #dbe6fb;
