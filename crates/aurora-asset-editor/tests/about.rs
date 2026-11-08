@@ -105,6 +105,46 @@ fn notices_carry_the_slint_attribution_clause_and_the_inter_copyright() {
     assert!(notices.contains("Copyright (c) 2016 The Inter Project Authors"));
 }
 
+/// The licence texts the notices copy by hand, in the files the project takes them from.
+const BC3_ENCODER_SOURCE: &str = include_str!("../../aurora-asset/src/texture/bc3_encode/mod.rs");
+const INTER_LICENCE: &str = include_str!("../../aurora-ui/ui/fonts/OFL.txt");
+const MIT_LICENSE_HEADING: &str = "MIT License";
+
+#[test]
+fn notices_copy_the_directxtex_and_inter_licences_in_full() {
+    let notices = notices_text().replace("\r\n", "\n");
+    let directxtex = mit_licence_in_header(BC3_ENCODER_SOURCE);
+    assert!(
+        notices.contains(&directxtex),
+        "the notices do not hold the DirectXTex licence as the source header has it:\n{directxtex}"
+    );
+    let inter = INTER_LICENCE.replace("\r\n", "\n");
+    assert!(
+        notices.contains(inter.trim_end()),
+        "the notices do not hold the bundled OFL.txt in full"
+    );
+}
+
+/// The comment lines from "MIT License" to the end of the file's leading comment, without the `//`.
+fn mit_licence_in_header(source: &str) -> String {
+    let lines: Vec<&str> = source
+        .lines()
+        .take_while(|line| line.starts_with("//") && !line.starts_with("//!"))
+        .map(comment_text)
+        .skip_while(|line| *line != MIT_LICENSE_HEADING)
+        .collect();
+    assert!(
+        !lines.is_empty(),
+        "the BC3 encoder's header has no MIT licence"
+    );
+    lines.join("\n").trim_end().to_owned()
+}
+
+fn comment_text(line: &str) -> &str {
+    let text = line.trim_start_matches("//");
+    text.strip_prefix(' ').unwrap_or(text)
+}
+
 struct Ui {
     ui: HeadlessUi,
     view: MainWindowView,
