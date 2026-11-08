@@ -27,6 +27,12 @@ const MINIMUM_WINDOW: (f32, f32) = (760.0, 500.0);
 const LONG_RUN_URL: &str = "https://github.com/Swizzy/AuroraAssetEditor/actions/runs/19283746501";
 /// A sideways wheel turn, more than any overhang a line of the notices could have.
 const SIDEWAYS_SCROLL: f32 = 200.0;
+/// The first two lines of `handwritten.txt`, each one line in the notices box.
+const NOTICES_FIRST_LINE: &str =
+    "Software and fonts that Aurora Asset Editor includes, and the licences they carry.";
+const NOTICES_SECOND_LINE: &str = "The Rust crates it is built from follow after these entries.";
+/// Positions are logical floats; a line step that is off shows as a whole pixel or more.
+const LINE_POSITION_TOLERANCE: f32 = 0.01;
 /// Copy build info, Third-party notices, then the notices list.
 const NOTICES_TAB_STOPS: usize = 3;
 const THEMES: [(ThemeChoice, &str); 2] =
@@ -455,6 +461,40 @@ fn expanded_notices_fit_the_minimum_window_and_scroll_with_the_keys() {
         "Up and PageUp scroll back"
     );
     assert!(ui.app.borrow().modal().is_some());
+}
+
+#[test]
+fn up_and_down_move_the_notices_by_exactly_one_line() {
+    let mut harness = AppHarness::new();
+    let ui = Ui::start(&mut harness, ThemeChoice::Dark);
+    ui.app.borrow_mut().show_about();
+    ui.app.borrow_mut().toggle_about_notices();
+    ui.render();
+    for _ in 0..NOTICES_TAB_STOPS {
+        ui.press(Key::Tab);
+    }
+    let line_top = |label: &str| {
+        ElementHandle::find_by_accessible_label(ui.view.window(), label)
+            .next()
+            .unwrap_or_else(|| panic!("the notices show \"{label}\""))
+            .absolute_position()
+            .y
+    };
+    let first_line_top = line_top(NOTICES_FIRST_LINE);
+
+    ui.press(Key::DownArrow);
+    let second_line_top = line_top(NOTICES_SECOND_LINE);
+    assert!(
+        (second_line_top - first_line_top).abs() < LINE_POSITION_TOLERANCE,
+        "after Down the second line is at {second_line_top}, the first was at {first_line_top}"
+    );
+
+    ui.press(Key::UpArrow);
+    let first_line_back = line_top(NOTICES_FIRST_LINE);
+    assert!(
+        (first_line_back - first_line_top).abs() < LINE_POSITION_TOLERANCE,
+        "after Up the first line is at {first_line_back}, it started at {first_line_top}"
+    );
 }
 
 #[test]

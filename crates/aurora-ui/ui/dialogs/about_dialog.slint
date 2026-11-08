@@ -98,11 +98,11 @@ export component AboutDialog inherits DialogFrame {
                 height: Theme.notices-height;
                 key-pressed(event) => {
                     if event.text == Key.UpArrow {
-                        notices-list.content-y = min(0px, notices-list.content-y + Theme.notices-line-step);
+                        notices-list.content-y = min(0px, notices-list.content-y + line-probe.preferred-height);
                         return accept;
                     }
                     if event.text == Key.DownArrow {
-                        notices-list.content-y = max(notices-list.visible-height - notices-list.content-height, notices-list.content-y - Theme.notices-line-step);
+                        notices-list.content-y = max(notices-list.visible-height - notices-list.content-height, notices-list.content-y - line-probe.preferred-height);
                         return accept;
                     }
                     if event.text == Key.PageUp {
@@ -114,6 +114,15 @@ export component AboutDialog inherits DialogFrame {
                         return accept;
                     }
                     reject
+                }
+
+                // One line of the notices, never shown, as wide and in the same font as the list's lines: Up and
+                // Down move the list by its height, which is exactly one line.
+                line-probe := Text {
+                    width: notices-list.visible-width;
+                    text: " ";
+                    wrap: word-wrap;
+                    visible: false;
                 }
 
                 Rectangle {
