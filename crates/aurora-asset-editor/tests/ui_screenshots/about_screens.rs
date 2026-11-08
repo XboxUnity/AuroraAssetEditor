@@ -8,17 +8,20 @@ const CLIPBOARD_FAILURE: &str = "clipboard is gone";
 /// Far more than the card's body is taller than the window at the minimum size, so the scroll stops at its end.
 const SCROLL_TO_END: f32 = -2000.0;
 
+// The AboutSlint widget prints the version of Slint it comes with, so a Slint upgrade changes every screen here
+// that shows it (all but about-copy-failed) and they must be approved again. The notices screens show only the top
+// of notices/handwritten.txt, so editing its head changes them; the generated third-party list further down does not.
 pub const ABOUT: ScreenArea = ScreenArea {
     title: "About",
     screens: &[
         Screen {
             name: "about",
-            description: "The About dialog with the build lines 2.0.7 (a1b2c3d), the credits and \"Made with Slint\", the notices collapsed.",
+            description: "The About dialog with the build lines 2.0.7 (a1b2c3d), the credits and \"Made with Slint\", the notices collapsed. The Slint widget prints its own version, which changes with every Slint upgrade.",
             stage: stage_about,
         },
         Screen {
             name: "about-copied",
-            description: "The About dialog after \"Copy build info\": the button reads \"Copied\".",
+            description: "The About dialog after \"Copy build info\": the button reads \"Copied\". The Slint widget prints its own version, which changes with every Slint upgrade.",
             stage: stage_copied,
         },
         Screen {
@@ -28,12 +31,12 @@ pub const ABOUT: ScreenArea = ScreenArea {
         },
         Screen {
             name: "about-notices",
-            description: "The About dialog with the third-party notices expanded, showing the top of the list: the whole card, \"Made with Slint\" included, fits the window.",
+            description: "The About dialog with the third-party notices expanded, showing the top of the list: the whole card, \"Made with Slint\" included, fits the window. The box shows the head of notices/handwritten.txt. The Slint widget prints its own version, which changes with every Slint upgrade.",
             stage: stage_notices,
         },
         Screen {
             name: "about-notices-minimum",
-            description: "The About dialog with the notices expanded at the minimum window size, its body scrolled to the end: \"Made with Slint\" shows below the notices box while the title and the OK row stay in view.",
+            description: "The About dialog with the notices expanded at the minimum window size, its body scrolled to the end: \"Made with Slint\" shows below the notices box while the title and the OK row stay in view. The box shows the head of notices/handwritten.txt. The Slint widget prints its own version, which changes with every Slint upgrade.",
             stage: stage_notices_minimum,
         },
     ],
