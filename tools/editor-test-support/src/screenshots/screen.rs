@@ -10,7 +10,7 @@ pub const SCREEN_THEMES: [(ThemeChoice, &str); 2] =
 pub struct Screen {
     /// Lowercase kebab-case, starting with what the screen shows (`cover-loaded`).
     pub name: &'static str,
-    /// What the screen shows, for the person approving it on the contact sheet.
+    /// What the screen shows, for the person reviewing it on the contact sheet.
     pub description: &'static str,
     /// Builds the state in the given theme. Called on a fresh thread for every image.
     pub stage: fn(ThemeChoice) -> Scene,

@@ -7,22 +7,21 @@ use std::thread::{self, ThreadId};
 use aurora_asset_editor::app::Menu;
 use aurora_asset_editor::settings::ThemeChoice;
 use editor_test_support::{
-    AppHarness, ImageReport, ImageStatus, ReferenceMode, ReferenceStore, Scene, Screen, ScreenArea,
-    ScreenFilterOnCi, ScreenshotSuite, SuiteReport, read_png, write_opaque_png,
+    AppHarness, BaselineSource, DEFAULT_LABEL, ImageChange, ImageReport, RunManifest, Scene,
+    Screen, ScreenArea, ScreenFilterOnCi, ScreenshotFolders, ScreenshotSuite, SuiteReport,
 };
-use image::{Rgba, RgbaImage};
 use tempfile::TempDir;
 
+const PLATFORM: &str = "test-platform";
+const OTHER_PLATFORM: &str = "other-platform";
 const AREA_TITLE: &str = "Menus under test";
 const SCREEN_A_DESCRIPTION: &str = "The gear menu open";
 const ESCAPED_DESCRIPTION: &str = "a < b & c";
-const UPDATE_COMMAND: &str = "cargo xtask ui-screenshots update";
-const MAGENTA: Rgba<u8> = Rgba([0xff, 0x00, 0xff, 0xff]);
+const ALL_IMAGES: [&str; 4] = ["a-dark", "a-light", "b-dark", "b-light"];
 
 static STAGING_THREADS: Mutex<Vec<ThreadId>> = Mutex::new(Vec::new());
-/// Files a stage looks for, and whether each was on disk while the screen was staged.
-static WATCHED_FILES: Mutex<Vec<PathBuf>> = Mutex::new(Vec::new());
-static WATCHED_FILES_SEEN: Mutex<Vec<bool>> = Mutex::new(Vec::new());
+/// Where the stage of `REPORT_BLOCKING_SCREENS` puts a folder, so `report.txt` cannot be written.
+static REPORT_BLOCKER: Mutex<Option<PathBuf>> = Mutex::new(None);
 
 fn menu_scene(theme: ThemeChoice, menu: Menu) -> Scene {
     let scene = Scene::start(AppHarness::new(), theme);
@@ -59,14 +58,12 @@ fn stage_open_menu_recording_thread(theme: ThemeChoice) -> Scene {
     stage_open_menu(theme)
 }
 
-fn stage_gear_menu_watching_files(theme: ThemeChoice) -> Scene {
-    let watched = WATCHED_FILES
+fn stage_gear_menu_blocking_report(theme: ThemeChoice) -> Scene {
+    let blocker = REPORT_BLOCKER
         .lock()
-        .expect("no thread panicked while holding the list");
-    WATCHED_FILES_SEEN
-        .lock()
-        .expect("no thread panicked while holding the list")
-        .extend(watched.iter().map(|path| path.exists()));
+        .expect("no thread panicked while holding the path");
+    let path = blocker.as_ref().expect("the test sets the blocked path");
+    fs::create_dir_all(path).expect("a folder in place of report.txt is created");
     stage_gear_menu(theme)
 }
 
@@ -83,6 +80,22 @@ const SCREEN_B: Screen = Screen {
 const TWO_SCREENS: &[ScreenArea] = &[ScreenArea {
     title: AREA_TITLE,
     screens: &[SCREEN_A, SCREEN_B],
+}];
+/// `TWO_SCREENS` after screen a changed: it now shows the open menu.
+const SCREEN_A_CHANGED: &[ScreenArea] = &[ScreenArea {
+    title: AREA_TITLE,
+    screens: &[
+        Screen {
+            name: "a",
+            description: SCREEN_A_DESCRIPTION,
+            stage: stage_open_menu,
+        },
+        SCREEN_B,
+    ],
+}];
+const ONLY_SCREEN_A: &[ScreenArea] = &[ScreenArea {
+    title: AREA_TITLE,
+    screens: &[SCREEN_A],
 }];
 const RECORDING_SCREENS: &[ScreenArea] = &[ScreenArea {
     title: AREA_TITLE,
@@ -119,44 +132,70 @@ const SCREEN_WITH_MARKUP: &[ScreenArea] = &[ScreenArea {
         stage: stage_gear_menu,
     }],
 }];
+const REPORT_BLOCKING_SCREENS: &[ScreenArea] = &[ScreenArea {
+    title: AREA_TITLE,
+    screens: &[Screen {
+        name: "a",
+        description: SCREEN_A_DESCRIPTION,
+        stage: stage_gear_menu_blocking_report,
+    }],
+}];
 
-/// A references folder and an output folder inside one temporary folder.
+/// The screenshot folders of the platform `test-platform` inside one temporary folder.
 struct SuiteFolders {
-    _folder: TempDir,
-    references: PathBuf,
-    output: PathBuf,
+    temp: TempDir,
 }
 
 impl SuiteFolders {
     fn new() -> SuiteFolders {
-        let folder = tempfile::tempdir().expect("a temporary folder is needed for the suite");
         SuiteFolders {
-            references: folder.path().join("references"),
-            output: folder.path().join("output"),
-            _folder: folder,
+            temp: tempfile::tempdir().expect("a temporary folder is needed for the suite"),
         }
     }
 
-    fn store(&self) -> ReferenceStore {
-        ReferenceStore::new(self.references.clone(), self.output.clone())
+    fn root(&self) -> &Path {
+        self.temp.path()
     }
 
-    fn run(&self, mode: ReferenceMode, only: Option<&str>, areas: &[ScreenArea]) -> SuiteReport {
-        ScreenshotSuite::new(self.store(), mode, only.map(str::to_owned)).run(areas)
+    fn folders(&self) -> ScreenshotFolders {
+        ScreenshotFolders::new(self.root().to_path_buf(), PLATFORM.to_owned())
     }
 
-    fn write_png(&self, path: &Path) {
-        let image = RgbaImage::from_pixel(2, 2, MAGENTA);
-        write_opaque_png(path, &image).expect("the test image is written");
+    fn current(&self) -> PathBuf {
+        self.root().join(PLATFORM)
     }
 
-    /// Changes two pixels of an approved reference, so the next check finds "2 pixels differ".
-    fn change_reference(&self, image: &str) {
-        let path = self.store().reference_path(image);
-        let mut reference = read_png(&path).expect("the reference was written by an update run");
-        reference.put_pixel(0, 0, MAGENTA);
-        reference.put_pixel(1, 0, MAGENTA);
-        write_opaque_png(&path, &reference).expect("the changed reference is written");
+    fn previous(&self) -> PathBuf {
+        self.root().join("previous").join(PLATFORM)
+    }
+
+    fn run(&self, areas: &[ScreenArea]) -> SuiteReport {
+        self.run_labelled(DEFAULT_LABEL, None, areas)
+    }
+
+    fn run_labelled(&self, label: &str, only: Option<&str>, areas: &[ScreenArea]) -> SuiteReport {
+        self.run_with(BaselineSource::PreviousRun, label, only, areas)
+    }
+
+    fn run_against(&self, baseline: &Path, areas: &[ScreenArea]) -> SuiteReport {
+        let source = BaselineSource::Folder(baseline.to_path_buf());
+        self.run_with(source, DEFAULT_LABEL, None, areas)
+    }
+
+    fn run_with(
+        &self,
+        baseline: BaselineSource,
+        label: &str,
+        only: Option<&str>,
+        areas: &[ScreenArea],
+    ) -> SuiteReport {
+        let suite = ScreenshotSuite::new(
+            self.folders(),
+            baseline,
+            only.map(str::to_owned),
+            label.to_owned(),
+        );
+        suite.run(areas)
     }
 
     fn sheet(&self, report: &SuiteReport) -> String {
@@ -164,7 +203,7 @@ impl SuiteFolders {
             .sheet
             .as_ref()
             .expect("the run wrote a contact sheet");
-        assert_eq!(path, &self.output.join("index.html"));
+        assert_eq!(path, &self.current().join("index.html"));
         fs::read_to_string(path).expect("the contact sheet is readable")
     }
 }
@@ -180,21 +219,121 @@ fn image<'a>(report: &'a SuiteReport, name: &str) -> &'a ImageReport {
         .unwrap_or_else(|| panic!("the report has the image {name}"))
 }
 
+fn baseline_label(report: &SuiteReport) -> &str {
+    report
+        .baseline
+        .as_ref()
+        .map(|manifest| manifest.label.as_str())
+        .expect("the run had a baseline")
+}
+
+fn has_problem(report: &SuiteReport, wanted: impl Fn(&str) -> bool) -> bool {
+    report.problems.iter().any(|problem| wanted(problem))
+}
+
+/// `second` appears apart from `first`, so the text names both even when `first` contains
+/// `second`.
+fn names_both(text: &str, first: &str, second: &str) -> bool {
+    text.split_once(first)
+        .is_some_and(|(before, after)| before.contains(second) || after.contains(second))
+}
+
+fn has_note(report: &SuiteReport, text: &str) -> bool {
+    report.notes.iter().any(|note| note.contains(text))
+}
+
+fn assert_every_image_is(report: &SuiteReport, change: &ImageChange) {
+    for image in report.images() {
+        assert_eq!(&image.change, change, "{}", image.image);
+    }
+}
+
+/// A finished run of another platform: its manifest and nothing else.
+fn finished_run_of_other_platform(folder: &Path) {
+    let manifest = RunManifest {
+        platform: OTHER_PLATFORM.to_owned(),
+        label: DEFAULT_LABEL.to_owned(),
+        rendered: "2026-11-01 10:00 UTC".to_owned(),
+        filter: None,
+    };
+    manifest
+        .write(folder)
+        .expect("the other platform's manifest is written");
+}
+
 #[test]
-fn every_screen_is_checked_in_both_themes() {
+fn first_run_has_no_baseline_and_every_image_is_new() {
     let folders = SuiteFolders::new();
 
-    let report = folders.run(ReferenceMode::Update, None, TWO_SCREENS);
+    let report = folders.run(TWO_SCREENS);
 
-    assert_eq!(
-        image_names(&report),
-        ["a-dark", "a-light", "b-dark", "b-light"]
+    assert_eq!(image_names(&report), ALL_IMAGES);
+    assert_every_image_is(&report, &ImageChange::New);
+    assert!(report.baseline.is_none());
+    assert!(
+        has_note(&report, "no earlier finished local run"),
+        "{report}"
     );
-    for image in report.images() {
-        assert_eq!(image.status, ImageStatus::Created, "{}", image.image);
-    }
     assert_eq!(report.areas.len(), 1);
     assert_eq!(report.areas[0].title, AREA_TITLE);
+    assert!(report.passed(), "{report}");
+}
+
+#[test]
+fn second_run_compares_with_the_first() {
+    let folders = SuiteFolders::new();
+    folders.run(TWO_SCREENS);
+
+    let report = folders.run(TWO_SCREENS);
+
+    assert_every_image_is(&report, &ImageChange::Unchanged);
+    assert_eq!(baseline_label(&report), DEFAULT_LABEL);
+    assert!(folders.previous().join("manifest.txt").is_file());
+    assert!(report.passed(), "{report}");
+}
+
+#[test]
+fn changed_screen_is_reported_and_does_not_fail() {
+    let folders = SuiteFolders::new();
+    folders.run(TWO_SCREENS);
+
+    let report = folders.run(SCREEN_A_CHANGED);
+
+    for name in ["a-dark", "a-light"] {
+        assert!(
+            matches!(image(&report, name).change, ImageChange::Changed(_)),
+            "{name} changed: {report}"
+        );
+    }
+    for name in ["b-dark", "b-light"] {
+        assert_eq!(
+            image(&report, name).change,
+            ImageChange::Unchanged,
+            "{name}"
+        );
+    }
+    assert!(report.passed(), "{report}");
+    assert!(folders.current().join("diff").join("a-dark.png").is_file());
+    let text = report.to_string();
+    assert!(text.contains("2 changed"), "{text}");
+    assert!(text.contains("Changes do not fail the run"), "{text}");
+}
+
+#[test]
+fn removed_screen_is_listed_with_its_baseline_image() {
+    let folders = SuiteFolders::new();
+    folders.run(TWO_SCREENS);
+
+    let report = folders.run(ONLY_SCREEN_A);
+
+    assert_eq!(report.removed, ["b-dark", "b-light"]);
+    assert!(
+        folders
+            .current()
+            .join("baseline")
+            .join("b-dark.png")
+            .is_file()
+    );
     assert!(report.passed(), "{report}");
 }
 
@@ -202,7 +341,7 @@ fn every_screen_is_checked_in_both_themes() {
 fn each_image_is_staged_on_its_own_thread() {
     let folders = SuiteFolders::new();
 
-    folders.run(ReferenceMode::Update, None, RECORDING_SCREENS);
+    folders.run(RECORDING_SCREENS);
 
     let threads = STAGING_THREADS
         .lock()
@@ -216,78 +355,86 @@ fn each_image_is_staged_on_its_own_thread() {
 #[test]
 fn staging_panic_fails_the_run_and_names_the_image() {
     let folders = SuiteFolders::new();
-    let stale_actual = folders.store().actual_path("broken-dark");
-    folders.write_png(&stale_actual);
 
-    let report = folders.run(ReferenceMode::Update, None, ONE_BROKEN_SCREEN);
+    let report = folders.run(ONE_BROKEN_SCREEN);
 
     for name in ["broken-dark", "broken-light"] {
-        match &image(&report, name).status {
-            ImageStatus::Error(message) => {
+        match &image(&report, name).change {
+            ImageChange::Error(message) => {
                 assert!(message.contains("staging or capture panicked"), "{message}");
                 assert!(message.contains("boom"), "{message}");
             }
             other => panic!("{name} is an error, not {other:?}"),
         }
     }
-    for name in ["a-dark", "a-light", "b-dark", "b-light"] {
-        assert_eq!(image(&report, name).status, ImageStatus::Created, "{name}");
+    for name in ALL_IMAGES {
+        assert_eq!(image(&report, name).change, ImageChange::New, "{name}");
     }
     assert!(!report.passed());
-    assert!(!stale_actual.exists(), "the stale screenshot is removed");
+    assert!(folders.current().join("manifest.txt").is_file());
     let text = report.to_string();
     assert!(text.contains("broken-dark"), "{text}");
     assert!(text.contains("boom"), "{text}");
 }
 
 #[test]
-fn orphan_reference_fails_in_check_mode() {
+fn each_run_starts_from_an_empty_output_folder() {
     let folders = SuiteFolders::new();
-    folders.run(ReferenceMode::Update, None, TWO_SCREENS);
-    folders.write_png(&folders.store().reference_path("extra"));
-
-    let report = folders.run(ReferenceMode::Check, None, TWO_SCREENS);
-
-    for image in report.images() {
-        assert_eq!(image.status, ImageStatus::Matches, "{}", image.image);
+    let stale = [
+        folders.current().join("images").join("stale-dark.png"),
+        folders.current().join("diff").join("a-dark.png"),
+    ];
+    for path in &stale {
+        fs::create_dir_all(path.parent().expect("the stale file has a folder"))
+            .expect("the stale file's folder is created");
+        fs::write(path, b"stale").expect("the stale file is written");
     }
-    assert_eq!(report.orphans, ["extra"]);
-    assert!(!report.passed());
-    assert!(report.to_string().contains("extra"), "{report}");
+
+    let report = folders.run(TWO_SCREENS);
+
+    for path in &stale {
+        assert!(!path.exists(), "{} is gone", path.display());
+    }
+    assert!(report.passed(), "{report}");
 }
 
 #[test]
-fn update_mode_removes_orphans() {
+fn unfinished_local_run_is_never_the_baseline() {
     let folders = SuiteFolders::new();
-    let orphan = folders.store().reference_path("extra");
-    folders.write_png(&orphan);
+    folders.run_labelled("first", None, TWO_SCREENS);
+    folders.run_labelled("second", None, TWO_SCREENS);
+    fs::remove_file(folders.current().join("manifest.txt"))
+        .expect("the second run wrote its manifest");
 
-    let report = folders.run(ReferenceMode::Update, None, TWO_SCREENS);
+    let report = folders.run(TWO_SCREENS);
 
-    assert_eq!(report.removed_orphans, ["extra"]);
-    assert!(report.orphans.is_empty());
-    assert!(!orphan.exists());
+    assert_eq!(baseline_label(&report), "first");
+    assert!(has_note(&report, "did not finish"), "{report}");
+    assert!(report.passed(), "{report}");
+}
+
+#[test]
+fn filtered_run_never_becomes_the_baseline() {
+    let folders = SuiteFolders::new();
+    folders.run_labelled("full", None, TWO_SCREENS);
+    folders.run_labelled("filtered", Some("b"), TWO_SCREENS);
+
+    let report = folders.run_labelled("again", None, TWO_SCREENS);
+
+    assert_eq!(baseline_label(&report), "full");
+    assert_every_image_is(&report, &ImageChange::Unchanged);
     assert!(report.passed(), "{report}");
 }
 
 #[test]
 fn filtered_run_is_reported_as_filtered() {
     let folders = SuiteFolders::new();
-    let orphan = folders.store().reference_path("extra");
-    let other_screen_actual = folders.store().actual_path("a-dark");
-    folders.write_png(&orphan);
-    folders.write_png(&other_screen_actual);
+    folders.run(TWO_SCREENS);
 
-    let report = folders.run(ReferenceMode::Update, Some("b"), TWO_SCREENS);
+    let report = folders.run_labelled(DEFAULT_LABEL, Some("b"), TWO_SCREENS);
 
     assert_eq!(image_names(&report), ["b-dark", "b-light"]);
-    assert!(report.orphans.is_empty());
-    assert!(report.removed_orphans.is_empty());
-    assert!(orphan.exists(), "a filtered run leaves orphans alone");
-    assert!(
-        other_screen_actual.exists(),
-        "a filtered run leaves the outputs of other screens alone"
-    );
+    assert!(report.removed.is_empty(), "{report}");
     assert_eq!(report.filter.as_deref(), Some("b"));
     let text = report.to_string();
     assert!(
@@ -297,127 +444,176 @@ fn filtered_run_is_reported_as_filtered() {
 }
 
 #[test]
-fn filter_matching_no_screen_fails_the_run() {
+fn baseline_from_another_platform_fails_the_run() {
     let folders = SuiteFolders::new();
+    let other = folders.root().join("other-run");
+    finished_run_of_other_platform(&other);
 
-    let report = folders.run(ReferenceMode::Update, Some("nothing"), TWO_SCREENS);
+    let report = folders.run_against(&other, TWO_SCREENS);
 
-    assert_eq!(report.images().count(), 0);
     assert!(!report.passed());
-    assert!(report.to_string().contains("nothing"), "{report}");
+    assert!(
+        has_problem(&report, |problem| problem.contains(OTHER_PLATFORM)
+            && problem.contains(PLATFORM)),
+        "{report}"
+    );
+    assert_every_image_is(&report, &ImageChange::New);
+    assert!(
+        folders
+            .current()
+            .join("images")
+            .join("a-dark.png")
+            .is_file()
+    );
 }
 
 #[test]
-fn full_run_clears_outputs_of_screens_that_no_longer_exist() {
+fn missing_baseline_folder_fails_the_run() {
     let folders = SuiteFolders::new();
-    let store = folders.store();
-    let retired = [
-        store.actual_path("gone-dark"),
-        store.diff_path("gone-dark"),
-        store.reference_copy_path("gone-dark"),
-    ];
-    for path in &retired {
-        folders.write_png(path);
-    }
+    let nowhere = folders.root().join("nowhere");
 
-    let report = folders.run(ReferenceMode::Update, None, TWO_SCREENS);
+    let report = folders.run_against(&nowhere, TWO_SCREENS);
 
-    for path in &retired {
-        assert!(!path.exists(), "{} is removed", path.display());
+    assert!(!report.passed());
+    let named = nowhere.display().to_string();
+    assert!(
+        has_problem(&report, |problem| problem.contains(&named)),
+        "{report}"
+    );
+}
+
+#[test]
+fn relative_baseline_fails_the_run() {
+    let folders = SuiteFolders::new();
+
+    let report = folders.run_against(Path::new("relative/baseline"), TWO_SCREENS);
+
+    assert!(!report.passed());
+    assert!(
+        has_problem(&report, |problem| problem.contains("AURORA_UI_BASELINE")
+            && problem.contains("must be absolute")),
+        "{report}"
+    );
+    assert_every_image_is(&report, &ImageChange::New);
+    assert!(
+        folders
+            .current()
+            .join("images")
+            .join("a-dark.png")
+            .is_file()
+    );
+}
+
+#[test]
+fn baseline_inside_the_run_folder_fails_the_run() {
+    for subfolder in [None, Some("images")] {
+        let folders = SuiteFolders::new();
+        let baseline = match subfolder {
+            Some(name) => folders.current().join(name),
+            None => folders.current(),
+        };
+        folders.run_labelled("first", None, TWO_SCREENS);
+
+        let report = folders.run_against(&baseline, TWO_SCREENS);
+
+        assert!(!report.passed());
+        let baseline_named = baseline.display().to_string();
+        let current_named = folders.current().display().to_string();
+        assert!(
+            has_problem(&report, |problem| names_both(
+                problem,
+                &baseline_named,
+                &current_named
+            )),
+            "{report}"
+        );
+        let kept = RunManifest::read(&folders.previous()).expect("the first run was kept");
+        assert_eq!(kept.label, "first");
+        for name in ALL_IMAGES {
+            let path = folders
+                .previous()
+                .join("images")
+                .join(format!("{name}.png"));
+            assert!(path.is_file(), "{} was kept", path.display());
+        }
     }
+}
+
+#[test]
+fn unreadable_baseline_image_does_not_fail_the_run() {
+    let folders = SuiteFolders::new();
+    folders.run(TWO_SCREENS);
+    fs::write(
+        folders.current().join("images").join("a-dark.png"),
+        b"not a png",
+    )
+    .expect("the first run's image is overwritten");
+
+    let report = folders.run(TWO_SCREENS);
+
+    assert!(
+        matches!(
+            image(&report, "a-dark").change,
+            ImageChange::BaselineUnreadable(_)
+        ),
+        "{report}"
+    );
     assert!(report.passed(), "{report}");
 }
 
 #[test]
-fn report_names_the_failures_and_the_update_command() {
+fn baseline_comes_from_its_value() {
+    assert_eq!(
+        ScreenshotSuite::baseline_from_value(None),
+        BaselineSource::PreviousRun
+    );
+    assert_eq!(
+        ScreenshotSuite::baseline_from_value(Some("")),
+        BaselineSource::PreviousRun
+    );
+    assert_eq!(
+        ScreenshotSuite::baseline_from_value(Some("x")),
+        BaselineSource::Folder(PathBuf::from("x"))
+    );
+}
+
+#[test]
+fn label_comes_from_its_value() {
+    assert_eq!(ScreenshotSuite::label_from_value(None), "local run");
+    assert_eq!(ScreenshotSuite::label_from_value(Some("")), "local run");
+    assert_eq!(
+        ScreenshotSuite::label_from_value(Some("v2.0.12 (abc1234)")),
+        "v2.0.12 (abc1234)"
+    );
+}
+
+#[test]
+fn finished_run_writes_its_manifest() {
     let folders = SuiteFolders::new();
-    folders.run(ReferenceMode::Update, None, TWO_SCREENS);
-    folders.change_reference("a-dark");
 
-    let report = folders.run(ReferenceMode::Check, None, TWO_SCREENS);
+    folders.run_labelled("v2.0.12 (abc1234)", None, TWO_SCREENS);
 
-    assert!(matches!(
-        image(&report, "a-dark").status,
-        ImageStatus::Differs(_)
-    ));
+    let manifest = RunManifest::read(&folders.current()).expect("the run wrote its manifest");
+    assert_eq!(manifest.platform, PLATFORM);
+    assert_eq!(manifest.label, "v2.0.12 (abc1234)");
+    assert!(manifest.rendered.ends_with(" UTC"), "{}", manifest.rendered);
+    assert_eq!(manifest.filter, None);
+
+    folders.run_labelled(DEFAULT_LABEL, Some("b"), TWO_SCREENS);
+
+    let filtered = RunManifest::read(&folders.current()).expect("the run wrote its manifest");
+    assert_eq!(filtered.filter.as_deref(), Some("b"));
+}
+
+#[test]
+fn filter_matching_no_screen_fails_the_run() {
+    let folders = SuiteFolders::new();
+
+    let report = folders.run_labelled(DEFAULT_LABEL, Some("nothing"), TWO_SCREENS);
+
+    assert_eq!(report.images().count(), 0);
     assert!(!report.passed());
-    let text = report.to_string();
-    let store = folders.store();
-    assert!(text.contains("a-dark"), "{text}");
-    assert!(text.contains("2 pixels differ"), "{text}");
-    assert!(
-        text.contains(&store.diff_path("a-dark").display().to_string()),
-        "{text}"
-    );
-    assert!(
-        text.contains(&store.actual_path("a-dark").display().to_string()),
-        "{text}"
-    );
-    assert!(text.contains(UPDATE_COMMAND), "{text}");
-    let written =
-        fs::read_to_string(folders.output.join("report.txt")).expect("the run wrote report.txt");
-    assert_eq!(written, text);
-}
-
-#[test]
-fn contact_sheet_lists_every_image_with_its_description() {
-    let folders = SuiteFolders::new();
-
-    let report = folders.run(ReferenceMode::Update, None, TWO_SCREENS);
-
-    let sheet = folders.sheet(&report);
-    assert!(sheet.contains("actual/a-dark.png"), "{sheet}");
-    assert!(sheet.contains("actual/a-light.png"), "{sheet}");
-    assert!(sheet.contains(SCREEN_A_DESCRIPTION), "{sheet}");
-    assert!(sheet.contains(AREA_TITLE), "{sheet}");
-}
-
-#[test]
-fn contact_sheet_shows_reference_actual_and_diff_for_a_failure() {
-    let folders = SuiteFolders::new();
-    folders.run(ReferenceMode::Update, None, TWO_SCREENS);
-    folders.change_reference("a-dark");
-
-    let report = folders.run(ReferenceMode::Check, None, TWO_SCREENS);
-
-    let sheet = folders.sheet(&report);
-    assert!(sheet.contains("reference/a-dark.png"), "{sheet}");
-    assert!(sheet.contains("actual/a-dark.png"), "{sheet}");
-    assert!(sheet.contains("diff/a-dark.png"), "{sheet}");
-    assert!(sheet.contains(">differs</span>"), "{sheet}");
-    assert!(sheet.contains("Needs a look"), "{sheet}");
-    assert!(sheet.contains("href=\"#a-dark\""), "{sheet}");
-    assert!(!sheet.contains("diff/a-light.png"), "{sheet}");
-}
-
-#[test]
-fn contact_sheet_marks_updated_and_new_images() {
-    let folders = SuiteFolders::new();
-    folders.run(ReferenceMode::Update, None, TWO_SCREENS);
-    folders.change_reference("a-dark");
-    fs::remove_file(folders.store().reference_path("b-dark")).expect("the reference exists");
-
-    let report = folders.run(ReferenceMode::Update, None, TWO_SCREENS);
-
-    assert!(matches!(
-        image(&report, "a-dark").status,
-        ImageStatus::Replaced(_)
-    ));
-    assert_eq!(image(&report, "b-dark").status, ImageStatus::Created);
-    let sheet = folders.sheet(&report);
-    assert!(sheet.contains(">updated</span>"), "{sheet}");
-    assert!(sheet.contains(">new</span>"), "{sheet}");
-}
-
-#[test]
-fn contact_sheet_escapes_text() {
-    let folders = SuiteFolders::new();
-
-    let report = folders.run(ReferenceMode::Update, None, SCREEN_WITH_MARKUP);
-
-    let sheet = folders.sheet(&report);
-    assert!(sheet.contains("a &lt; b &amp; c"), "{sheet}");
-    assert!(!sheet.contains(ESCAPED_DESCRIPTION), "{sheet}");
+    assert!(report.to_string().contains("nothing"), "{report}");
 }
 
 #[test]
@@ -428,40 +624,16 @@ fn screen_name_used_twice_fails_the_run() {
     }];
     let folders = SuiteFolders::new();
 
-    let report = folders.run(ReferenceMode::Update, None, REPEATED_NAME);
+    let report = folders.run(REPEATED_NAME);
 
     assert!(!report.passed());
     assert!(
-        report
-            .problems
-            .iter()
-            .any(|problem| problem.contains("a-dark") && problem.contains("more than one screen")),
+        has_problem(&report, |problem| problem.contains("a-dark")
+            && problem.contains("more than one screen")),
         "{report}"
     );
     let sheet = folders.sheet(&report);
     assert_eq!(sheet.matches("id=\"a-dark\"").count(), 1, "{sheet}");
-}
-
-#[test]
-fn report_text_that_cannot_be_written_fails_the_sheet_too() {
-    let folders = SuiteFolders::new();
-    fs::create_dir_all(folders.output.join("report.txt"))
-        .expect("a folder in place of report.txt is created");
-
-    let report = folders.run(ReferenceMode::Update, None, TWO_SCREENS);
-
-    assert!(!report.passed());
-    assert!(
-        report
-            .problems
-            .iter()
-            .any(|problem| problem.contains("Could not write") && problem.contains("report.txt")),
-        "{report}"
-    );
-    let sheet = folders.sheet(&report);
-    assert!(!sheet.contains(">Passed<"), "{sheet}");
-    assert!(sheet.contains(">Failed<"), "{sheet}");
-    assert!(sheet.contains("report.txt"), "{sheet}");
 }
 
 #[test]
@@ -497,39 +669,47 @@ fn screen_filter_is_refused_on_ci() {
 }
 
 #[test]
-fn previous_sheet_and_report_are_removed_before_staging() {
-    const WATCHING_SCREEN: &[ScreenArea] = &[ScreenArea {
-        title: AREA_TITLE,
-        screens: &[Screen {
-            name: "a",
-            description: SCREEN_A_DESCRIPTION,
-            stage: stage_gear_menu_watching_files,
-        }],
-    }];
-    const STALE_MARKER: &str = "stale result of an earlier run";
+fn report_text_that_cannot_be_written_fails_the_sheet_too() {
     let folders = SuiteFolders::new();
-    let previous = [
-        folders.output.join("index.html"),
-        folders.output.join("report.txt"),
-    ];
-    fs::create_dir_all(&folders.output).expect("the output folder is created");
-    for path in &previous {
-        fs::write(path, STALE_MARKER).expect("the stale result is written");
-    }
-    *WATCHED_FILES
+    *REPORT_BLOCKER
         .lock()
-        .expect("no thread panicked while holding the list") = previous.to_vec();
+        .expect("no thread panicked while holding the path") =
+        Some(folders.current().join("report.txt"));
 
-    let report = folders.run(ReferenceMode::Update, None, WATCHING_SCREEN);
+    let report = folders.run(REPORT_BLOCKING_SCREENS);
 
-    let seen = WATCHED_FILES_SEEN
-        .lock()
-        .expect("no thread panicked while holding the list");
-    assert_eq!(
-        *seen,
-        [false, false, false, false],
-        "index.html, report.txt per theme"
+    assert!(!report.passed());
+    assert!(
+        has_problem(&report, |problem| problem.contains("Could not write")
+            && problem.contains("report.txt")),
+        "{report}"
     );
-    assert!(report.passed(), "{report}");
-    assert!(!folders.sheet(&report).contains(STALE_MARKER));
+    let sheet = folders.sheet(&report);
+    assert!(!sheet.contains(">Passed<"), "{sheet}");
+    assert!(sheet.contains(">Failed<"), "{sheet}");
+    assert!(sheet.contains("report.txt"), "{sheet}");
+}
+
+#[test]
+fn contact_sheet_lists_every_image_with_its_description() {
+    let folders = SuiteFolders::new();
+
+    let report = folders.run(TWO_SCREENS);
+
+    let sheet = folders.sheet(&report);
+    assert!(sheet.contains("images/a-dark.png"), "{sheet}");
+    assert!(sheet.contains("images/a-light.png"), "{sheet}");
+    assert!(sheet.contains(SCREEN_A_DESCRIPTION), "{sheet}");
+    assert!(sheet.contains(AREA_TITLE), "{sheet}");
+}
+
+#[test]
+fn contact_sheet_escapes_text() {
+    let folders = SuiteFolders::new();
+
+    let report = folders.run(SCREEN_WITH_MARKUP);
+
+    let sheet = folders.sheet(&report);
+    assert!(sheet.contains("a &lt; b &amp; c"), "{sheet}");
+    assert!(!sheet.contains(ESCAPED_DESCRIPTION), "{sheet}");
 }

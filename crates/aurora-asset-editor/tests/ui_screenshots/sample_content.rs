@@ -133,8 +133,9 @@ const FULL_CHANNEL: u32 = 255;
 const MIN_BASE_CHANNEL: u8 = 48;
 const BASE_CHANNEL_RANGE: u8 = 160;
 /// The gradient moves in this many bands from left to right. A smooth ramp, or bands running diagonally,
-/// resized smoothly into a slot (and DXT blocks along their edges) differ from row to row and push the
-/// references over their size budget; bands running straight down repeat row after row.
+/// resized smoothly into a slot (and DXT blocks along their edges) differ from row to row and make every
+/// screenshot much larger; bands running straight down repeat row after row and stay readable in a
+/// thumbnail.
 const GRADIENT_BANDS: u32 = 12;
 /// How much lighter the top-left quarter is, so a flipped or rotated image shows.
 const LIGHT_QUARTER_BOOST: u8 = 48;

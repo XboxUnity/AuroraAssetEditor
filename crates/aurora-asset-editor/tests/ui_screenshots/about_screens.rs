@@ -9,8 +9,9 @@ const CLIPBOARD_FAILURE: &str = "clipboard is gone";
 const SCROLL_TO_END: f32 = -2000.0;
 
 // The AboutSlint widget prints the version of Slint it comes with, so a Slint upgrade changes every screen here
-// that shows it (all but about-copy-failed) and they must be approved again. The notices screens show only the top
-// of notices/handwritten.txt, so editing its head changes them; the generated third-party list further down does not.
+// that shows it (all but about-copy-failed), and the next review shows them as changed. The notices screens show
+// only the top of notices/handwritten.txt, so editing its head changes them; the generated third-party list further
+// down does not.
 pub const ABOUT: ScreenArea = ScreenArea {
     title: "About",
     screens: &[

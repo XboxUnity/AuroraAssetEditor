@@ -152,7 +152,7 @@ impl Scene {
         self.kept_alive.push(Box::new(value));
     }
 
-    /// The screen as a reference image shows it. Panics when the screen shows text that would differ on
+    /// The screen as its screenshot shows it. Panics when the screen shows text that would differ on
     /// another machine, naming the text.
     pub fn capture(&self) -> RgbaImage {
         self.render();

@@ -3,10 +3,10 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
+use super::image_change::ImageChange;
 use super::image_files::PNG_EXTENSION;
 use super::pixel_comparison::PixelComparison;
-use super::reference_store::{ACTUAL_FOLDER, ImageStatus, REFERENCE_COPY_FOLDER};
-use super::run_folder::DIFF_FOLDER;
+use super::run_folder::{BASELINE_COPY_FOLDER, DIFF_FOLDER, IMAGES_FOLDER};
 use super::suite_report::{ImageReport, SuiteReport};
 
 pub const CONTACT_SHEET_FILE: &str = "index.html";
@@ -44,10 +44,9 @@ h1{margin:0;font-size:28px;font-weight:650;letter-spacing:-.01em}
 .shot figcaption{display:flex;align-items:center;gap:10px;margin-bottom:8px;font-size:13px}
 .theme{font-weight:700;text-transform:uppercase;letter-spacing:.08em}
 .badge{padding:1px 9px;border-radius:999px;font-size:12px;font-weight:650;color:#fff}
-.badge-matches{background:#3a3e45;color:#e7e8ea}
-.badge-differs{background:#c62828}
-.badge-missing{background:#a85400}
-.badge-updated{background:#1d4ed8}
+.badge-unchanged{background:#3a3e45;color:#e7e8ea}
+.badge-changed{background:#c62828}
+.badge-unreadable{background:#a85400}
 .badge-new{background:#1b7f3b}
 .badge-error{background:#7b1fa2}
 .outcome{margin:0 0 10px;font-size:13px}
@@ -58,7 +57,7 @@ h1{margin:0;font-size:28px;font-weight:650;letter-spacing:-.01em}
 "#;
 const PAGE_END: &str = "</main>\n</body>\n</html>\n";
 
-/// Writes the page the user approves the UI from: counts, everything that needs a look, then
+/// Writes the page the user reviews the UI from: counts, everything that needs a look, then
 /// every screen with its dark and light image side by side. Images are linked by paths relative
 /// to `output`, so the folder stands on its own in a zip.
 pub fn write_contact_sheet(report: &SuiteReport, output: &Path) -> io::Result<PathBuf> {
@@ -121,21 +120,13 @@ fn push_summary(html: &mut String, report: &SuiteReport, areas: &[ShownArea<'_>]
     push_counts(html, report);
     if let Some(text) = &report.filter {
         html.push_str(&format!(
-            "<p class=\"notice\">Filtered to screens containing <code>{}</code>: other screens and orphan references were not checked.</p>\n",
+            "<p class=\"notice\">Filtered to screens containing <code>{}</code>: other screens were not rendered, and removed screens were not looked for.</p>\n",
             escape(text)
         ));
     }
     push_list(html, "Problems", &report.problems);
-    push_list(
-        html,
-        "References without a screen in the catalogue",
-        &report.orphans,
-    );
-    push_list(
-        html,
-        "Removed references without a screen",
-        &report.removed_orphans,
-    );
+    push_list(html, "Notes", &report.notes);
+    push_list(html, "Removed images", &report.removed);
     push_needs_a_look(html, areas);
     html.push_str("</header>\n");
 }
@@ -145,11 +136,11 @@ fn push_counts(html: &mut String, report: &SuiteReport) {
     let entries = [
         (counts.screens, "screens"),
         (counts.images, "images"),
-        (counts.matching, "matching"),
-        (counts.differing, "differing"),
-        (counts.missing, "missing"),
-        (counts.updated, "updated"),
+        (counts.changed, "changed"),
         (counts.new, "new"),
+        (counts.removed, "removed"),
+        (counts.unchanged, "unchanged"),
+        (counts.unreadable_baselines, "unreadable baselines"),
         (counts.errors, "errors"),
     ];
     html.push_str("<ul class=\"counts\">\n");
@@ -173,16 +164,16 @@ fn push_list(html: &mut String, heading: &str, items: &[String]) {
     html.push_str("</ul>\n");
 }
 
-/// Links to every image that is not plain matching, so a long sheet never hides one.
+/// Links to every image that is not unchanged, so a long sheet never hides one.
 fn push_needs_a_look(html: &mut String, areas: &[ShownArea<'_>]) {
     let flagged: Vec<&ImageReport> = areas
         .iter()
         .flat_map(|area| area.images.iter().copied())
-        .filter(|image| image.status != ImageStatus::Matches)
+        .filter(|image| image.change != ImageChange::Unchanged)
         .collect();
     if flagged.is_empty() {
         if !areas.is_empty() {
-            html.push_str("<p class=\"all-clear\">Every image matches its reference.</p>\n");
+            html.push_str("<p class=\"all-clear\">Every image is unchanged.</p>\n");
         }
         return;
     }
@@ -191,7 +182,7 @@ fn push_needs_a_look(html: &mut String, areas: &[ShownArea<'_>]) {
         let name = escape(&image.image);
         html.push_str(&format!(
             "<li><a class=\"name\" href=\"#{name}\">{name}</a> {}</li>\n",
-            badge(&image.status)
+            badge(&image.change)
         ));
     }
     html.push_str("</ul>\n");
@@ -233,49 +224,36 @@ fn push_image(html: &mut String, image: &ImageReport) {
         "<figure class=\"shot\" id=\"{}\">\n<figcaption><span class=\"theme\">{}</span>{}</figcaption>\n",
         escape(name),
         escape(image.theme),
-        badge(&image.status)
+        badge(&image.change)
     ));
-    match &image.status {
-        ImageStatus::Matches => push_panel(html, None, ACTUAL_FOLDER, name),
-        ImageStatus::Differs(comparison) => {
-            push_comparison(html, comparison, ["Reference", "Actual"], name);
+    match &image.change {
+        ImageChange::Unchanged => push_panel(html, None, IMAGES_FOLDER, name),
+        ImageChange::Changed(comparison) => push_comparison(html, comparison, name),
+        ImageChange::New => {
+            push_outcome(html, "New: the baseline has no such image.");
+            push_panel(html, None, IMAGES_FOLDER, name);
         }
-        ImageStatus::Replaced(comparison) => {
-            push_comparison(html, comparison, ["Old reference", "New reference"], name);
+        ImageChange::BaselineUnreadable(reason) => {
+            push_outcome(html, reason);
+            push_panel(html, None, IMAGES_FOLDER, name);
         }
-        ImageStatus::Missing => {
-            push_outcome(
-                html,
-                "No reference yet: an update run approves this screenshot as it is.",
-            );
-            push_panel(html, None, ACTUAL_FOLDER, name);
-        }
-        ImageStatus::Created => {
-            push_outcome(html, "New reference, written by this update run.");
-            push_panel(html, None, ACTUAL_FOLDER, name);
-        }
-        // An error can come from clearing the earlier outputs, and then an old screenshot may
-        // still be on disk, so an error shows its message only, never an image.
-        ImageStatus::Error(message) => {
+        // An error can come after the screenshot was written, or before, so the file on disk may
+        // not be this image's; an error shows its message only, never an image.
+        ImageChange::Error(message) => {
             html.push_str(&format!("<pre class=\"error\">{}</pre>\n", escape(message)));
         }
     }
     html.push_str("</figure>\n");
 }
 
-/// The reference as it was, the screenshot of this run and the diff, each captioned.
-fn push_comparison(
-    html: &mut String,
-    comparison: &PixelComparison,
-    [reference_caption, actual_caption]: [&str; 2],
-    image: &str,
-) {
+/// The baseline's image, the screenshot of this run and the diff, each captioned.
+fn push_comparison(html: &mut String, comparison: &PixelComparison, image: &str) {
     push_outcome(html, &comparison.to_string());
-    push_panel(html, Some(reference_caption), REFERENCE_COPY_FOLDER, image);
-    push_panel(html, Some(actual_caption), ACTUAL_FOLDER, image);
+    push_panel(html, Some("Baseline"), BASELINE_COPY_FOLDER, image);
+    push_panel(html, Some("Current"), IMAGES_FOLDER, image);
     push_panel(
         html,
-        Some("Diff: reference, actual, changes in magenta"),
+        Some("Diff: baseline, current, changes in magenta"),
         DIFF_FOLDER,
         image,
     );
@@ -301,16 +279,15 @@ fn push_panel(html: &mut String, caption: Option<&str>, folder: &str, image: &st
     ));
 }
 
-fn badge(status: &ImageStatus) -> String {
-    let label = match status {
-        ImageStatus::Matches => "matches",
-        ImageStatus::Differs(_) => "differs",
-        ImageStatus::Missing => "missing",
-        ImageStatus::Created => "new",
-        ImageStatus::Replaced(_) => "updated",
-        ImageStatus::Error(_) => "error",
+fn badge(change: &ImageChange) -> String {
+    let (class, label) = match change {
+        ImageChange::Unchanged => ("unchanged", "unchanged"),
+        ImageChange::Changed(_) => ("changed", "changed"),
+        ImageChange::New => ("new", "new"),
+        ImageChange::BaselineUnreadable(_) => ("unreadable", "unreadable baseline"),
+        ImageChange::Error(_) => ("error", "error"),
     };
-    format!("<span class=\"badge badge-{label}\">{label}</span>")
+    format!("<span class=\"badge badge-{class}\">{label}</span>")
 }
 
 /// Text placed in the page, as element content or in a quoted attribute.
