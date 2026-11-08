@@ -10,8 +10,10 @@ impl App {
     pub fn apply_outcomes_after_close(&mut self, outcomes: &Receiver<JobOutcome>) {
         loop {
             match outcomes.try_recv() {
-                // A picture resized for the closed window has nowhere to go.
-                Ok(JobOutcome::Preview(_)) => {}
+                Ok(JobOutcome::Preview(resized)) => log::debug!(
+                    "A preview of {:?} was resized after the window closed",
+                    resized.picture
+                ),
                 Ok(outcome) => self.on_job_outcome(outcome),
                 Err(TryRecvError::Empty | TryRecvError::Closed) => return,
             }
