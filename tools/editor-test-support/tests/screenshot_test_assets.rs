@@ -130,6 +130,20 @@ fn games_come_from_content_db() {
 }
 
 #[test]
+fn unreadable_content_db_is_reported_by_its_own_path() {
+    let fixture = Fixture::new();
+    let database = fixture.folder.path().join("DataBases/content.db");
+    fs::write(&database, b"not a database").expect("the database is overwritten");
+
+    let error = error_of(fixture.assets().games());
+
+    assert!(
+        matches!(&error, TestAssetsError::Unreadable { path, .. } if *path == database),
+        "{error}"
+    );
+}
+
+#[test]
 fn games_are_read_from_a_copy_of_content_db() {
     let fixture = Fixture::new();
     let database = fixture.folder.path().join("DataBases/content.db");

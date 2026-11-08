@@ -1,3 +1,4 @@
+use std::ffi::OsStr;
 use std::fmt;
 use std::fs;
 use std::io;
@@ -25,15 +26,17 @@ pub struct TestAssets {
 
 impl TestAssets {
     pub fn from_environment() -> Result<TestAssets, TestAssetsError> {
-        match std::env::var_os(TEST_ASSETS_VARIABLE) {
-            Some(value) if !value.is_empty() => TestAssets::from_folder(PathBuf::from(value)),
-            _ => Err(TestAssetsError::NotSet),
-        }
+        let value = std::env::var_os(TEST_ASSETS_VARIABLE);
+        TestAssets::from_os_value(value.as_deref())
+    }
+
+    pub fn from_value(value: Option<&str>) -> Result<TestAssets, TestAssetsError> {
+        TestAssets::from_os_value(value.map(OsStr::new))
     }
 
     /// An unset or empty `value` is `NotSet`. Every missing part is collected before failing, so
     /// one message lists them all.
-    pub fn from_value(value: Option<&str>) -> Result<TestAssets, TestAssetsError> {
+    fn from_os_value(value: Option<&OsStr>) -> Result<TestAssets, TestAssetsError> {
         match value {
             Some(value) if !value.is_empty() => TestAssets::from_folder(PathBuf::from(value)),
             _ => Err(TestAssetsError::NotSet),
@@ -66,7 +69,7 @@ impl TestAssets {
     pub fn games(&self) -> Result<Vec<Game>, TestAssetsError> {
         let (_copy_folder, copy) = self.content_db_copy()?;
         read_content_db(&copy).map_err(|error| TestAssetsError::Unreadable {
-            path: copy,
+            path: content_db_path(&self.folder),
             reason: error.to_string(),
         })
     }
