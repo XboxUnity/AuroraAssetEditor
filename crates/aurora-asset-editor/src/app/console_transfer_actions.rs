@@ -64,11 +64,11 @@ impl App {
     /// "Download": `All` replaces every page with the full set and stays on the console page; one kind
     /// replaces and opens its page.
     pub fn download(&mut self, choice: KindChoice) {
-        let (scope, after) = match choice {
-            KindChoice::All => (DownloadScope::FullSet, AfterDownload::StayOnConsole),
-            KindChoice::One(kind) => (DownloadScope::OneKind(kind), AfterDownload::OpenFirstLoaded),
+        let after = match choice {
+            KindChoice::All => AfterDownload::StayOnConsole,
+            KindChoice::One(_) => AfterDownload::OpenFirstLoaded,
         };
-        self.start_download(scope, after);
+        self.start_download(DownloadScope::from(choice), after);
     }
 
     /// "Upload current": the editor's pages as they are, to the selected game. Empty pages ask first, since
