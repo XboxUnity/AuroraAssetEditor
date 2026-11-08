@@ -1,5 +1,5 @@
 use aurora_asset::RgbaImage;
-use aurora_image::resize_preview;
+use aurora_image::{preview_size, resize_preview};
 use aurora_ui::PreviewArea;
 
 use crate::view::PictureId;
@@ -23,6 +23,11 @@ pub struct ResizedPreview {
 }
 
 impl PreviewJob {
+    /// The size of the copy this job makes.
+    pub fn size(&self) -> (u32, u32) {
+        preview_size(self.pixels.dimensions(), self.space)
+    }
+
     pub fn run(self) -> ResizedPreview {
         ResizedPreview {
             picture: self.picture,

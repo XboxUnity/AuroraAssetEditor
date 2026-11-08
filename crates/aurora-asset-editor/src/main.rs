@@ -257,11 +257,16 @@ fn receive_outcomes(
                 outcome => {
                     // The app reports the failure; the view asks for the picture again.
                     if let JobOutcome::Failed {
-                        job: FailedJob::Preview { picture, area },
+                        job:
+                            FailedJob::Preview {
+                                picture,
+                                area,
+                                size,
+                            },
                         ..
                     } = &outcome
                     {
-                        view.preview_failed(*picture, *area);
+                        view.preview_failed(*picture, *area, *size);
                     }
                     app.borrow_mut().on_job_outcome(outcome);
                 }

@@ -49,7 +49,7 @@ impl PreviewJobs {
             let Job::Preview(preview) = job else {
                 panic!("a view submits only preview jobs, not {job:?}");
             };
-            view.preview_failed(preview.picture, preview.area);
+            view.preview_failed(preview.picture, preview.area, preview.size());
             failed += 1;
         }
         failed

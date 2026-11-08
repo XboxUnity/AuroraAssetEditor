@@ -28,9 +28,11 @@ pub enum FailedJob {
         index: usize,
     },
     /// Holds nothing of the app's. The view keeps showing the picture as it had it, and asks again once.
+    /// `size` is the size the copy was to have.
     Preview {
         picture: PictureId,
         area: PreviewArea,
+        size: (u32, u32),
     },
 }
 
@@ -66,6 +68,7 @@ impl FailedJob {
             Job::Preview(preview) => FailedJob::Preview {
                 picture: preview.picture,
                 area: preview.area,
+                size: preview.size(),
             },
         }
     }

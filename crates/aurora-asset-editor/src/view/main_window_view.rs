@@ -94,9 +94,12 @@ impl MainWindowView {
         self.previews.borrow_mut().store(resized);
     }
 
-    /// A preview job for `picture` in `area` failed; the next render asks for the copy again, once per size.
-    pub fn preview_failed(&self, picture: PictureId, area: PreviewArea) {
-        self.previews.borrow_mut().record_failure(picture, area);
+    /// The preview job for `picture` in `area` at `size` failed; the next render asks for the copy again,
+    /// once per size.
+    pub fn preview_failed(&self, picture: PictureId, area: PreviewArea, size: (u32, u32)) {
+        self.previews
+            .borrow_mut()
+            .record_failure(picture, area, size);
     }
 
     /// Every callback calls its `App` method, then renders.
