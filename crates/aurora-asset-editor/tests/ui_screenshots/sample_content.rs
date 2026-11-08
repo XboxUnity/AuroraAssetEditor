@@ -217,11 +217,16 @@ pub fn load_asset_file(scene: &mut Scene, file_name: &str, bytes: &[u8]) {
 
 /// Writes `image` as a PNG named `file_name`, for a dialog or a drop to hand to the app.
 pub fn png_file(scene: &mut Scene, file_name: &str, image: &RgbaImage) -> PathBuf {
+    write_to_scene_folder(scene, file_name, &png_bytes(image))
+}
+
+/// `image` encoded as a PNG.
+pub fn png_bytes(image: &RgbaImage) -> Vec<u8> {
     let mut bytes = Cursor::new(Vec::new());
     image
         .write_to(&mut bytes, ImageFormat::Png)
         .expect("a sample image encodes as PNG");
-    write_to_scene_folder(scene, file_name, bytes.get_ref())
+    bytes.into_inner()
 }
 
 /// A file in a folder that lives as long as the scene.
