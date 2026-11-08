@@ -12,7 +12,7 @@ const TITLE_ID: &str = "4D5307E6";
 const KEYWORDS: &str = "Halo";
 const COVERS_PREFIX: &str = "/api/Covers/";
 const ARCHIVE_PREFIX: &str = "/archive/";
-const THUMBNAIL_SIZE: (u32, u32) = (90, 60);
+pub const THUMBNAIL_SIZE: (u32, u32) = (90, 60);
 const IMAGE_SIZE: (u32, u32) = (300, 200);
 const THUMBNAIL_SEED_BASE: u8 = 30;
 const IMAGE_SEED_BASE: u8 = 33;
@@ -40,12 +40,13 @@ const COVERS: [Cover; 3] = [
     },
 ];
 
-struct Cover {
-    label: &'static str,
+/// One entry of XboxUnity's listing.
+pub struct Cover {
+    pub label: &'static str,
     /// Names the cover's two image routes.
-    slug: &'static str,
+    pub slug: &'static str,
     /// Whether its thumbnail and image can be downloaded.
-    available: bool,
+    pub available: bool,
 }
 
 pub const ONLINE: ScreenArea = ScreenArea {
@@ -105,7 +106,7 @@ pub const ONLINE: ScreenArea = ScreenArea {
 };
 
 /// The Online page of an app whose online client reaches `server`, or of a fresh app when there is none.
-fn start_online(server: Option<&RecordedHttp>, theme: ThemeChoice) -> Scene {
+pub fn start_online(server: Option<&RecordedHttp>, theme: ThemeChoice) -> Scene {
     let mut harness = AppHarness::new();
     if let Some(server) = server {
         let base = server.base_url();
@@ -140,7 +141,7 @@ fn stage_archive(theme: ThemeChoice) -> Scene {
 
 fn stage_searching(theme: ThemeChoice) -> Scene {
     let scene = start_online(None, theme);
-    search_for_title_id(&scene);
+    search_for_title_id(&scene, TITLE_ID);
     scene
 }
 
@@ -148,16 +149,16 @@ fn stage_results(theme: ThemeChoice) -> Scene {
     let server = RecordedHttp::start(halo_3_routes());
     let mut scene = start_online(Some(&server), theme);
     scene.keep_alive(server);
-    search_for_title_id(&scene);
+    search_for_title_id(&scene, TITLE_ID);
     scene.run_jobs();
     scene
 }
 
 fn stage_no_results(theme: ThemeChoice) -> Scene {
-    let server = RecordedHttp::start(vec![json_route(&listing_path(), "[]".to_owned())]);
+    let server = RecordedHttp::start(vec![json_route(&listing_path(TITLE_ID), "[]".to_owned())]);
     let mut scene = start_online(Some(&server), theme);
     scene.keep_alive(server);
-    search_for_title_id(&scene);
+    search_for_title_id(&scene, TITLE_ID);
     scene.run_jobs();
     scene
 }
@@ -172,7 +173,7 @@ fn stage_selected_failed(theme: ThemeChoice) -> Scene {
 
 fn stage_search_failed(theme: ThemeChoice) -> Scene {
     let mut scene = start_online(None, theme);
-    search_for_title_id(&scene);
+    search_for_title_id(&scene, TITLE_ID);
     answer_search(
         &mut scene,
         Err(OnlineError::HttpStatus {
@@ -192,6 +193,12 @@ fn stage_title_id_missing(theme: ThemeChoice) -> Scene {
 /// The results page with the tile at `index` clicked and its image downloaded.
 fn select_result(theme: ThemeChoice, index: usize) -> Scene {
     let mut scene = stage_results(theme);
+    select_result_at(&mut scene, index);
+    scene
+}
+
+/// Clicks the result tile at `index` and downloads its image.
+pub fn select_result_at(scene: &mut Scene, index: usize) {
     // The tile's label is the one the app built from the listing's entry, not the entry's name.
     let label = scene.harness().app().online().results[index]
         .result
@@ -199,20 +206,22 @@ fn select_result(theme: ThemeChoice, index: usize) -> Scene {
         .clone();
     scene.click_label_in(&label, RESULTS_CONTAINER);
     scene.run_jobs();
-    scene
 }
 
-/// Types Halo 3's TitleID and presses Search; the search job stays queued.
-fn search_for_title_id(scene: &Scene) {
+/// Types `title_id` and presses Search; the search job stays queued.
+pub fn search_for_title_id(scene: &Scene, title_id: &str) {
     scene.act(|app| {
-        app.edit_search_text(TITLE_ID);
+        app.edit_search_text(title_id);
         app.search_online();
     });
 }
 
 /// XboxUnity's listing for the game and the images it points to.
 fn halo_3_routes() -> Vec<Route> {
-    let mut routes = vec![json_route(&listing_path(), listing_json())];
+    let mut routes = vec![json_route(
+        &listing_path(TITLE_ID),
+        listing_json(TITLE_ID, &COVERS),
+    )];
     for (index, cover) in COVERS.iter().enumerate() {
         let index = u8::try_from(index).expect("the sample has a handful of covers");
         let routes_of_cover = [
@@ -225,7 +234,10 @@ fn halo_3_routes() -> Vec<Route> {
         ];
         for (path, size, seed) in routes_of_cover {
             if cover.available {
-                routes.push(image_route(&path, size, seed));
+                routes.push(png_route(
+                    &path,
+                    png_bytes(&sample_art(size.0, size.1, seed)),
+                ));
             } else {
                 routes.push(gone_route(&path));
             }
@@ -234,9 +246,9 @@ fn halo_3_routes() -> Vec<Route> {
     routes
 }
 
-/// Where the test server answers the search for Halo 3.
-fn listing_path() -> String {
-    format!("{COVERS_PREFIX}{TITLE_ID}")
+/// Where the test server answers the search for `title_id`.
+pub fn listing_path(title_id: &str) -> String {
+    format!("{COVERS_PREFIX}{title_id}")
 }
 
 /// The search's address on XboxUnity itself, as a failure names it.
@@ -244,13 +256,14 @@ fn listing_url() -> String {
     format!("{}{TITLE_ID}", Endpoints::live().xboxunity_covers)
 }
 
-/// The JSON of XboxUnity's answer; `{server}` is replaced by the test server's address.
-fn listing_json() -> String {
-    let entries: Vec<String> = COVERS
+/// The JSON of XboxUnity's answer listing `covers` for `title_id`; `{server}` is replaced by the
+/// test server's address.
+pub fn listing_json(title_id: &str, covers: &[Cover]) -> String {
+    let entries: Vec<String> = covers
         .iter()
         .map(|cover| {
             format!(
-                r#"{{"name":"{}","official":true,"rating":"5","url":"{{server}}{}","thumbnail":"{{server}}{}","titleid":"{TITLE_ID}"}}"#,
+                r#"{{"name":"{}","official":true,"rating":"5","url":"{{server}}{}","thumbnail":"{{server}}{}","titleid":"{title_id}"}}"#,
                 cover.label,
                 image_path(cover),
                 thumbnail_path(cover),
@@ -260,28 +273,27 @@ fn listing_json() -> String {
     format!("[{}]", entries.join(","))
 }
 
-fn thumbnail_path(cover: &Cover) -> String {
+pub fn thumbnail_path(cover: &Cover) -> String {
     format!("/thumb/{}.png", cover.slug)
 }
 
-fn image_path(cover: &Cover) -> String {
+pub fn image_path(cover: &Cover) -> String {
     format!("/image/{}.png", cover.slug)
 }
 
-fn json_route(path: &str, body: String) -> Route {
+pub fn json_route(path: &str, body: String) -> Route {
     route(path, 200, "application/json", body.into_bytes())
 }
 
-fn image_route(path: &str, size: (u32, u32), seed: u8) -> Route {
-    let image = sample_art(size.0, size.1, seed);
-    route(path, 200, "image/png", png_bytes(&image))
+pub fn png_route(path: &str, png: Vec<u8>) -> Route {
+    route(path, 200, "image/png", png)
 }
 
 fn gone_route(path: &str) -> Route {
     route(path, 404, "text/plain", b"gone".to_vec())
 }
 
-fn route(path: &str, status: u16, content_type: &str, body: Vec<u8>) -> Route {
+pub fn route(path: &str, status: u16, content_type: &str, body: Vec<u8>) -> Route {
     Route {
         path: path.to_owned(),
         status,

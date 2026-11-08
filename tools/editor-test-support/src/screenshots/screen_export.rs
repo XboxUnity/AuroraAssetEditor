@@ -1,0 +1,114 @@
+use std::fmt;
+use std::io;
+use std::path::{Path, PathBuf};
+
+use image::{ImageError, RgbaImage};
+
+use super::capture_thread::capture_on_own_thread;
+use super::image_files::{png_path, validate_image_name};
+use super::png_file::{PngFileError, read_png, write_opaque_png};
+use super::screen::{SCREEN_THEMES, Screen, image_name};
+
+/// Writes screens into a folder of committed images, such as the README's. A file whose pixels
+/// equal the new capture keeps its bytes, so re-exporting an unchanged screen changes nothing in
+/// git. Files of the folder that are not images of these screens are left alone.
+pub struct ScreenExport {
+    folder: PathBuf,
+}
+
+/// What became of each image of an export.
+#[derive(Debug, Default)]
+pub struct ExportReport {
+    pub written: Vec<String>,
+    /// Images whose file already held the same pixels.
+    pub kept: Vec<String>,
+    /// One message per image that could not be exported, naming the image.
+    pub errors: Vec<String>,
+}
+
+/// What an export does with one capture.
+enum ExportOutcome {
+    Written,
+    Kept,
+}
+
+impl ScreenExport {
+    pub fn new(folder: PathBuf) -> ScreenExport {
+        ScreenExport { folder }
+    }
+
+    /// Every screen in both themes, each on its own thread. An image that fails is reported and
+    /// the others still go.
+    pub fn export(&self, screens: &[Screen]) -> ExportReport {
+        let mut report = ExportReport::default();
+        for screen in screens {
+            for (theme, theme_name) in SCREEN_THEMES {
+                let image = image_name(screen, theme_name);
+                let outcome = validate_image_name(&image)
+                    .map_err(|error| error.to_string())
+                    .and_then(|()| capture_on_own_thread(&image, screen.stage, theme))
+                    .and_then(|capture| self.store(&image, &capture));
+                match outcome {
+                    Ok(ExportOutcome::Written) => report.written.push(image),
+                    Ok(ExportOutcome::Kept) => report.kept.push(image),
+                    Err(message) => report.errors.push(format!("{image}: {message}")),
+                }
+            }
+        }
+        report
+    }
+
+    fn store(&self, image: &str, capture: &RgbaImage) -> Result<ExportOutcome, String> {
+        let path = png_path(&self.folder, image);
+        if holds_pixels(&path, capture)? {
+            return Ok(ExportOutcome::Kept);
+        }
+        write_opaque_png(&path, capture)
+            .map_err(|error| format!("could not write {}: {error}", path.display()))?;
+        Ok(ExportOutcome::Written)
+    }
+}
+
+/// Whether `path` holds a PNG of exactly `capture`. A file that is not there, or is not a PNG,
+/// holds nothing and gets replaced; any other failure to read it is an error.
+fn holds_pixels(path: &Path, capture: &RgbaImage) -> Result<bool, String> {
+    match read_png(path) {
+        Ok(existing) => Ok(existing == *capture),
+        Err(PngFileError::Io(error)) if error.kind() == io::ErrorKind::NotFound => Ok(false),
+        Err(PngFileError::Decode(ImageError::IoError(error))) => Err(unreadable(path, &error)),
+        Err(PngFileError::Decode(_)) => Ok(false),
+        Err(error) => Err(unreadable(path, &error)),
+    }
+}
+
+fn unreadable(path: &Path, error: &dyn fmt::Display) -> String {
+    format!("could not read {}: {error}", path.display())
+}
+
+impl ExportReport {
+    pub fn passed(&self) -> bool {
+        self.errors.is_empty()
+    }
+}
+
+impl fmt::Display for ExportReport {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(formatter, "Written: {}", listed(&self.written))?;
+        writeln!(formatter, "Kept (pixels unchanged): {}", listed(&self.kept))?;
+        if self.errors.is_empty() {
+            return writeln!(formatter, "Errors: none");
+        }
+        writeln!(formatter, "Errors:")?;
+        for error in &self.errors {
+            writeln!(formatter, "  {error}")?;
+        }
+        Ok(())
+    }
+}
+
+fn listed(images: &[String]) -> String {
+    if images.is_empty() {
+        return "none".to_owned();
+    }
+    images.join(", ")
+}

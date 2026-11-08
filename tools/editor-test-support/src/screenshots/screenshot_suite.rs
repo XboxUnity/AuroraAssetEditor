@@ -1,4 +1,3 @@
-use std::any::Any;
 use std::collections::BTreeSet;
 use std::env;
 use std::error::Error;
@@ -6,17 +5,13 @@ use std::fmt;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::thread;
-
-use aurora_asset_editor::settings::ThemeChoice;
-use image::RgbaImage;
 
 use super::baseline::Baseline;
+use super::capture_thread::capture_on_own_thread;
 use super::contact_sheet::{CONTACT_SHEET_FILE, write_contact_sheet};
 use super::image_change::ImageChange;
 use super::path_error::with_path;
 use super::run_manifest::RunManifest;
-use super::scene::Scene;
 use super::screen::{SCREEN_THEMES, Screen, ScreenArea, image_name};
 use super::screenshot_folders::ScreenshotFolders;
 use super::suite_report::{AreaReport, ImageReport, SuiteReport};
@@ -33,7 +28,6 @@ pub const REPORT_FILE: &str = "report.txt";
 
 const CI_VARIABLE: &str = "CI";
 const RENDERED_FORMAT: &str = "%Y-%m-%d %H:%M UTC";
-const PANIC_WITHOUT_TEXT: &str = "a panic without a message";
 
 /// What a run compares its images with.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -423,36 +417,6 @@ fn keep_removed_images(baseline: &Baseline, report: &mut SuiteReport) {
         }
         report.removed.push(removed.clone());
     }
-}
-
-/// Slint's platform, mock clock and focus are per thread, so a fresh thread makes the image
-/// independent of every other image and of the order of the catalogue. A panic on that thread
-/// becomes the image's failure instead of ending the run.
-fn capture_on_own_thread(
-    image: &str,
-    stage: fn(ThemeChoice) -> Scene,
-    theme: ThemeChoice,
-) -> Result<RgbaImage, String> {
-    let capture = thread::Builder::new()
-        .name(image.to_owned())
-        .spawn(move || stage(theme).capture())
-        .map_err(|error| format!("Could not start a thread for {image}: {error}"))?;
-    capture.join().map_err(|payload| {
-        format!(
-            "staging or capture panicked: {}",
-            panic_text(payload.as_ref())
-        )
-    })
-}
-
-fn panic_text(payload: &(dyn Any + Send)) -> String {
-    if let Some(text) = payload.downcast_ref::<&str>() {
-        return (*text).to_owned();
-    }
-    if let Some(text) = payload.downcast_ref::<String>() {
-        return text.clone();
-    }
-    PANIC_WITHOUT_TEXT.to_owned()
 }
 
 /// The earlier report and contact sheet are removed before anything else, so a run that stops

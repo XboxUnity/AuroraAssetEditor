@@ -8,7 +8,7 @@ use editor_test_support::{AppHarness, Scene, Screen, ScreenArea};
 use crate::sample_content::{console_harness, png_file, sample_art, sample_games};
 use crate::staged_outcomes::{mark_presence, refresh_fails, report_bulk_progress, show_games};
 
-const TABLE: &str = "ConsolePage::game-table";
+pub const TABLE: &str = "ConsolePage::game-table";
 const SELECTED_GAME: &str = "Fable II";
 const FIRST_GAME: usize = 0;
 const SECOND_GAME: usize = 1;
@@ -101,7 +101,7 @@ pub const CONSOLE: ScreenArea = ScreenArea {
 };
 
 /// The Console page of an app with the console set up.
-fn start_console(theme: ThemeChoice) -> Scene {
+pub fn start_console(theme: ThemeChoice) -> Scene {
     start_console_with(console_harness(), theme)
 }
 

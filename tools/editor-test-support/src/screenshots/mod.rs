@@ -1,4 +1,5 @@
 mod baseline;
+mod capture_thread;
 mod contact_sheet;
 mod diff_image;
 mod image_change;
@@ -10,6 +11,7 @@ mod run_folder;
 mod run_manifest;
 mod scene;
 mod screen;
+mod screen_export;
 mod screen_text_check;
 mod screenshot_folders;
 mod screenshot_suite;
@@ -32,6 +34,7 @@ pub use run_folder::{
 pub use run_manifest::{MANIFEST_FILE, MANIFEST_FORMAT, ManifestError, RunManifest};
 pub use scene::{SETTLE_TIME, Scene};
 pub use screen::{SCREEN_THEMES, Screen, ScreenArea, image_name};
+pub use screen_export::{ExportReport, ScreenExport};
 pub use screen_text_check::{FORBIDDEN_SCREEN_TEXT, ScreenTextProblem, check_screen_text};
 pub use screenshot_folders::{PREVIOUS_FOLDER, ScreenshotFolders};
 pub use screenshot_suite::{
