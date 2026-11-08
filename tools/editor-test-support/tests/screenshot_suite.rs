@@ -311,6 +311,8 @@ fn output_folder_that_cannot_be_prepared_stops_the_run() {
     folders.run_labelled("first", None, TWO_SCREENS);
     let earlier_report = folders.current().join("report.txt");
     assert!(earlier_report.is_file(), "the first run wrote its report");
+    let earlier_sheet = folders.current().join("index.html");
+    assert!(earlier_sheet.is_file(), "the first run wrote its sheet");
     fs::write(
         folders.root().join("previous"),
         b"a file where a folder belongs",
@@ -330,6 +332,10 @@ fn output_folder_that_cannot_be_prepared_stops_the_run() {
     assert!(
         !earlier_report.exists(),
         "the first run's report is not left to read as this run's"
+    );
+    assert!(
+        !earlier_sheet.exists(),
+        "the first run's sheet is not left to show its verdict as this run's"
     );
 }
 
@@ -354,6 +360,31 @@ fn earlier_report_that_cannot_be_removed_stops_the_run() {
     assert_eq!(report.sheet, None);
     assert!(
         earlier_report.join("inside").is_dir(),
+        "the run stopped before the rotation"
+    );
+}
+
+#[test]
+fn earlier_sheet_that_cannot_be_removed_stops_the_run() {
+    let folders = SuiteFolders::new();
+    let earlier_sheet = folders.current().join("index.html");
+    fs::create_dir_all(earlier_sheet.join("inside"))
+        .expect("a folder in place of index.html is created");
+
+    let report = folders.run(TWO_SCREENS);
+
+    assert!(!report.passed());
+    let named = earlier_sheet.display().to_string();
+    assert!(
+        has_problem(&report, |problem| problem
+            .contains("Could not remove the earlier")
+            && problem.contains(&named)),
+        "{report}"
+    );
+    assert_eq!(report.images().count(), 0);
+    assert_eq!(report.sheet, None);
+    assert!(
+        earlier_sheet.join("inside").is_dir(),
         "the run stopped before the rotation"
     );
 }

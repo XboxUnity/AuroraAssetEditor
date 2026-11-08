@@ -115,7 +115,7 @@ impl ScreenshotSuite {
             .to_owned()
     }
 
-    /// The earlier report goes first and the output folder is prepared next; a failure in either
+    /// The earlier report and sheet go first and the output folder is prepared next; a failure in either
     /// stops the run before anything is rendered. Whatever happens after that, the run ends by
     /// writing the sheet, the text report and the manifest, so a failed run is still a baseline
     /// for the next one.
@@ -133,12 +133,10 @@ impl ScreenshotSuite {
             problems: Vec::new(),
             sheet: None,
         };
-        let earlier_report = report.folder.folder().join(REPORT_FILE);
-        if let Err(error) = remove_earlier_report(&earlier_report) {
-            report.problems.push(format!(
-                "Could not remove the earlier {}, so nothing was rendered: {error}",
-                earlier_report.display()
-            ));
+        if let Err(message) = remove_earlier_results(report.folder.folder()) {
+            report
+                .problems
+                .push(format!("{message}, so nothing was rendered"));
             return report;
         }
         let baseline_allowed = self.check_baseline_folder(&mut report);
@@ -457,13 +455,23 @@ fn panic_text(payload: &(dyn Any + Send)) -> String {
     PANIC_WITHOUT_TEXT.to_owned()
 }
 
-/// Removed before anything else, so a run that stops early never leaves an older report that
-/// reads as its own. A report that is not there is fine.
-fn remove_earlier_report(path: &Path) -> io::Result<()> {
-    match fs::remove_file(path) {
-        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
-        other => other,
+/// The earlier report and contact sheet are removed before anything else, so a run that stops
+/// early never leaves either to read as its own. A file that is not there is fine.
+fn remove_earlier_results(folder: &Path) -> Result<(), String> {
+    for file in [REPORT_FILE, CONTACT_SHEET_FILE] {
+        let path = folder.join(file);
+        match fs::remove_file(&path) {
+            Ok(()) => {}
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(error) => {
+                return Err(format!(
+                    "Could not remove the earlier {}: {error}",
+                    path.display()
+                ));
+            }
+        }
     }
+    Ok(())
 }
 
 /// A file that is not there is fine; any other failure to remove it is a problem of the run.
