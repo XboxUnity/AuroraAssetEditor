@@ -5,7 +5,6 @@ import { TextField } from "../controls/text_field.slint";
 export component FormFieldRow inherits HorizontalLayout {
     in property <string> label;
     in property <string> value;
-    in property <InputType> input-type: InputType.text;
     out property <bool> has-focus: field.has-focus;
     callback edited(string);
     callback accepted();
@@ -27,7 +26,6 @@ export component FormFieldRow inherits HorizontalLayout {
     field := TextField {
         horizontal-stretch: 1;
         value: root.value;
-        input-type: root.input-type;
         accessible-label: root.label;
         edited(text) => {
             root.edited(text);

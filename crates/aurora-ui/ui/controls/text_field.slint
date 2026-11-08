@@ -6,7 +6,6 @@ export component TextField inherits Rectangle {
     in property <string> value;
     in property <string> placeholder;
     in property <bool> enabled: true;
-    in property <InputType> input-type: InputType.text;
     out property <bool> has-focus: input.has-focus;
     callback edited(string);
     callback accepted();
@@ -19,8 +18,7 @@ export component TextField inherits Rectangle {
     background: Theme.field-background;
     opacity: enabled ? 1 : Theme.disabled-opacity;
     accessible-role: text-input;
-    // A password is never read out.
-    accessible-value: input-type == InputType.password ? "" : value;
+    accessible-value: value;
     accessible-placeholder-text: placeholder;
     accessible-enabled: enabled;
 
@@ -57,8 +55,7 @@ export component TextField inherits Rectangle {
             text: value;
             enabled: enabled;
             single-line: true;
-            input-type: root.input-type;
-            accessible-value: root.input-type == InputType.password ? "" : self.text;
+            accessible-value: self.text;
             color: Theme.text;
             selection-background-color: Theme.chip-background;
             selection-foreground-color: Theme.chip-text;

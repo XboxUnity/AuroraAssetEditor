@@ -400,7 +400,7 @@ fn bulk_errors_continue_and_are_summarised_and_logged() {
         fixture.harness.app().status().text,
         "Bulk covers: 2 saved, 1 failed"
     );
-    assert!(fixture.harness.app().toasts().iter().count() == 0);
+    assert_eq!(fixture.harness.app().toasts().iter().count(), 0);
     assert!(!text.contains("Stopped"), "{text}");
     let log = fixture.harness.error_log_text();
     assert!(log.contains("Halo 3 (4D5307E6)"), "{log}");
