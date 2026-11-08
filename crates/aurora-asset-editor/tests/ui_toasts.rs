@@ -17,6 +17,9 @@ use test_servers::{FakeConsole, FakeConsoleConfig};
 
 const TOAST_CARD: &str = "ToastStack::toast-card";
 const STATUS_LINE: &str = "MainWindow::status-line";
+const CLOSE_BUTTON: &str = "Toast::close-button";
+/// The smallest click area of a toast's x, in logical pixels.
+const MIN_CLICK_SIZE: f32 = 16.0;
 const CLIPBOARD_FAILURE: &str = "clipboard is gone";
 const DARK_ERROR_TEXT: Rgba<u8> = Rgba([0xf8, 0x71, 0x71, 0xff]);
 const COLOUR_TOLERANCE: u8 = 24;
@@ -288,6 +291,30 @@ fn four_quick_toasts_keep_only_the_newest_three() {
     assert_eq!(window.cards().len(), MAX_TOASTS);
     mock_elapsed_time(TOAST_DURATION);
     assert!(window.toasts().is_empty(), "each of them ends on time");
+}
+
+#[test]
+fn the_x_dismisses_only_its_own_toast() {
+    let mut harness = game_harness();
+    let window = Window::start(&mut harness);
+    copy_ids(&window, 3);
+    let closes: Vec<ElementHandle> =
+        ElementHandle::find_by_element_id(window.view.window(), CLOSE_BUTTON).collect();
+    assert_eq!(closes.len(), 3, "every toast has its x");
+    assert!(closes.iter().all(|close| {
+        let size = close.size();
+        size.width >= MIN_CLICK_SIZE && size.height >= MIN_CLICK_SIZE
+    }));
+
+    closes[1].mock_single_click(PointerEventButton::Left);
+
+    assert_eq!(
+        window.toast_texts(),
+        ["Copied TitleID 4D5307E6", "Copied TitleID 4D5307E6"],
+        "the middle one, a DatabaseID copy, is gone"
+    );
+    mock_elapsed_time(TOAST_DURATION);
+    assert!(window.toasts().is_empty(), "the others keep their time");
 }
 
 #[test]

@@ -1,8 +1,8 @@
 import { Icon } from "../controls/icon.slint";
 import { Theme } from "../theme/theme.slint";
 
-// The outcome of an action, on a card tinted by it, with a shadow like a menu's. A click dismisses it before its
-// time is up.
+// The outcome of an action, on a card tinted by it, with a shadow like a menu's. The x in the top right corner, or
+// a click anywhere on it, dismisses it before its time is up.
 export component Toast inherits Rectangle {
     in property <string> text;
     in property <bool> error;
@@ -34,7 +34,7 @@ export component Toast inherits Rectangle {
 
     HorizontalLayout {
         padding-left: Theme.toast-padding-x;
-        padding-right: Theme.toast-padding-x;
+        padding-right: Theme.toast-close-inset;
         padding-top: Theme.toast-padding-y;
         padding-bottom: Theme.toast-padding-y;
         spacing: Theme.toast-icon-gap;
@@ -53,6 +53,33 @@ export component Toast inherits Rectangle {
             color: foreground;
             wrap: word-wrap;
             vertical-alignment: center;
+        }
+        // Beside the first line, so the text wraps clear of it.
+        VerticalLayout {
+            horizontal-stretch: 0;
+            alignment: start;
+            close-button := Rectangle {
+                width: Theme.toast-close-size;
+                height: Theme.toast-close-size;
+                border-radius: Theme.menu-row-radius;
+                background: close-touch.has-hover ? Theme.pill-background : transparent;
+                accessible-role: button;
+                accessible-label: "Close";
+                accessible-action-default => {
+                    dismissed();
+                }
+
+                Icon {
+                    source: @image-url("../icons/close.svg");
+                    colorize: foreground;
+                }
+
+                close-touch := TouchArea {
+                    clicked => {
+                        dismissed();
+                    }
+                }
+            }
         }
     }
 }
