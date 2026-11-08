@@ -12,6 +12,7 @@ mod gdiplus_gray16_table;
 mod gdiplus_resize;
 mod image_target;
 mod import_error;
+mod preview_resize;
 mod resampler;
 
 pub use decode_image::{IMPORT_EXTENSIONS, MAX_IMPORT_ALLOC, MAX_IMPORT_SIDE, decode_image};
@@ -21,4 +22,5 @@ pub use export_format::ExportFormat;
 pub use fit_to_target::fit_to_target;
 pub use image_target::ImageTarget;
 pub use import_error::ImportError;
+pub use preview_resize::{PREVIEW_FILTER, preview_size, resize_preview};
 pub use resampler::{RESIZE_FILTER, Resampler};
