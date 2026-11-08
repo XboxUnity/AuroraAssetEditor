@@ -186,3 +186,20 @@ impl Scene {
         self.view.render(&self.app.borrow());
     }
 }
+
+/// A shown window keeps itself, and with it the view's images, alive until it is hidden; the suite stages
+/// every screen on one thread, so each scene hides its window when it ends.
+impl Drop for Scene {
+    fn drop(&mut self) {
+        let Err(error) = self.window().window().hide() else {
+            return;
+        };
+        let problem = format!("the testing backend could not hide a scene's window: {error}");
+        // A second panic while a failed staging unwinds would abort the suite and lose its report.
+        if std::thread::panicking() {
+            eprintln!("{problem}");
+        } else {
+            panic!("{problem}");
+        }
+    }
+}
