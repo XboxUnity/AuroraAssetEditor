@@ -152,7 +152,7 @@ fn stage_importing(theme: ThemeChoice) -> Scene {
     scene
 }
 
-fn centre_of(element: &ElementHandle) -> LogicalPosition {
+pub fn centre_of(element: &ElementHandle) -> LogicalPosition {
     let position = element.absolute_position();
     let size = element.size();
     LogicalPosition::new(

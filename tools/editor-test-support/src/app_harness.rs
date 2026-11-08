@@ -177,6 +177,11 @@ impl AppHarness {
         environment.startup_problems.extend(startup.problem);
     }
 
+    /// Starts the app reporting `build` in place of `test_build_info()`.
+    pub fn with_build(&mut self, build: BuildInfo) {
+        self.setup("with_build").environment.build = build;
+    }
+
     pub fn with_startup_problem(&mut self, problem: StartupProblem) {
         self.setup("with_startup_problem")
             .environment

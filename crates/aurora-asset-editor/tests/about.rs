@@ -23,6 +23,8 @@ const MIN_FOREGROUND_COLOURS: usize = 2;
 const CARD_PROBE_GAP: f32 = 4.0;
 const DATE_EXAMPLE: &str = "2026-11-07T10:00:00Z";
 const MINIMUM_WINDOW: (f32, f32) = (760.0, 500.0);
+/// As long as a GitHub Actions run address gets.
+const LONG_RUN_URL: &str = "https://github.com/Swizzy/AuroraAssetEditor/actions/runs/19283746501";
 /// A sideways wheel turn, more than any overhang a line of the notices could have.
 const SIDEWAYS_SCROLL: f32 = 200.0;
 /// Copy build info, Third-party notices, then the notices list.
@@ -328,6 +330,35 @@ fn escape_and_enter_close_about() {
         ui.render();
         ui.press(key);
         assert!(ui.app.borrow().modal().is_none());
+    }
+}
+
+/// A CI build shows one more line, the run's address, so the card is checked with it too.
+#[test]
+fn about_card_fits_the_default_window_with_the_notices_open() {
+    for run_url in [None, Some(LONG_RUN_URL)] {
+        let mut harness = AppHarness::new();
+        harness.with_build(build_info(run_url));
+        let ui = Ui::start(&mut harness, ThemeChoice::Dark);
+        ui.app.borrow_mut().show_about();
+        ui.app.borrow_mut().toggle_about_notices();
+        ui.render();
+
+        let body = ui.element("AboutDialog::body");
+        let content = ui.element("AboutDialog::body-layout");
+        assert!(
+            content.size().height <= body.size().height,
+            "run URL {run_url:?}: the body holds {} px in {} px and scrolls",
+            content.size().height,
+            body.size().height
+        );
+        let widget = ui.element(ABOUT_SLINT_ID);
+        let widget_right = widget.absolute_position().x + widget.size().width;
+        let body_right = body.absolute_position().x + body.size().width;
+        assert!(
+            widget_right <= body_right,
+            "AboutSlint ends at {widget_right}, the card's body at {body_right}"
+        );
     }
 }
 

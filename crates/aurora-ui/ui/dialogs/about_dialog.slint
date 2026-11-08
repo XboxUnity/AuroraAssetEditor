@@ -140,7 +140,11 @@ export component AboutDialog inherits DialogFrame {
                 }
             }
 
-            about-slint := AboutSlint { }
+            // The licence asks for the widget, not for a size: at its smallest the card fits the default window
+            // with the notices open.
+            about-slint := AboutSlint {
+                height: self.min-height;
+            }
         }
     }
 
