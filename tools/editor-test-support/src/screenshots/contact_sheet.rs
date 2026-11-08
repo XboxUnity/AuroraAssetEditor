@@ -237,8 +237,8 @@ fn push_image(html: &mut String, image: &ImageReport) {
             push_outcome(html, reason);
             push_panel(html, None, IMAGES_FOLDER, name);
         }
-        // An error can come after the screenshot was written, or before, so the file on disk may
-        // not be this image's; an error shows its message only, never an image.
+        // An error can come before the screenshot was written or from writing it, so the file may
+        // be missing or incomplete; an error shows its message only, never an image.
         ImageChange::Error(message) => {
             html.push_str(&format!("<pre class=\"error\">{}</pre>\n", escape(message)));
         }

@@ -293,6 +293,87 @@ fn second_run_compares_with_the_first() {
 }
 
 #[test]
+fn finished_run_replaces_the_previous_run() {
+    let folders = SuiteFolders::new();
+    folders.run_labelled("first", None, TWO_SCREENS);
+    folders.run_labelled("second", None, TWO_SCREENS);
+
+    let report = folders.run_labelled("third", None, TWO_SCREENS);
+
+    assert_eq!(baseline_label(&report), "second");
+    assert_every_image_is(&report, &ImageChange::Unchanged);
+    assert!(report.passed(), "{report}");
+}
+
+#[test]
+fn output_folder_that_cannot_be_prepared_stops_the_run() {
+    let folders = SuiteFolders::new();
+    folders.run_labelled("first", None, TWO_SCREENS);
+    let earlier_report = folders.current().join("report.txt");
+    assert!(earlier_report.is_file(), "the first run wrote its report");
+    fs::write(
+        folders.root().join("previous"),
+        b"a file where a folder belongs",
+    )
+    .expect("the blocking file is written");
+
+    let report = folders.run(TWO_SCREENS);
+
+    assert!(!report.passed());
+    assert!(
+        has_problem(&report, |problem| problem
+            .contains("Could not prepare the output folder")),
+        "{report}"
+    );
+    assert_eq!(report.images().count(), 0);
+    assert_eq!(report.sheet, None);
+    assert!(
+        !earlier_report.exists(),
+        "the first run's report is not left to read as this run's"
+    );
+}
+
+#[test]
+fn earlier_report_that_cannot_be_removed_stops_the_run() {
+    let folders = SuiteFolders::new();
+    let earlier_report = folders.current().join("report.txt");
+    fs::create_dir_all(earlier_report.join("inside"))
+        .expect("a folder in place of report.txt is created");
+
+    let report = folders.run(TWO_SCREENS);
+
+    assert!(!report.passed());
+    let named = earlier_report.display().to_string();
+    assert!(
+        has_problem(&report, |problem| problem
+            .contains("Could not remove the earlier")
+            && problem.contains(&named)),
+        "{report}"
+    );
+    assert_eq!(report.images().count(), 0);
+    assert_eq!(report.sheet, None);
+    assert!(
+        earlier_report.join("inside").is_dir(),
+        "the run stopped before the rotation"
+    );
+}
+
+#[test]
+fn run_with_an_unreadable_manifest_is_deleted_with_a_note() {
+    let folders = SuiteFolders::new();
+    folders.run(TWO_SCREENS);
+    fs::write(folders.current().join("manifest.txt"), "not a manifest\n")
+        .expect("the first run's manifest is overwritten");
+
+    let report = folders.run(TWO_SCREENS);
+
+    assert!(report.baseline.is_none(), "{report}");
+    assert!(has_note(&report, "its manifest is unreadable"), "{report}");
+    assert!(!folders.previous().exists());
+    assert!(report.passed(), "{report}");
+}
+
+#[test]
 fn changed_screen_is_reported_and_does_not_fail() {
     let folders = SuiteFolders::new();
     folders.run(TWO_SCREENS);
@@ -422,6 +503,7 @@ fn filtered_run_never_becomes_the_baseline() {
     let report = folders.run_labelled("again", None, TWO_SCREENS);
 
     assert_eq!(baseline_label(&report), "full");
+    assert!(has_note(&report, "it was filtered to \"b\""), "{report}");
     assert_every_image_is(&report, &ImageChange::Unchanged);
     assert!(report.passed(), "{report}");
 }
@@ -519,13 +601,13 @@ fn baseline_inside_the_run_folder_fails_the_run() {
         assert!(!report.passed());
         let baseline_named = baseline.display().to_string();
         let current_named = folders.current().display().to_string();
+        assert_eq!(report.problems.len(), 1, "{report}");
+        let refusal = &report.problems[0];
+        assert!(refusal.contains("is the run folder"), "{refusal}");
+        assert!(refusal.contains("cannot hold the baseline"), "{refusal}");
         assert!(
-            has_problem(&report, |problem| names_both(
-                problem,
-                &baseline_named,
-                &current_named
-            )),
-            "{report}"
+            names_both(refusal, &baseline_named, &current_named),
+            "{refusal}"
         );
         let kept = RunManifest::read(&folders.previous()).expect("the first run was kept");
         assert_eq!(kept.label, "first");

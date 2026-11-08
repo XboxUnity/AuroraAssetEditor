@@ -115,8 +115,10 @@ impl ScreenshotSuite {
             .to_owned()
     }
 
-    /// Whatever happens after the output folder is prepared, the run ends by writing the sheet,
-    /// the text report and the manifest, so a failed run is still a baseline for the next one.
+    /// The earlier report goes first and the output folder is prepared next; a failure in either
+    /// stops the run before anything is rendered. Whatever happens after that, the run ends by
+    /// writing the sheet, the text report and the manifest, so a failed run is still a baseline
+    /// for the next one.
     pub fn run(&self, areas: &[ScreenArea]) -> SuiteReport {
         let mut report = SuiteReport {
             folder: self.folders.current(),
@@ -131,6 +133,14 @@ impl ScreenshotSuite {
             problems: Vec::new(),
             sheet: None,
         };
+        let earlier_report = report.folder.folder().join(REPORT_FILE);
+        if let Err(error) = remove_earlier_report(&earlier_report) {
+            report.problems.push(format!(
+                "Could not remove the earlier {}, so nothing was rendered: {error}",
+                earlier_report.display()
+            ));
+            return report;
+        }
         let baseline_allowed = self.check_baseline_folder(&mut report);
         match self.folders.start_run() {
             Ok(note) => report.notes.extend(note),
@@ -445,6 +455,15 @@ fn panic_text(payload: &(dyn Any + Send)) -> String {
         return text.clone();
     }
     PANIC_WITHOUT_TEXT.to_owned()
+}
+
+/// Removed before anything else, so a run that stops early never leaves an older report that
+/// reads as its own. A report that is not there is fine.
+fn remove_earlier_report(path: &Path) -> io::Result<()> {
+    match fs::remove_file(path) {
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
+        other => other,
+    }
 }
 
 /// A file that is not there is fine; any other failure to remove it is a problem of the run.
