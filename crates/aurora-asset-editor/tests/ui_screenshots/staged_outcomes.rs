@@ -1,9 +1,11 @@
 use aurora_asset_editor::app::App;
 use aurora_asset_editor::jobs::{
-    ConsoleJobKind, ConsoleOutcome, Job, JobOutcome, OnlineJob, OnlineOutcome, Progress,
+    ConsoleJob, ConsoleJobKind, ConsoleOutcome, ConsoleRequest, Job, JobOutcome, OnlineJob,
+    OnlineOutcome, Progress,
 };
 use aurora_console::{
-    AssetPresence, AuroraRevision, ConsoleError, ConsoleStatus, Game, GameIds, GameListing,
+    AssetPresence, AuroraRevision, BulkReport, ConsoleError, ConsoleStatus, Game, GameIds,
+    GameListing,
 };
 use aurora_online::{CoverResult, OnlineError};
 use editor_test_support::Scene;
@@ -34,6 +36,30 @@ pub fn answer_search(scene: &mut Scene, result: Result<Vec<CoverResult>, OnlineE
     });
 }
 
+/// The Aurora a staged console reports.
+pub fn sample_revision() -> AuroraRevision {
+    AuroraRevision::new(SAMPLE_REVISION.to_owned())
+}
+
+/// Answers the queued connection test with `result` instead of running it, so no console is contacted
+/// and no test server's port shows in the dialog.
+pub fn answer_connection_test(scene: &mut Scene, result: Result<AuroraRevision, ConsoleError>) {
+    let job = scene.take_next_job();
+    let Some(Job::Console(ConsoleRequest {
+        job: ConsoleJob::Test,
+        ..
+    })) = job
+    else {
+        panic!("the next job is not a connection test: {job:?}");
+    };
+    scene.act(|app| app.on_job_outcome(JobOutcome::Console(ConsoleOutcome::Tested(result))));
+}
+
+/// Ends the running bulk run with `report`.
+pub fn finish_bulk(app: &mut App, report: BulkReport) {
+    app.on_job_outcome(JobOutcome::Console(ConsoleOutcome::Bulk(Ok(report))));
+}
+
 /// Fills the table as a refresh does: Aurora answers first, which connects the link, then the listing
 /// arrives. The console is never contacted.
 pub fn show_games(app: &mut App, games: Vec<Game>) {
@@ -41,7 +67,7 @@ pub fn show_games(app: &mut App, games: Vec<Game>) {
     app.on_job_outcome(JobOutcome::Progress(Progress::Console {
         kind: ConsoleJobKind::Refresh,
         status: ConsoleStatus::AuroraFound {
-            revision: AuroraRevision::new(SAMPLE_REVISION.to_owned()),
+            revision: sample_revision(),
         },
     }));
     let generation = app.console().refresh_generation();
