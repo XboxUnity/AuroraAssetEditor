@@ -1,18 +1,20 @@
 use std::path::Path;
 
 use aurora_asset::AssetKind;
-use aurora_console::{FtpSettings, GameIds, asset_file_name};
+use aurora_console::{ConsoleError, FtpSettings, GameIds, asset_file_name};
 
 use crate::console::{capitalize_first, is_connection_failure, kind_list, kind_name};
 use crate::dialogs::{ConfirmedAction, Modal, UploadTargetForm};
+use crate::editor::DecodedKind;
 use crate::files::slot_label;
 use crate::jobs::{
-    AfterDownload, AssetUpload, ConsoleJob, JobPriority, KindDownload, TransferReport,
+    AfterDownload, AssetUpload, ConsoleJob, DownloadScope, JobPriority, KindDownload,
+    TransferReport,
 };
 use crate::status::{ConsoleActivity, STATUS_SEPARATOR, StatusLine};
 
 use super::console_actions::NO_CONSOLE_TEXT;
-use super::file_actions::BUSY_TEXT;
+use super::file_actions::{ASSET_TYPE_COUNT, BUSY_TEXT};
 use super::{App, KindChoice, Page};
 
 pub const NO_CONSOLE_SET_UP_REASON: &str = "No console set up";
@@ -23,7 +25,6 @@ pub const EMPTY_UPLOAD_TITLE: &str = "Upload empty assets?";
 pub const NOTHING_TO_UPLOAD_TEXT: &str = "Nothing to upload: every page in the editor is empty.";
 const REMOVE_CONFIRM_LABEL: &str = "Remove";
 const EMPTY_UPLOAD_CONFIRM_LABEL: &str = "Upload";
-const ALREADY_LOADED_LABEL: &str = "Already loaded:";
 const ALREADY_SENT_LABEL: &str = "Already sent:";
 
 impl App {
@@ -45,18 +46,20 @@ impl App {
         }
     }
 
-    /// "Open in editor": every kind of the selected game, then the first page that received content.
+    /// "Open in editor": the selected game's full set replaces every page, then the first page that received
+    /// content opens.
     pub fn open_in_editor(&mut self) {
-        self.start_download(KindChoice::All, AfterDownload::OpenFirstLoaded);
+        self.start_download(DownloadScope::FullSet, AfterDownload::OpenFirstLoaded);
     }
 
-    /// "Download": `All` stays on the console page, one kind opens its page.
+    /// "Download": `All` replaces every page with the full set and stays on the console page; one kind
+    /// replaces and opens its page.
     pub fn download(&mut self, choice: KindChoice) {
-        let after = match choice {
-            KindChoice::All => AfterDownload::StayOnConsole,
-            KindChoice::One(_) => AfterDownload::OpenFirstLoaded,
+        let (scope, after) = match choice {
+            KindChoice::All => (DownloadScope::FullSet, AfterDownload::StayOnConsole),
+            KindChoice::One(kind) => (DownloadScope::OneKind(kind), AfterDownload::OpenFirstLoaded),
         };
-        self.start_download(choice, after);
+        self.start_download(scope, after);
     }
 
     /// "Upload current": the editor's pages as they are, to the selected game. Empty pages ask first, since
@@ -214,7 +217,7 @@ impl App {
         });
     }
 
-    fn start_download(&mut self, choice: KindChoice, after: AfterDownload) {
+    fn start_download(&mut self, scope: DownloadScope, after: AfterDownload) {
         let Some((settings, ids)) = self.console_target() else {
             return;
         };
@@ -222,11 +225,7 @@ impl App {
             return;
         }
         self.active_work.console = Some(ConsoleActivity::Downloading);
-        let job = ConsoleJob::Download {
-            ids,
-            kinds: choice.kinds(),
-            after,
-        };
+        let job = ConsoleJob::Download { ids, scope, after };
         self.submit_console_job(settings, job, JobPriority::User);
     }
 
@@ -259,62 +258,121 @@ impl App {
     pub(super) fn apply_downloaded(
         &mut self,
         ids: &GameIds,
+        scope: DownloadScope,
         after: AfterDownload,
         results: Vec<KindDownload>,
     ) {
         self.active_work.console = None;
-        let mut loaded = Vec::new();
-        let mut missing = Vec::new();
-        let mut failure = None;
-        let mut unread_images = Vec::new();
+        match scope {
+            DownloadScope::OneKind(_) => self.apply_kind_download(ids, after, results),
+            DownloadScope::FullSet => self.apply_full_set(ids, after, results),
+        }
+    }
+
+    /// One kind: its page takes what arrived; a kind the console does not have leaves the page as it is.
+    fn apply_kind_download(
+        &mut self,
+        ids: &GameIds,
+        after: AfterDownload,
+        results: Vec<KindDownload>,
+    ) {
         for KindDownload { kind, result } in results {
             match result {
                 Ok(Some(decoded)) => {
-                    let file_name = asset_file_name(kind, &ids.title_id);
-                    for dropped in &decoded.dropped {
-                        self.note_unread_image(
-                            Path::new(&file_name),
-                            &slot_label(dropped.slot),
-                            &dropped.error,
-                            &mut unread_images,
-                        );
+                    self.replace_pages_with_downloads(ids, vec![*decoded]);
+                    if after == AfterDownload::OpenFirstLoaded {
+                        self.page = Page::of_kind(kind);
                     }
-                    self.pages.get_mut(kind).replace_with(*decoded);
-                    loaded.push(kind);
+                    self.status = StatusLine::info(format!(
+                        "Downloaded {} from the console",
+                        kind_name(kind)
+                    ));
                 }
-                Ok(None) => missing.push(kind),
-                Err(error) => failure = Some((kind, error)),
+                Ok(None) => {
+                    self.status =
+                        StatusLine::info(format!("No {} asset on console", kind_name(kind)));
+                }
+                Err(error) => self.report_download_failure(kind, &error),
             }
+        }
+    }
+
+    /// The full set: the pages change only once every kind has arrived, so the editor never mixes the
+    /// console's assets with what was open before. A kind the console does not have becomes an empty page.
+    fn apply_full_set(&mut self, ids: &GameIds, after: AfterDownload, results: Vec<KindDownload>) {
+        let mut found = Vec::new();
+        for KindDownload { kind, result } in results {
+            match result {
+                Ok(Some(decoded)) => found.push(*decoded),
+                Ok(None) => {}
+                Err(error) => {
+                    self.report_download_failure(kind, &error);
+                    return;
+                }
+            }
+        }
+        let first_found = found.first().map(|decoded| Page::of_kind(decoded.kind));
+        for kind in AssetKind::ALL {
+            if !found.iter().any(|decoded| decoded.kind == kind) {
+                self.pages.get_mut(kind).clear();
+            }
+        }
+        self.replace_pages_with_downloads(ids, found);
+        if after == AfterDownload::OpenFirstLoaded {
+            self.page = first_found.unwrap_or(Page::Cover);
+        }
+        let present = self.pages.present_types();
+        self.status = StatusLine::info(format!(
+            "Loaded {} from the console{STATUS_SEPARATOR}{present} of {ASSET_TYPE_COUNT} asset types present",
+            self.game_label(ids)
+        ));
+    }
+
+    /// Each downloaded page replaces its page in the editor; entries that could not be decoded are listed.
+    fn replace_pages_with_downloads(&mut self, ids: &GameIds, downloads: Vec<DecodedKind>) {
+        let mut unread_images = Vec::new();
+        for decoded in downloads {
+            let file_name = asset_file_name(decoded.kind, &ids.title_id);
+            for dropped in &decoded.dropped {
+                self.note_unread_image(
+                    Path::new(&file_name),
+                    &slot_label(dropped.slot),
+                    &dropped.error,
+                    &mut unread_images,
+                );
+            }
+            self.pages.get_mut(decoded.kind).replace_with(decoded);
         }
         self.show_unread_images(unread_images);
-        if let (AfterDownload::OpenFirstLoaded, Some(first)) = (after, loaded.first()) {
-            self.page = Page::of_kind(*first);
+    }
+
+    fn report_download_failure(&mut self, kind: AssetKind, error: &ConsoleError) {
+        if is_connection_failure(error) {
+            self.show_connection_failed(error);
+        } else {
+            let context = format!("Could not download {}", kind_name(kind));
+            self.report_console_error(&context, error);
         }
-        if let Some((kind, error)) = failure {
-            if is_connection_failure(&error) {
-                self.show_connection_failed(&error);
-            } else {
-                let context = format!("Could not download {}", kind_name(kind));
-                if loaded.is_empty() {
-                    self.report_console_error(&context, &error);
-                } else {
-                    let note = format!("{ALREADY_LOADED_LABEL} {}", kind_list(&loaded));
-                    self.report_console_error_noting(&context, &error, &note);
-                }
-            }
-            return;
+    }
+
+    /// How a status line names the game with `ids`: "{title} ({TitleID})", or the TitleID alone when neither
+    /// the current game nor the console's list knows its title.
+    pub(super) fn game_label(&self, ids: &GameIds) -> String {
+        let current_title = self
+            .current_game
+            .as_ref()
+            .filter(|game| &game.ids == ids)
+            .map(|game| game.title.as_str());
+        let listed_title = || {
+            self.console
+                .table
+                .game(ids)
+                .map(|game| game.title_name.as_str())
+        };
+        match current_title.or_else(listed_title) {
+            Some(title) => format!("{title} ({})", ids.title_id),
+            None => ids.title_id.to_string(),
         }
-        let mut parts = Vec::new();
-        if !loaded.is_empty() {
-            parts.push(format!(
-                "Downloaded {} from the console",
-                kind_list(&loaded)
-            ));
-        }
-        for kind in missing {
-            parts.push(format!("No {} asset on console", kind_name(kind)));
-        }
-        self.status = StatusLine::info(parts.join(STATUS_SEPARATOR));
     }
 
     pub(super) fn apply_uploaded(&mut self, report: TransferReport) {

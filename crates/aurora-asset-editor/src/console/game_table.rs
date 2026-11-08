@@ -109,7 +109,12 @@ impl GameTable {
     }
 
     pub fn contains(&self, ids: &GameIds) -> bool {
-        self.games.iter().any(|game| &game.ids == ids)
+        self.game(ids).is_some()
+    }
+
+    /// The listed game with `ids`, if the list has it.
+    pub fn game(&self, ids: &GameIds) -> Option<&Game> {
+        self.games.iter().find(|game| &game.ids == ids)
     }
 
     pub fn set_presence(&mut self, ids: &GameIds, cell: PresenceCell) {

@@ -10,7 +10,7 @@ use aurora_console::{
 };
 use aurora_online::CoverSource;
 
-use super::{AfterDownload, AssetUpload, KindDownload, TransferReport};
+use super::{AfterDownload, AssetUpload, DownloadScope, KindDownload, TransferReport};
 
 /// Work for the console's FTP server, done with `settings`.
 #[derive(Debug)]
@@ -32,10 +32,10 @@ pub enum ConsoleJob {
         ids: GameIds,
         gate: PresenceGate,
     },
-    /// Downloads and decodes `kinds` in order; the first error ends the job.
+    /// Downloads and decodes the kinds of `scope` in order; the first error ends the job.
     Download {
         ids: GameIds,
-        kinds: Vec<AssetKind>,
+        scope: DownloadScope,
         after: AfterDownload,
     },
     /// Sends the files in order; the first error ends the job.
@@ -108,6 +108,7 @@ pub enum ConsoleOutcome {
     /// One item per kind that was tried, in order; an error is the last one.
     Downloaded {
         ids: GameIds,
+        scope: DownloadScope,
         after: AfterDownload,
         results: Vec<KindDownload>,
     },

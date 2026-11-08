@@ -25,7 +25,7 @@ pub const UNREAD_IMAGES_TITLE: &str = "Some images could not be read";
 pub const NOT_ENOUGH_SPACE_TITLE: &str = "Not enough space";
 pub const NOT_ENOUGH_SPACE_TEXT: &str = "Not enough space to fit all screenshots, please clear current screenshots and load the FSD asset again...";
 const LOAD_PROBLEMS_FOOTER: &str = "Details are in error.log.";
-const ASSET_TYPE_COUNT: usize = 5;
+pub(super) const ASSET_TYPE_COUNT: usize = 5;
 pub const BUSY_TEXT: &str = "Busy, try again when the current work finishes";
 pub const DROP_DURING_QUESTION_TEXT: &str =
     "Finish the open question first, then drop the files again.";

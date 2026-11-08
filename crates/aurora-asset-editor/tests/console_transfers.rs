@@ -176,7 +176,7 @@ fn empty_console_asset_counts_as_missing() {
 }
 
 #[test]
-fn download_all_runs_gc_bk_gl_ss_and_skips_missing() {
+fn download_all_runs_gc_bk_gl_ss_and_takes_missing_as_empty() {
     let (mut harness, console) = harness_with_empty_console();
     put_on_console(&console, AssetKind::IconBanner, &mut icon_banner_file());
     put_on_console(&console, AssetKind::Background, &mut background_file());
@@ -199,7 +199,7 @@ fn download_all_runs_gc_bk_gl_ss_and_skips_missing() {
     let app = &mut *harness.app();
     assert_eq!(
         app.status().text,
-        "Downloaded cover, background and icon & banner from the console · No screenshots asset on console"
+        "Loaded Halo (4D5307E6) from the console · 4 of 5 asset types present"
     );
     assert_eq!(app.page(), Page::Console);
     assert!(app.pages().icon_banner.has_content());
@@ -230,7 +230,10 @@ fn download_all_stops_at_first_error() {
             .starts_with("Could not download background: ")
     );
     assert_eq!(app.modal(), None);
-    assert!(app.pages().cover.has_content());
+    assert!(
+        !app.pages().cover.has_content(),
+        "the cover that arrived before the failure reached the editor"
+    );
     assert!(!app.pages().icon_banner.has_content());
 }
 
@@ -728,7 +731,7 @@ fn partial_upload_failure_names_what_was_sent() {
 }
 
 #[test]
-fn partial_download_failure_names_what_was_loaded() {
+fn a_failure_partway_through_download_all_changes_no_page() {
     let (mut harness, console) = harness_with_empty_console();
     put_on_console(&console, AssetKind::Cover, &mut cover_file(10));
     put_on_console(&console, AssetKind::Background, &mut background_file());
@@ -757,12 +760,8 @@ fn partial_download_failure_names_what_was_loaded() {
         "{}",
         status.text
     );
-    assert!(
-        status.text.ends_with(". Already loaded: cover"),
-        "{}",
-        status.text
-    );
-    assert!(harness.app().pages().cover.has_content());
+    assert!(!status.text.contains("Already loaded"), "{}", status.text);
+    assert!(!harness.app().pages().cover.has_content());
 }
 
 #[test]
@@ -842,4 +841,141 @@ fn a_transfer_clears_the_unreachable_mark_so_presence_is_rechecked() {
         panic!("the presence check was skipped");
     };
     assert!(presence.cover);
+}
+
+/// Fills every page of the editor from local files, each different from what the console tests put there.
+fn load_every_page(harness: &mut AppHarness) {
+    load_into_editor(harness, "cover.asset", &mut cover_file(50));
+    load_into_editor(harness, "background.asset", &mut background_file());
+    load_into_editor(harness, "icon-banner.asset", &mut icon_banner_file());
+    let mut screenshots = asset_file_with(&[(screenshot_slot(1), solid(3), Compression::None)]);
+    load_into_editor(harness, "screenshots.asset", &mut screenshots);
+}
+
+/// What each page would upload, in GC, BK, GL, SS order.
+fn every_page_bytes(harness: &mut AppHarness) -> Vec<Vec<u8>> {
+    AssetKind::ALL
+        .into_iter()
+        .map(|kind| harness.app().page_bytes(kind))
+        .collect()
+}
+
+fn pages_with_content(harness: &mut AppHarness) -> Vec<AssetKind> {
+    AssetKind::ALL
+        .into_iter()
+        .filter(|kind| harness.app().pages().get(*kind).has_content())
+        .collect()
+}
+
+#[test]
+fn open_in_editor_replaces_every_page_with_the_consoles_set() {
+    let (mut harness, console) = harness_with_empty_console();
+    let mut cover = cover_file(10);
+    put_on_console(&console, AssetKind::Cover, &mut cover);
+    load_every_page(&mut harness);
+    select_halo(&mut harness);
+    harness.app().show_page(Page::Console);
+
+    harness.app().open_in_editor();
+    harness.run_jobs();
+
+    assert_eq!(pages_with_content(&mut harness), vec![AssetKind::Cover]);
+    let app = &mut *harness.app();
+    let expected = decode(cover.get(AssetSlot::Cover).unwrap()).unwrap();
+    assert_eq!(
+        app.pages().cover.preview(AssetSlot::Cover),
+        &SlotPreview::Pixels(expected)
+    );
+    assert_eq!(app.page(), Page::Cover);
+    assert_eq!(
+        app.status().text,
+        "Loaded Halo (4D5307E6) from the console · 1 of 5 asset types present"
+    );
+    assert_eq!(app.status().severity, Severity::Info);
+}
+
+#[test]
+fn download_all_replaces_every_page_and_stays_on_the_console_page() {
+    let (mut harness, console) = harness_with_empty_console();
+    put_on_console(&console, AssetKind::Cover, &mut cover_file(10));
+    load_every_page(&mut harness);
+    select_halo(&mut harness);
+    harness.app().show_page(Page::Console);
+
+    harness.app().download(KindChoice::All);
+    harness.run_jobs();
+
+    assert_eq!(pages_with_content(&mut harness), vec![AssetKind::Cover]);
+    assert_eq!(harness.app().page(), Page::Console);
+    assert_eq!(
+        harness.app().status().text,
+        "Loaded Halo (4D5307E6) from the console · 1 of 5 asset types present"
+    );
+}
+
+#[test]
+fn open_in_editor_with_nothing_on_the_console_empties_the_editor_and_opens_the_cover_page() {
+    let (mut harness, _console) = harness_with_empty_console();
+    load_every_page(&mut harness);
+    select_halo(&mut harness);
+    harness.app().show_page(Page::Console);
+
+    harness.app().open_in_editor();
+    harness.run_jobs();
+
+    assert_eq!(pages_with_content(&mut harness), Vec::new());
+    assert_eq!(harness.app().page(), Page::Cover);
+    assert_eq!(
+        harness.app().status().text,
+        "Loaded Halo (4D5307E6) from the console · 0 of 5 asset types present"
+    );
+}
+
+#[test]
+fn a_failure_on_the_third_kind_leaves_every_page_as_it_was() {
+    let (mut harness, console) = harness_with_empty_console();
+    put_on_console(&console, AssetKind::Cover, &mut cover_file(10));
+    put_on_console(&console, AssetKind::Background, &mut background_file());
+    put_on_console(&console, AssetKind::IconBanner, &mut icon_banner_file());
+    console.truncate_download(&console_path(&halo(), AssetKind::IconBanner), 10);
+    load_every_page(&mut harness);
+    select_halo(&mut harness);
+    harness.app().show_page(Page::Console);
+    let before = every_page_bytes(&mut harness);
+
+    harness.app().open_in_editor();
+    harness.run_jobs();
+
+    assert_eq!(every_page_bytes(&mut harness), before);
+    let app = &mut *harness.app();
+    assert_eq!(app.page(), Page::Console);
+    assert_eq!(app.status().severity, Severity::Error);
+    assert!(
+        app.status()
+            .text
+            .starts_with("Could not download icon & banner: "),
+        "{}",
+        app.status().text
+    );
+    assert!(
+        !app.status().text.contains("Already loaded"),
+        "{}",
+        app.status().text
+    );
+}
+
+#[test]
+fn per_type_download_of_a_missing_kind_keeps_its_page() {
+    let (mut harness, _console) = harness_with_empty_console();
+    load_every_page(&mut harness);
+    select_halo(&mut harness);
+    harness.app().show_page(Page::Console);
+    let before = every_page_bytes(&mut harness);
+
+    harness.app().download(KindChoice::One(AssetKind::Cover));
+    harness.run_jobs();
+
+    assert_eq!(every_page_bytes(&mut harness), before);
+    assert_eq!(harness.app().status().text, "No cover asset on console");
+    assert_eq!(harness.app().page(), Page::Console);
 }

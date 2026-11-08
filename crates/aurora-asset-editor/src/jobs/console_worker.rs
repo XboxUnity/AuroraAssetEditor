@@ -69,10 +69,11 @@ impl ConsoleWorker {
                     result,
                 }
             }
-            ConsoleJob::Download { ids, kinds, after } => {
-                let results = download_kinds(client, &ids, &kinds);
+            ConsoleJob::Download { ids, scope, after } => {
+                let results = download_kinds(client, &ids, &scope.kinds());
                 ConsoleOutcome::Downloaded {
                     ids,
+                    scope,
                     after,
                     results,
                 }

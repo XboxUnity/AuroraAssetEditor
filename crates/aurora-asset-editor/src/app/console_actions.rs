@@ -167,11 +167,10 @@ impl App {
             }
             ConsoleOutcome::Downloaded {
                 ids,
+                scope,
                 after,
                 results,
-            } => {
-                self.apply_downloaded(&ids, after, results);
-            }
+            } => self.apply_downloaded(&ids, scope, after, results),
             ConsoleOutcome::Uploaded(report) => self.apply_uploaded(report),
             ConsoleOutcome::Removed(report) => self.apply_removed(report),
             ConsoleOutcome::Bulk(result) => self.apply_bulk(result),
