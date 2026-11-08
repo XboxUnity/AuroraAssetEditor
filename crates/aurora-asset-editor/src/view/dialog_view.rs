@@ -94,6 +94,8 @@ pub(super) fn render_dialogs(window: &MainWindow, app: &App) {
     dialog.set_text(content.text.into());
     dialog.set_confirm_label(content.confirm_label.into());
     dialog.set_danger(content.danger);
+    // A new model on every render is safe here: the dialogs read choices and fields by index, never with
+    // `for`, so their buttons and boxes stay in place, with any press, caret or focus they hold.
     dialog.set_choices(ModelRc::new(VecModel::from(content.choices)));
     dialog.set_fields(ModelRc::new(VecModel::from(content.fields)));
     dialog.set_accept_enabled(content.accept_enabled);

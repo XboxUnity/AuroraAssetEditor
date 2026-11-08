@@ -716,6 +716,50 @@ fn choice_buttons_answer_with_their_choice() {
 }
 
 #[test]
+fn a_render_while_typing_keeps_the_text_caret_and_focus() {
+    let (_harness, ui) = open_flow(&FLOWS[5], ThemeChoice::Dark);
+    ui.type_text("10.0.0.2");
+    ui.press(Key::LeftArrow);
+    ui.press(Key::LeftArrow);
+    // What the app does after any job outcome, such as a connection test's status.
+    ui.render();
+    ui.type_text("9");
+
+    let host = "10.0.09.2";
+    assert_eq!(ui.fields()[0], host, "the digit went in at the caret");
+    assert_eq!(
+        text_input(&ui, "IP Address:")
+            .accessible_value()
+            .unwrap_or_default(),
+        host
+    );
+}
+
+#[test]
+fn a_render_during_a_press_on_a_choice_keeps_the_click() {
+    let (_harness, ui) = open_flow(&FLOWS[1], ThemeChoice::Dark);
+    let button = ui.element("ChoiceDialog::first-choice-button");
+    let (position, size) = (button.absolute_position(), button.size());
+    let centre = LogicalPosition::new(
+        position.x + size.width / 2.0,
+        position.y + size.height / 2.0,
+    );
+    let window = ui.view.window().window();
+    window.dispatch_event(WindowEvent::PointerMoved { position: centre });
+    window.dispatch_event(WindowEvent::PointerPressed {
+        position: centre,
+        button: PointerEventButton::Left,
+    });
+    ui.render();
+    window.dispatch_event(WindowEvent::PointerReleased {
+        position: centre,
+        button: PointerEventButton::Left,
+    });
+
+    assert_eq!(ui.app.borrow().modal(), None, "the choice was made");
+}
+
+#[test]
 fn connection_boxes_edit_their_fields_and_save_writes_them() {
     let (harness, ui) = open_flow(&FLOWS[5], ThemeChoice::Dark);
     let typed = [
