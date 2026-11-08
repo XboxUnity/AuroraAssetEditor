@@ -1,8 +1,11 @@
 import { Theme } from "../theme/theme.slint";
+import { PreviewArea } from "../model/preview_area.slint";
 import { DashedBorder } from "dashed_border.slint";
+import { PreviewImage } from "preview_image.slint";
 
 // The preview area of an asset page: the image scaled to fit, or the placeholder art with the drop hint.
 export component DropSlot inherits Rectangle {
+    in property <PreviewArea> area;
     in property <image> image;
     in property <bool> has-image;
     in property <bool> unsupported;
@@ -22,13 +25,14 @@ export component DropSlot inherits Rectangle {
         dash-color: Theme.slot-border;
     }
 
-    if has-image: preview := Image {
+    // Kept while the slot is empty too, so the view knows the space before a picture arrives.
+    preview := PreviewImage {
         x: Theme.border-width;
         y: Theme.border-width;
         width: parent.width - 2 * Theme.border-width;
         height: parent.height - 2 * Theme.border-width;
+        area: area;
         source: image;
-        image-fit: contain;
     }
 
     if unsupported: unsupported-label := Text {

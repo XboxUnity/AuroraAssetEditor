@@ -19,7 +19,8 @@ const BACKGROUND_JOB: u64 = 2;
 const SECOND_USER_JOB: u64 = 3;
 const PANIC_JOB: u64 = 4;
 const AFTER_PANIC_JOB: u64 = 5;
-const WORKER_THREADS: usize = 3;
+/// Load and import, console, online, preview.
+const WORKER_THREADS: usize = 4;
 /// Far longer than joining two threads that have finished their jobs takes.
 const SHUTDOWN_LIMIT: std::time::Duration = std::time::Duration::from_secs(10);
 

@@ -1,0 +1,46 @@
+import { PreviewArea } from "../model/preview_area.slint";
+import { PreviewModel } from "../model/preview_model.slint";
+
+// A picture fitted into this element. The software renderer scales pictures nearest-neighbour, so the view
+// resizes each picture smoothly to fit the space this element reports, and a picture of exactly that size is
+// drawn pixel for pixel. Any other picture (as loaded, or fitted to an earlier size) is scaled to fit until
+// the view's copy arrives.
+export component PreviewImage {
+    in property <PreviewArea> area;
+    in property <image> source;
+
+    property <int> area-width: floor(root.width / 1phx);
+    property <int> area-height: floor(root.height / 1phx);
+    property <length> picture-width: source.width * 1phx;
+    property <length> picture-height: source.height * 1phx;
+    // The view's copy fits the space and fills it in one direction, to the physical pixel.
+    property <bool> view-listening: PreviewModel.view-listening;
+    property <bool> fits-area: picture-width <= root.width && picture-height <= root.height
+        && (picture-width > root.width - 1phx || picture-height > root.height - 1phx);
+
+    init => {
+        report-area();
+    }
+    changed area-width => {
+        report-area();
+    }
+    changed area-height => {
+        report-area();
+    }
+    changed view-listening => {
+        report-area();
+    }
+
+    function report-area() {
+        PreviewModel.area-changed(area, area-width, area-height);
+    }
+
+    picture := Image {
+        x: (root.width - self.width) / 2;
+        y: (root.height - self.height) / 2;
+        width: fits-area ? picture-width : root.width;
+        height: fits-area ? picture-height : root.height;
+        source: root.source;
+        image-fit: contain;
+    }
+}

@@ -24,6 +24,8 @@ pub enum FailedJob {
         generation: u64,
         index: usize,
     },
+    /// Holds nothing of the app's: the view keeps showing the picture as it had it.
+    Preview,
 }
 
 impl FailedJob {
@@ -55,6 +57,7 @@ impl FailedJob {
                 generation: *generation,
                 index: *index,
             },
+            Job::Preview(_) => FailedJob::Preview,
         }
     }
 
@@ -68,6 +71,7 @@ impl FailedJob {
             FailedJob::OnlineSearch { .. } => "The online search",
             FailedJob::OnlineThumbnail { .. } => "Loading a result's thumbnail",
             FailedJob::OnlineFull { .. } => "Loading a result's image",
+            FailedJob::Preview => "Resizing a preview",
         }
     }
 }

@@ -2,7 +2,10 @@ use aurora_console::ConsoleStatus;
 
 use crate::files::LoadedFiles;
 
-use super::{ConsoleJobKind, ConsoleOutcome, FailedJob, ImportResult, JobPanic, OnlineOutcome};
+use super::{
+    ConsoleJobKind, ConsoleOutcome, FailedJob, ImportResult, JobPanic, OnlineOutcome,
+    ResizedPreview,
+};
 
 /// What a job hands back to the UI thread: its result, or progress while it runs.
 #[derive(Debug)]
@@ -11,6 +14,8 @@ pub enum JobOutcome {
     Imported(Vec<ImportResult>),
     Console(ConsoleOutcome),
     Online(OnlineOutcome),
+    /// For the view, not the app.
+    Preview(ResizedPreview),
     Progress(Progress),
     /// The job panicked; the worker goes on with a fresh executor.
     Failed {

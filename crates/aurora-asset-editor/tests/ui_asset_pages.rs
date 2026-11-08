@@ -8,7 +8,7 @@ use aurora_asset_editor::editor::SlotPreview;
 use aurora_asset_editor::settings::ThemeChoice;
 use aurora_asset_editor::view::MainWindowView;
 use aurora_ui::{EditorModel, MainWindow, ScreenshotTile};
-use editor_test_support::{AppHarness, HeadlessUi, asset_file_with};
+use editor_test_support::{AppHarness, HeadlessUi, PreviewJobs, asset_file_with};
 use i_slint_backend_testing::ElementHandle;
 use image::{Rgba, RgbaImage};
 use slint::platform::{Key, PointerEventButton, WindowEvent};
@@ -56,7 +56,7 @@ impl Ui {
     fn start(harness: &mut AppHarness) -> Ui {
         let ui = HeadlessUi::new();
         let window = MainWindow::new().expect("the main window builds on the testing backend");
-        let view = MainWindowView::new(window);
+        let view = MainWindowView::new(window, PreviewJobs::new().runner());
         ui.show(view.window().window());
         let app = harness.share_app();
         view.connect(Rc::clone(&app));

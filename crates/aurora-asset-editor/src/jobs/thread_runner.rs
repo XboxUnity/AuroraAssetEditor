@@ -14,15 +14,19 @@ const LOAD_THREAD: &str = "load and import";
 // One thread, so the app holds one FTP session at a time: Aurora allows few sessions and serves them slowly.
 const CONSOLE_THREAD: &str = "console";
 const ONLINE_THREAD: &str = "online";
+// Its own thread, so resizing previews never waits for a load or a download.
+const PREVIEW_THREAD: &str = "preview";
 
-/// Runs jobs on three worker threads: loading and importing files, the console, and online searches. Each
-/// thread takes its `User` jobs before its `Background` ones; outcomes and progress go to `outcomes`.
+/// Runs jobs on four worker threads: loading and importing files, the console, online searches, and
+/// previews. Each thread takes its `User` jobs before its `Background` ones; outcomes and progress go to
+/// `outcomes`.
 pub struct ThreadRunner {
     queues: Arc<RunnerQueues>,
     /// Waited for at the shutdown: an interrupted console upload would leave a half-written file behind.
     joined_threads: Vec<JoinHandle<()>>,
-    /// Not waited for: an online fetch can take until its timeout, and nothing is lost when it is cut off.
-    online_thread: Option<JoinHandle<()>>,
+    /// Not waited for: an online fetch can take until its timeout, a preview is only for the screen, and
+    /// nothing is lost when either is cut off.
+    detached_threads: Vec<JoinHandle<()>>,
 }
 
 impl ThreadRunner {
@@ -36,12 +40,13 @@ impl ThreadRunner {
         let mut runner = ThreadRunner {
             queues: Arc::clone(&queues),
             joined_threads: Vec::new(),
-            online_thread: None,
+            detached_threads: Vec::new(),
         };
         let threads = [
             (LOAD_THREAD, QueueId::Load),
             (CONSOLE_THREAD, QueueId::Console),
             (ONLINE_THREAD, QueueId::Online),
+            (PREVIEW_THREAD, QueueId::Preview),
         ];
         for (name, queue_id) in threads {
             let make_executor = Arc::clone(&make_executor);
@@ -51,7 +56,7 @@ impl ThreadRunner {
                 .name(format!("{name} worker"))
                 .spawn(move || work(&*make_executor, queues.queue(queue_id), &outcomes))?;
             match queue_id {
-                QueueId::Online => runner.online_thread = Some(thread),
+                QueueId::Online | QueueId::Preview => runner.detached_threads.push(thread),
                 QueueId::Load | QueueId::Console => runner.joined_threads.push(thread),
             }
         }
@@ -66,14 +71,14 @@ impl ThreadRunner {
     }
 
     /// Drops the jobs that have not started and waits for the running load and console jobs to end. The online
-    /// thread is left to end on its own; dropping its handle detaches it.
+    /// and preview threads are left to end on their own; dropping their handles detaches them.
     pub fn shutdown(mut self) {
         self.stop();
     }
 
     fn stop(&mut self) {
         self.queues.close_all();
-        self.online_thread = None;
+        self.detached_threads.clear();
         for thread in self.joined_threads.drain(..) {
             let name = thread.thread().name().unwrap_or_default().to_owned();
             if thread.join().is_err() {
@@ -155,6 +160,7 @@ enum QueueId {
     Load,
     Console,
     Online,
+    Preview,
 }
 
 #[derive(Default)]
@@ -162,6 +168,7 @@ struct RunnerQueues {
     load: JobQueue,
     console: JobQueue,
     online: JobQueue,
+    preview: JobQueue,
 }
 
 impl RunnerQueues {
@@ -170,6 +177,7 @@ impl RunnerQueues {
             QueueId::Load => &self.load,
             QueueId::Console => &self.console,
             QueueId::Online => &self.online,
+            QueueId::Preview => &self.preview,
         }
     }
 
@@ -178,11 +186,12 @@ impl RunnerQueues {
             Job::Load(_) | Job::Import(_) => &self.load,
             Job::Console(_) => &self.console,
             Job::Online(_) => &self.online,
+            Job::Preview(_) => &self.preview,
         }
     }
 
     fn close_all(&self) {
-        for queue in [&self.load, &self.console, &self.online] {
+        for queue in [&self.load, &self.console, &self.online, &self.preview] {
             queue.close();
         }
     }

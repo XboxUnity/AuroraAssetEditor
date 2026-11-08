@@ -7,7 +7,7 @@ use aurora_asset_editor::app::App;
 use aurora_asset_editor::jobs::Job;
 use aurora_asset_editor::platform::SystemTheme;
 use aurora_asset_editor::settings::ThemeChoice;
-use aurora_asset_editor::view::MainWindowView;
+use aurora_asset_editor::view::{MainWindowView, SPACE_SETTLE_TIME};
 use aurora_ui::MainWindow;
 use i_slint_backend_testing::{ElementHandle, mock_elapsed_time};
 use image::RgbaImage;
@@ -15,18 +15,21 @@ use slint::platform::{Key, PointerEventButton, WindowEvent};
 use slint::{ComponentHandle, SharedString};
 
 use super::screen_text_check::check_screen_text;
-use crate::{AppHarness, HeadlessUi};
+use crate::{AppHarness, HeadlessUi, PreviewJobs};
 
 /// How far a capture advances the mock clock: longer than any animation in the UI, the strip's wheel
-/// scroll included, so every animation has ended and the cursor's blink phase is the same on every capture.
+/// scroll included, and than the wait before pictures are resized to a new space, so every animation has
+/// ended, every picture is resized, and the cursor's blink phase is the same on every capture.
 pub const SETTLE_TIME: Duration = Duration::from_secs(1);
 const CAPTURE_SCALE_FACTOR: f32 = 1.0;
+const _: () = assert!(SETTLE_TIME.as_millis() > SPACE_SETTLE_TIME.as_millis());
 
 /// A screen being staged for a screenshot: the harness's app in a connected main window, with everything
 /// that could differ between runs pinned (size, theme, scale factor, pointer, mock time).
 pub struct Scene {
     ui: HeadlessUi,
     view: MainWindowView,
+    previews: PreviewJobs,
     app: Rc<RefCell<App>>,
     harness: AppHarness,
     pointer_kept: bool,
@@ -46,7 +49,8 @@ impl Scene {
         harness.app().set_theme(theme);
         let ui = HeadlessUi::new();
         let window = MainWindow::new().expect("the main window builds on the testing backend");
-        let view = MainWindowView::new(window);
+        let previews = PreviewJobs::new();
+        let view = MainWindowView::new(window, previews.runner());
         ui.show_at_size(view.window().window(), size);
         // The testing backend never reports a dark OS theme; pinned anyway so no screen relies on that.
         view.set_system_theme(SystemTheme { dark: false });
@@ -55,6 +59,7 @@ impl Scene {
         let scene = Scene {
             ui,
             view,
+            previews,
             app,
             harness,
             pointer_kept: false,
@@ -155,8 +160,17 @@ impl Scene {
         if !self.pointer_kept {
             window.dispatch_event(WindowEvent::PointerExited);
         }
+        // Reports the space of every preview area now, so the wait for the spaces to settle ends within
+        // SETTLE_TIME and the view asks for the resized pictures.
+        mock_elapsed_time(Duration::ZERO);
         mock_elapsed_time(SETTLE_TIME);
+        self.previews.run(&self.view);
         self.render();
+        assert_eq!(
+            self.previews.queued(),
+            0,
+            "the resized pictures are the ones the screen shows"
+        );
         assert_eq!(
             window.scale_factor(),
             CAPTURE_SCALE_FACTOR,

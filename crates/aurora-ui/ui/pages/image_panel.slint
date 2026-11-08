@@ -1,6 +1,7 @@
 import { DropSlot } from "../controls/drop_slot.slint";
 import { PillButton } from "../controls/pill_button.slint";
 import { EditorModel } from "../model/editor_model.slint";
+import { PreviewArea } from "../model/preview_area.slint";
 import { ShellModel } from "../model/shell_model.slint";
 import { SlotView } from "../model/slot_view.slint";
 import { Theme } from "../theme/theme.slint";
@@ -8,6 +9,7 @@ import { Theme } from "../theme/theme.slint";
 // A page header (title, caption, buttons) over the slot it acts on.
 export component ImagePanel inherits VerticalLayout {
     in property <SlotView> view;
+    in property <PreviewArea> area;
     in property <image> placeholder;
     // Only the Screenshots page has Add.
     in property <bool> has-add-button;
@@ -65,6 +67,7 @@ export component ImagePanel inherits VerticalLayout {
 
     slot := DropSlot {
         vertical-stretch: 1;
+        area: area;
         image: view.image;
         has-image: view.has-image;
         unsupported: view.unsupported;

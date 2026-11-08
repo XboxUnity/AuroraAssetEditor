@@ -6,6 +6,7 @@ mod fake_dialogs;
 mod fake_folder_opener;
 mod fixed_clock;
 mod headless_ui;
+mod preview_jobs;
 mod queued_runner;
 mod sample_assets;
 mod screenshots;
@@ -19,6 +20,7 @@ pub use fake_dialogs::{DialogRequest, FakeDialogs, FakeDialogsHandle};
 pub use fake_folder_opener::{FakeFolderOpener, FakeFolderOpenerHandle};
 pub use fixed_clock::FixedClock;
 pub use headless_ui::HeadlessUi;
+pub use preview_jobs::{PreviewJobs, settle_preview_spaces};
 pub use queued_runner::QueuedRunner;
 pub use sample_assets::{asset_file_with, placeholder};
 pub use screenshots::{

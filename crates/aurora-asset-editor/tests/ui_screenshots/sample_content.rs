@@ -134,8 +134,9 @@ const TILED_FLAG: u8 = 0x80;
 const FULL_CHANNEL: u32 = 255;
 const MIN_BASE_CHANNEL: u8 = 48;
 const BASE_CHANNEL_RANGE: u8 = 160;
-/// The gradient moves in this many diagonal bands: a smooth ramp scaled into the slot is noisy enough
-/// to push a reference PNG over its size budget, bands are not.
+/// The gradient moves in this many bands from left to right. A smooth ramp, or bands running diagonally,
+/// resized smoothly into a slot (and DXT blocks along their edges) differ from row to row and push the
+/// references over their size budget; bands running straight down repeat row after row.
 const GRADIENT_BANDS: u32 = 12;
 /// How much lighter the top-left quarter is, so a flipped or rotated image shows.
 const LIGHT_QUARTER_BOOST: u8 = 48;
@@ -162,8 +163,8 @@ pub enum SampleAsset {
     TiledCover,
 }
 
-/// A banded diagonal gradient between two colours derived from `seed`, the top-left quarter lighter. Integer
-/// arithmetic only, so the pixels are the same on every machine.
+/// A banded gradient from left to right between two colours derived from `seed`, the top-left quarter
+/// lighter. Integer arithmetic only, so the pixels are the same on every machine.
 pub fn sample_art(width: u32, height: u32, seed: u8) -> RgbaImage {
     let start = [
         base_channel(seed, 67, 40),
@@ -172,7 +173,7 @@ pub fn sample_art(width: u32, height: u32, seed: u8) -> RgbaImage {
     ];
     let end = start.map(|channel| u8::MAX - channel);
     RgbaImage::from_fn(width, height, |x, y| {
-        let smooth = (x * FULL_CHANNEL / (width - 1) + y * FULL_CHANNEL / (height - 1)) / 2;
+        let smooth = x * FULL_CHANNEL / (width - 1);
         let along =
             smooth * GRADIENT_BANDS / (FULL_CHANNEL + 1) * FULL_CHANNEL / (GRADIENT_BANDS - 1);
         let in_light_quarter = x < width / 2 && y < height / 2;

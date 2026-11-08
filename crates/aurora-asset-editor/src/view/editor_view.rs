@@ -3,14 +3,17 @@ use std::rc::Rc;
 
 use aurora_asset::{AssetSlot, SCREENSHOT_COUNT, ScreenshotNumber, TextureHeader};
 use aurora_image::ImageTarget;
-use aurora_ui::{EditorModel, MainWindow, ScreenshotTile, SlotView};
-use slint::{ComponentHandle, Image, Rgba8Pixel, SharedPixelBuffer};
+use aurora_ui::{EditorModel, MainWindow, PreviewArea, ScreenshotTile, SlotView};
+use slint::ComponentHandle;
 
 use crate::app::App;
 use crate::editor::{AssetDocument, SlotPreview, texture_caption};
 
 use super::shell_view::{Refresh, action_runner};
-use super::{ImageCache, ScreenshotTileContent, ScreenshotTiles};
+use super::{
+    ImageCache, PictureId, Previews, ScreenshotTileContent, ScreenshotTiles, ShownPicture,
+    slint_image,
+};
 
 /// Connects the asset pages' buttons, the screenshot strip and drag-reorder to `app`.
 pub(super) fn connect_editor(window: &MainWindow, app: &Rc<RefCell<App>>, refresh: &Refresh) {
@@ -55,22 +58,53 @@ pub(super) fn connect_editor(window: &MainWindow, app: &Rc<RefCell<App>>, refres
     });
 }
 
+/// The images that make the editor's pictures: each slot's pixels as loaded, and their resized copies.
+pub(super) struct EditorPictures<'a> {
+    pub originals: &'a mut ImageCache,
+    pub previews: &'a mut Previews,
+}
+
 pub(super) fn render_editor(
     window: &MainWindow,
     app: &App,
-    images: &mut ImageCache,
+    pictures: &mut EditorPictures<'_>,
     tiles: &mut ScreenshotTiles,
 ) {
     let editor = window.global::<EditorModel>();
     let pages = app.pages();
-    editor.set_cover(slot_view(&pages.cover, AssetSlot::Cover, images));
-    editor.set_background(slot_view(&pages.background, AssetSlot::Background, images));
-    editor.set_icon(slot_view(&pages.icon_banner, AssetSlot::Icon, images));
-    editor.set_banner(slot_view(&pages.icon_banner, AssetSlot::Banner, images));
+    editor.set_cover(slot_view(
+        &pages.cover,
+        AssetSlot::Cover,
+        PreviewArea::Cover,
+        pictures,
+    ));
+    editor.set_background(slot_view(
+        &pages.background,
+        AssetSlot::Background,
+        PreviewArea::Background,
+        pictures,
+    ));
+    editor.set_icon(slot_view(
+        &pages.icon_banner,
+        AssetSlot::Icon,
+        PreviewArea::Icon,
+        pictures,
+    ));
+    editor.set_banner(slot_view(
+        &pages.icon_banner,
+        AssetSlot::Banner,
+        PreviewArea::Banner,
+        pictures,
+    ));
 
     let screenshots = &pages.screenshots;
     let selected = app.selected_screenshot();
-    let mut screenshot = slot_view(screenshots, AssetSlot::Screenshot(selected), images);
+    let mut screenshot = slot_view(
+        screenshots,
+        AssetSlot::Screenshot(selected),
+        PreviewArea::Screenshot,
+        pictures,
+    );
     screenshot.caption = format!(
         "{} · {} of {SCREENSHOT_COUNT}",
         screenshot.caption,
@@ -82,21 +116,27 @@ pub(super) fn render_editor(
     let position_count = shown_position_count(screenshots);
     editor.set_screenshot_position_count(i32::try_from(position_count).unwrap_or(i32::MAX));
     tiles.show(
-        tile_contents(screenshots, position_count, selected),
-        |content| screenshot_tile(screenshots, content, images),
+        tile_contents(screenshots, position_count, selected, pictures),
+        screenshot_tile,
     );
     editor.set_drop_hover(app.drop_hover());
 }
 
-fn slot_view(document: &AssetDocument, slot: AssetSlot, images: &mut ImageCache) -> SlotView {
+fn slot_view(
+    document: &AssetDocument,
+    slot: AssetSlot,
+    area: PreviewArea,
+    pictures: &mut EditorPictures<'_>,
+) -> SlotView {
     let preview = document.preview(slot);
     let header = document.texture_header(slot);
+    let picture = slot_picture(document, slot, area, pictures);
     SlotView {
         slot_index: slot_index(slot),
         title: slot_title(slot).into(),
         caption: slot_caption(slot, header).into(),
-        image: slot_image(document, slot, images),
-        has_image: matches!(preview, SlotPreview::Pixels(_)),
+        has_image: picture.is_some(),
+        image: picture.map(|picture| picture.image).unwrap_or_default(),
         unsupported: matches!(preview, SlotPreview::Unsupported(_)),
         can_export: matches!(preview, SlotPreview::Pixels(_)),
         can_remove: header.is_some(),
@@ -108,13 +148,22 @@ fn tile_contents(
     screenshots: &AssetDocument,
     shown_count: usize,
     selected: ScreenshotNumber,
+    pictures: &mut EditorPictures<'_>,
 ) -> Vec<ScreenshotTileContent> {
-    let content = |number: ScreenshotNumber, is_next_free: bool| ScreenshotTileContent {
-        number,
-        image_revision: screenshots.revision(AssetSlot::Screenshot(number)),
-        filled: is_filled(screenshots, number),
-        selected: number == selected,
-        is_next_free,
+    let mut content = |number: ScreenshotNumber, is_next_free: bool| {
+        let slot = AssetSlot::Screenshot(number);
+        let picture = if is_next_free {
+            None
+        } else {
+            slot_picture(screenshots, slot, PreviewArea::Thumbnail, pictures)
+        };
+        ScreenshotTileContent {
+            number,
+            picture,
+            filled: is_filled(screenshots, number),
+            selected: number == selected,
+            is_next_free,
+        }
     };
     let mut contents: Vec<ScreenshotTileContent> = ScreenshotNumber::ALL[..shown_count]
         .iter()
@@ -126,19 +175,14 @@ fn tile_contents(
     contents
 }
 
-fn screenshot_tile(
-    screenshots: &AssetDocument,
-    content: &ScreenshotTileContent,
-    images: &mut ImageCache,
-) -> ScreenshotTile {
-    let image = if content.is_next_free {
-        Image::default()
-    } else {
-        slot_image(screenshots, AssetSlot::Screenshot(content.number), images)
-    };
+fn screenshot_tile(content: &ScreenshotTileContent) -> ScreenshotTile {
     ScreenshotTile {
         number: i32::from(content.number.get()),
-        image,
+        image: content
+            .picture
+            .as_ref()
+            .map(|picture| picture.image.clone())
+            .unwrap_or_default(),
         filled: content.filled,
         selected: content.selected,
         is_next_free: content.is_next_free,
@@ -159,20 +203,21 @@ fn is_filled(screenshots: &AssetDocument, number: ScreenshotNumber) -> bool {
         .is_some()
 }
 
-fn slot_image(document: &AssetDocument, slot: AssetSlot, images: &mut ImageCache) -> Image {
-    images.image(slot, document.revision(slot), || {
-        match document.preview(slot) {
-            SlotPreview::Pixels(pixels) => {
-                let buffer = SharedPixelBuffer::<Rgba8Pixel>::clone_from_slice(
-                    pixels.as_raw(),
-                    pixels.width(),
-                    pixels.height(),
-                );
-                Image::from_rgba8(buffer)
-            }
-            SlotPreview::Empty | SlotPreview::Unsupported(_) => Image::default(),
-        }
-    })
+/// The slot's picture as `area` shows it; `None` while the slot has no pixels to show.
+fn slot_picture(
+    document: &AssetDocument,
+    slot: AssetSlot,
+    area: PreviewArea,
+    pictures: &mut EditorPictures<'_>,
+) -> Option<ShownPicture> {
+    let SlotPreview::Pixels(pixels) = document.preview(slot) else {
+        return None;
+    };
+    let revision = document.revision(slot);
+    let originals = &mut *pictures.originals;
+    let original = || originals.image(slot, revision, || slint_image(pixels));
+    let id = PictureId::Slot { slot, revision };
+    Some(pictures.previews.show(id, area, pixels, original))
 }
 
 fn slot_title(slot: AssetSlot) -> String {

@@ -1,6 +1,8 @@
 import { DashedBorder } from "../controls/dashed_border.slint";
 import { Icon } from "../controls/icon.slint";
+import { PreviewImage } from "../controls/preview_image.slint";
 import { EditorModel } from "../model/editor_model.slint";
+import { PreviewArea } from "../model/preview_area.slint";
 import { ScreenshotTile } from "../model/screenshot_tile.slint";
 import { ShellModel } from "../model/shell_model.slint";
 import { Theme } from "../theme/theme.slint";
@@ -47,13 +49,13 @@ export component ScreenshotThumb inherits Rectangle {
         height: 100%;
         dash-color: Theme.slot-border;
     }
-    if tile.filled: Image {
+    if tile.filled: PreviewImage {
         x: Theme.border-width;
         y: Theme.border-width;
         width: parent.width - 2 * Theme.border-width;
         height: parent.height - 2 * Theme.border-width;
+        area: PreviewArea.thumbnail;
         source: tile.image;
-        image-fit: contain;
     }
     if !tile.filled && !tile.is-next-free: Text {
         width: 100%;

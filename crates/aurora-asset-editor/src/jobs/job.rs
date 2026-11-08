@@ -1,4 +1,4 @@
-use super::{ConsoleRequest, ImportJob, LoadJob, OnlineJob};
+use super::{ConsoleRequest, ImportJob, LoadJob, OnlineJob, PreviewJob};
 
 /// Which queue a job waits in: a worker takes every `User` job before any `Background` one.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -14,4 +14,6 @@ pub enum Job {
     Import(ImportJob),
     Console(ConsoleRequest),
     Online(OnlineJob),
+    /// Submitted by the view, which takes the outcome.
+    Preview(PreviewJob),
 }

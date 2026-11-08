@@ -17,7 +17,7 @@ use aurora_console::{
 };
 use aurora_online::{CoverSource, Endpoints};
 use aurora_ui::{ConsoleModel, GameRowView, MainWindow, OnlineModel, ShellModel};
-use editor_test_support::{AppHarness, HeadlessUi, asset_file_with};
+use editor_test_support::{AppHarness, HeadlessUi, PreviewJobs, asset_file_with};
 use i_slint_backend_testing::ElementHandle;
 use image::RgbaImage;
 use slint::platform::{Key, PointerEventButton, WindowEvent};
@@ -56,7 +56,7 @@ impl Ui {
     fn start(harness: &mut AppHarness) -> Ui {
         let ui = HeadlessUi::new();
         let window = MainWindow::new().expect("the main window builds on the testing backend");
-        let view = MainWindowView::new(window);
+        let view = MainWindowView::new(window, PreviewJobs::new().runner());
         ui.show(view.window().window());
         let app = harness.share_app();
         view.connect(Rc::clone(&app));

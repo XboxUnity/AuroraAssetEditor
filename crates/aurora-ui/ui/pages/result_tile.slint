@@ -1,5 +1,7 @@
 import { DashedBorder } from "../controls/dashed_border.slint";
 import { Icon } from "../controls/icon.slint";
+import { PreviewImage } from "../controls/preview_image.slint";
+import { PreviewArea } from "../model/preview_area.slint";
 import { ResultTileView } from "../model/result_tile_view.slint";
 import { Theme } from "../theme/theme.slint";
 
@@ -19,11 +21,11 @@ export component ResultTile inherits Rectangle {
         clicked();
     }
 
-    if view.has-image: thumbnail := Image {
+    if view.has-image: thumbnail := PreviewImage {
         width: 100%;
         height: 100%;
+        area: PreviewArea.result;
         source: view.image;
-        image-fit: contain;
     }
 
     if !view.has-image: VerticalLayout {

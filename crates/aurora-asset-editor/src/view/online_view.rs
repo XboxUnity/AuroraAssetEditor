@@ -3,14 +3,17 @@ use std::rc::Rc;
 
 use aurora_asset::RgbaImage;
 use aurora_online::CoverSource;
-use aurora_ui::{MainWindow, OnlineModel, ResultTileView};
-use slint::{ComponentHandle, Image, Rgba8Pixel, SharedPixelBuffer};
+use aurora_ui::{MainWindow, OnlineModel, PreviewArea, ResultTileView};
+use slint::{ComponentHandle, Image};
 
 use crate::app::App;
 use crate::online::{OnlineState, SearchMode, TileImage};
 
 use super::shell_view::{Refresh, action_runner};
-use super::{OnlineImageCache, ResultImage, ResultImageKey, ResultTileContent, ResultTiles};
+use super::{
+    OnlineImageCache, PictureId, Previews, ResultImage, ResultImageKey, ResultTileContent,
+    ResultTiles, ShownPicture, slint_image,
+};
 
 const EMPTY_GRID_TEXT: &str = "Search XboxUnity or the Internet Archive for covers";
 const TITLE_ID_PLACEHOLDER: &str = "TitleID";
@@ -57,10 +60,16 @@ pub(super) fn connect_online(window: &MainWindow, app: &Rc<RefCell<App>>, refres
     online.on_save_image(move || act(&mut |app| app.save_result_image()));
 }
 
+/// The images that make the Online page's pictures: each result image as loaded, and their resized copies.
+pub(super) struct OnlinePictures<'a> {
+    pub originals: &'a mut OnlineImageCache,
+    pub previews: &'a mut Previews,
+}
+
 pub(super) fn render_online(
     window: &MainWindow,
     app: &App,
-    images: &mut OnlineImageCache,
+    pictures: &mut OnlinePictures<'_>,
     tiles: &mut ResultTiles,
 ) {
     let online = window.global::<OnlineModel>();
@@ -70,19 +79,17 @@ pub(super) fn render_online(
     online.set_keywords_enabled(state.source != CoverSource::InternetArchive);
     online.set_search_text(state.search_text().into());
     online.set_search_placeholder(placeholder(state.mode).into());
-    tiles.show(result_contents(state), |content| {
-        result_tile_view(state, content, images)
-    });
+    tiles.show(result_contents(state, pictures), result_tile_view);
     online.set_searching(app.locks().online_search);
     online.set_empty_text(empty_text(state, app.locks().online_search).into());
-    render_selection(&online, state, app.locks().use_result, images);
+    render_selection(&online, state, app.locks().use_result, pictures);
 }
 
 fn render_selection(
     online: &OnlineModel,
     state: &OnlineState,
     use_locked: bool,
-    images: &mut OnlineImageCache,
+    pictures: &mut OnlinePictures<'_>,
 ) {
     let selected = state.selected_tile();
     let full = selected.map(|tile| &tile.full);
@@ -106,7 +113,7 @@ fn render_selection(
     let full_image = match (state.selected, full_pixels) {
         (Some(index), Some(pixels)) => {
             let key = image_key(state, index, ResultImage::Full);
-            images.image(key, || slint_image(pixels))
+            result_picture(key, PreviewArea::ResultPreview, pixels, pictures).image
         }
         _ => Image::default(),
     };
@@ -117,47 +124,54 @@ fn render_selection(
     online.set_can_save(full_pixels.is_some());
 }
 
-fn result_contents(state: &OnlineState) -> Vec<ResultTileContent> {
+fn result_contents(
+    state: &OnlineState,
+    pictures: &mut OnlinePictures<'_>,
+) -> Vec<ResultTileContent> {
     state
         .results
         .iter()
         .enumerate()
         .map(|(index, tile)| ResultTileContent {
             label: tile.result.label.as_str().into(),
-            thumbnail: matches!(tile.thumbnail, TileImage::Loaded { .. })
-                .then(|| image_key(state, index, ResultImage::Thumbnail)),
+            thumbnail: match &tile.thumbnail {
+                TileImage::Loaded { pixels, .. } => {
+                    let key = image_key(state, index, ResultImage::Thumbnail);
+                    Some(result_picture(key, PreviewArea::Result, pixels, pictures))
+                }
+                TileImage::Pending | TileImage::Failed => None,
+            },
             failed: matches!(tile.thumbnail, TileImage::Failed),
             selected: state.selected == Some(index),
         })
         .collect()
 }
 
-fn result_tile_view(
-    state: &OnlineState,
-    content: &ResultTileContent,
-    images: &mut OnlineImageCache,
-) -> ResultTileView {
-    let thumbnail = content
-        .thumbnail
-        .and_then(|key| thumbnail_image(state, key, images));
+fn result_tile_view(content: &ResultTileContent) -> ResultTileView {
     ResultTileView {
         label: content.label.clone(),
-        has_image: thumbnail.is_some(),
-        image: thumbnail.unwrap_or_default(),
+        has_image: content.thumbnail.is_some(),
+        image: content
+            .thumbnail
+            .as_ref()
+            .map(|picture| picture.image.clone())
+            .unwrap_or_default(),
         failed: content.failed,
         selected: content.selected,
     }
 }
 
-fn thumbnail_image(
-    state: &OnlineState,
+fn result_picture(
     key: ResultImageKey,
-    images: &mut OnlineImageCache,
-) -> Option<Image> {
-    match &state.results.get(key.index)?.thumbnail {
-        TileImage::Loaded { pixels, .. } => Some(images.image(key, || slint_image(pixels))),
-        TileImage::Pending | TileImage::Failed => None,
-    }
+    area: PreviewArea,
+    pixels: &RgbaImage,
+    pictures: &mut OnlinePictures<'_>,
+) -> ShownPicture {
+    let originals = &mut *pictures.originals;
+    let original = || originals.image(key, || slint_image(pixels));
+    pictures
+        .previews
+        .show(PictureId::Result(key), area, pixels, original)
 }
 
 fn image_key(state: &OnlineState, index: usize, image: ResultImage) -> ResultImageKey {
@@ -182,15 +196,6 @@ fn placeholder(mode: SearchMode) -> &'static str {
         SearchMode::TitleId => TITLE_ID_PLACEHOLDER,
         SearchMode::Keywords => KEYWORDS_PLACEHOLDER,
     }
-}
-
-fn slint_image(pixels: &RgbaImage) -> Image {
-    let buffer = SharedPixelBuffer::<Rgba8Pixel>::clone_from_slice(
-        pixels.as_raw(),
-        pixels.width(),
-        pixels.height(),
-    );
-    Image::from_rgba8(buffer)
 }
 
 fn position_of<T: PartialEq>(choices: &[T], value: T) -> i32 {

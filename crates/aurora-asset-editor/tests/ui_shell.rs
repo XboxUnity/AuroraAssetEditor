@@ -10,7 +10,7 @@ use aurora_asset_editor::settings::ThemeChoice;
 use aurora_asset_editor::view::{ImageCache, MainWindowView};
 use aurora_console::{GameIds, HexId};
 use aurora_ui::{MainWindow, MenuId, ShellModel};
-use editor_test_support::{AppHarness, HeadlessUi, asset_file_with};
+use editor_test_support::{AppHarness, HeadlessUi, PreviewJobs, asset_file_with};
 use i_slint_backend_testing::ElementHandle;
 use image::{Rgba, RgbaImage};
 use slint::ComponentHandle;
@@ -47,7 +47,7 @@ impl Shell {
     fn start(harness: &mut AppHarness) -> Shell {
         let ui = HeadlessUi::new();
         let window = MainWindow::new().expect("the main window builds on the testing backend");
-        let view = MainWindowView::new(window);
+        let view = MainWindowView::new(window, PreviewJobs::new().runner());
         ui.show(view.window().window());
         let app = harness.share_app();
         view.connect(Rc::clone(&app));

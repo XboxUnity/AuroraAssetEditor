@@ -1,7 +1,9 @@
 import { PillButton } from "../controls/pill_button.slint";
+import { PreviewImage } from "../controls/preview_image.slint";
 import { SegmentedChoice } from "../controls/segmented_choice.slint";
 import { TextField } from "../controls/text_field.slint";
 import { OnlineModel } from "../model/online_model.slint";
+import { PreviewArea } from "../model/preview_area.slint";
 import { Theme } from "../theme/theme.slint";
 import { ResultGrid } from "result_grid.slint";
 
@@ -68,11 +70,13 @@ export component OnlinePage inherits VerticalLayout {
                 border-color: Theme.slot-filled-border;
                 background: Theme.slot-filled-gradient;
                 clip: true;
-                if OnlineModel.selected-has-image: Image {
-                    width: 100%;
-                    height: 100%;
+                if OnlineModel.selected-has-image: PreviewImage {
+                    x: Theme.border-width;
+                    y: Theme.border-width;
+                    width: parent.width - 2 * Theme.border-width;
+                    height: parent.height - 2 * Theme.border-width;
+                    area: PreviewArea.result-preview;
                     source: OnlineModel.selected-image;
-                    image-fit: contain;
                 }
                 if OnlineModel.selected-failed: Text {
                     width: 100%;

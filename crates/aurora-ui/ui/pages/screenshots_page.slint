@@ -1,4 +1,5 @@
 import { EditorModel } from "../model/editor_model.slint";
+import { PreviewArea } from "../model/preview_area.slint";
 import { Theme } from "../theme/theme.slint";
 import { ImagePanel } from "image_panel.slint";
 import { ScreenshotStrip } from "screenshot_strip.slint";
@@ -9,6 +10,7 @@ export component ScreenshotsPage inherits VerticalLayout {
 
     panel := ImagePanel {
         view: EditorModel.screenshot;
+        area: PreviewArea.screenshot;
         placeholder: @image-url("../placeholders/screenshot.png");
         has-add-button: true;
     }

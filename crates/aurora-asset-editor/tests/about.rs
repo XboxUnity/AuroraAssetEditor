@@ -9,7 +9,7 @@ use aurora_asset_editor::dialogs::Modal;
 use aurora_asset_editor::settings::ThemeChoice;
 use aurora_asset_editor::view::MainWindowView;
 use aurora_ui::{DialogKind, DialogModel, MainWindow, ShellModel};
-use editor_test_support::{AppHarness, HeadlessUi};
+use editor_test_support::{AppHarness, HeadlessUi, PreviewJobs};
 use i_slint_backend_testing::ElementHandle;
 use image::RgbaImage;
 use slint::platform::{Key, PointerEventButton, WindowEvent};
@@ -181,7 +181,7 @@ impl Ui {
     fn start(harness: &mut AppHarness, theme: ThemeChoice) -> Ui {
         let ui = HeadlessUi::new();
         let window = MainWindow::new().expect("the main window builds on the testing backend");
-        let view = MainWindowView::new(window);
+        let view = MainWindowView::new(window, PreviewJobs::new().runner());
         ui.show(view.window().window());
         harness.app().set_theme(theme);
         let app = harness.share_app();

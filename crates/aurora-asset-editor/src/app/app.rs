@@ -219,6 +219,10 @@ impl App {
                 title,
             }) => self.apply_bulk_progress(position, total, &title),
             JobOutcome::Failed { job, panic } => self.apply_failed_job(&job, &panic),
+            JobOutcome::Preview(resized) => log::error!(
+                "A resized preview of {:?} reached the app; only the view shows previews",
+                resized.picture
+            ),
         }
     }
 

@@ -62,6 +62,7 @@ impl App {
                     tile.full = TileImage::Failed;
                 }
             }
+            FailedJob::Preview => {}
         }
     }
 }

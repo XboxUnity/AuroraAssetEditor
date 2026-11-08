@@ -118,7 +118,7 @@ fn run(
         startup_problems: problems,
     };
     let app = Rc::new(RefCell::new(App::new(environment)));
-    let view = Rc::new(MainWindowView::new(window));
+    let view = Rc::new(MainWindowView::new(window, Box::new(runner.submitter())));
     view.connect(Rc::clone(&app));
     receive_outcomes(outcome_receiver, &app, &view)?;
     watch_window_events(&app, &view);
@@ -252,7 +252,10 @@ fn receive_outcomes(
     let view = Rc::clone(view);
     slint::spawn_local(async move {
         while let Ok(outcome) = receiver.recv().await {
-            app.borrow_mut().on_job_outcome(outcome);
+            match outcome {
+                JobOutcome::Preview(resized) => view.show_resized(resized),
+                outcome => app.borrow_mut().on_job_outcome(outcome),
+            }
             view.render(&app.borrow());
         }
     })?;

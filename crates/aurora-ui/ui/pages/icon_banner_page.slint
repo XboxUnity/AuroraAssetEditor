@@ -1,4 +1,5 @@
 import { EditorModel } from "../model/editor_model.slint";
+import { PreviewArea } from "../model/preview_area.slint";
 import { Theme } from "../theme/theme.slint";
 import { ImagePanel } from "image_panel.slint";
 
@@ -8,10 +9,12 @@ export component IconBannerPage inherits VerticalLayout {
 
     icon-panel := ImagePanel {
         view: EditorModel.icon;
+        area: PreviewArea.icon;
         placeholder: @image-url("../placeholders/icon.png");
     }
     banner-panel := ImagePanel {
         view: EditorModel.banner;
+        area: PreviewArea.banner;
         placeholder: @image-url("../placeholders/banner.png");
     }
 }

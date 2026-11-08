@@ -1,0 +1,9 @@
+import { PreviewArea } from "preview_area.slint";
+
+export global PreviewModel {
+    // Set once the view handles `area-changed`; areas made before then (the first page) report again.
+    in property <bool> view-listening;
+
+    // The space a picture has in `area`, in physical pixels; reported when it first shows and on every change.
+    callback area-changed(area: PreviewArea, width: int, height: int);
+}
