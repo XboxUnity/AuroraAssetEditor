@@ -33,8 +33,6 @@ const FULL_WIDTH: u32 = 90;
 const FULL_HEIGHT: u32 = 60;
 const LONG_TITLE_LENGTH: usize = 200;
 const MANY_GAMES: usize = 60;
-/// Set to a folder to keep the rendered pages as PNG files for a look.
-const SNAPSHOT_DIR_VARIABLE: &str = "AURORA_UI_SNAPSHOT_DIR";
 /// Inside a button's left padding, clear of its rounded corners.
 const ACCENT_PROBE_INSET: f32 = 3.0;
 /// The accent #3b82f6 has blue far above red; the neutral pill colours do not.
@@ -169,16 +167,6 @@ fn assert_not_accent_coloured(ui: &Ui, id: &str) {
         blue.saturating_sub(red) < MAX_NEUTRAL_BLUE_CAST,
         "{id} is drawn neutral, not in the accent colour: {pixel:?}"
     );
-}
-
-fn keep_snapshot(image: &RgbaImage, name: &str) {
-    if let Some(folder) = std::env::var_os(SNAPSHOT_DIR_VARIABLE) {
-        let folder = PathBuf::from(folder);
-        std::fs::create_dir_all(&folder).expect("the snapshot folder can be created");
-        image
-            .save(folder.join(format!("{name}.png")))
-            .expect("the snapshot can be written");
-    }
 }
 
 fn assert_all_differ(states: &[(&str, RgbaImage)], theme: &str) {
@@ -329,9 +317,6 @@ fn online_page_renders_states() {
         assert!(!ui.enabled("OnlinePage::use-button"));
         states.push(("failed", ui.snapshot()));
 
-        for (state, image) in &states {
-            keep_snapshot(image, &format!("sources-{name}-online-{state}"));
-        }
         assert_all_differ(&states, name);
     }
 }
@@ -743,9 +728,6 @@ fn console_page_renders_states() {
         ui.labelled("Stop");
         states.push(("bulk-running", ui.snapshot()));
 
-        for (state, image) in &states {
-            keep_snapshot(image, &format!("sources-{name}-console-{state}"));
-        }
         assert_all_differ(&states, name);
     }
 }
@@ -1245,7 +1227,7 @@ fn long_and_non_latin_titles_render_without_panic() {
             .starts_with("ヘイロー3")
     );
     let snapshot = ui.snapshot();
-    // Not kept with the other snapshots: the Japanese glyphs come from the system's fonts.
+    // Not compared as a picture: the Japanese glyphs come from the system's fonts.
     assert_eq!(
         (snapshot.width(), snapshot.height()),
         HeadlessUi::WINDOW_SIZE

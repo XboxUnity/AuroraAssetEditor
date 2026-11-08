@@ -15,8 +15,6 @@ use image::RgbaImage;
 use slint::platform::{Key, PointerEventButton, WindowEvent};
 use slint::{ComponentHandle, LogicalPosition, LogicalSize, SharedString};
 
-/// Set to a folder to keep the rendered dialog as PNG files for a look.
-const SNAPSHOT_DIR_VARIABLE: &str = "AURORA_UI_SNAPSHOT_DIR";
 const ABOUT_SLINT_ID: &str = "AboutDialog::about-slint";
 /// The widget draws its logo and text in at least this many colours besides the card's.
 const MIN_FOREGROUND_COLOURS: usize = 2;
@@ -220,7 +218,6 @@ fn about_dialog_renders_with_about_slint() {
         );
 
         let snapshot = ui.snapshot();
-        keep_snapshot(&snapshot, &format!("about-{name}"));
 
         let widget = ElementHandle::find_by_element_id(ui.view.window(), ABOUT_SLINT_ID)
             .next()
@@ -480,7 +477,6 @@ fn expanded_notices_fit_the_minimum_window_and_scroll_with_the_keys() {
         )
         .to_image()
     };
-    keep_snapshot(&ui.snapshot(), "about-notices-minimum");
     for _ in 0..NOTICES_TAB_STOPS {
         ui.press(Key::Tab);
     }
@@ -571,14 +567,4 @@ fn notices_list_does_not_scroll_sideways() {
         crop(&ui.snapshot()).as_raw() == before.as_raw(),
         "the notices moved sideways"
     );
-}
-
-fn keep_snapshot(image: &RgbaImage, name: &str) {
-    if let Some(folder) = std::env::var_os(SNAPSHOT_DIR_VARIABLE) {
-        let folder = PathBuf::from(folder);
-        std::fs::create_dir_all(&folder).expect("the snapshot folder can be created");
-        image
-            .save(folder.join(format!("{name}.png")))
-            .expect("the snapshot can be written");
-    }
 }

@@ -45,8 +45,6 @@ const MINIMUM_WINDOW: (f32, f32) = (760.0, 500.0);
 const WHEEL_SETTLE: std::time::Duration = std::time::Duration::from_millis(400);
 const WHEEL_STEP: f32 = -60.0;
 const MAX_WHEEL_STEPS: usize = 40;
-/// Set to a folder to keep the rendered pages as PNG files for a look.
-const SNAPSHOT_DIR_VARIABLE: &str = "AURORA_UI_SNAPSHOT_DIR";
 
 struct Ui {
     ui: HeadlessUi,
@@ -275,16 +273,6 @@ fn half_way(top: Rgba<u8>, bottom: Rgba<u8>) -> Rgba<u8> {
         let sum = u16::from(top.0[channel]) + u16::from(bottom.0[channel]);
         u8::try_from(sum / 2).expect("the mean of two bytes is a byte")
     }))
-}
-
-fn keep_snapshot(image: &RgbaImage, name: &str) {
-    if let Some(folder) = std::env::var_os(SNAPSHOT_DIR_VARIABLE) {
-        let folder = PathBuf::from(folder);
-        std::fs::create_dir_all(&folder).expect("the snapshot folder can be created");
-        image
-            .save(folder.join(format!("{name}.png")))
-            .expect("the snapshot can be written");
-    }
 }
 
 fn screenshot_preview(app: &App, number: u8) -> SlotPreview {
@@ -771,11 +759,9 @@ fn asset_pages_render_in_both_themes() {
                 load_every_asset_page(&mut harness);
             }
             let ui = Ui::start(&mut harness);
-            let state = if loaded { "loaded" } else { "empty" };
             for page in ASSET_PAGES {
                 ui.act(|app| app.show_page(page));
                 let snapshot = ui.snapshot();
-                keep_snapshot(&snapshot, &format!("pages-{name}-{state}-{page:?}"));
 
                 for slot in ui.elements("ImagePanel::slot") {
                     let origin = slot.absolute_position();
@@ -937,10 +923,6 @@ fn screenshot_strip_scrolls_to_every_thumbnail() {
         assert!(
             ui.thumb_in_view("Screenshot 20"),
             "{width}: the wheel reaches thumbnail 20"
-        );
-        keep_snapshot(
-            &ui.snapshot(),
-            &format!("pages-dark-twenty-screenshots-{width}"),
         );
 
         ui.act(|app| app.select_screenshot(ScreenshotNumber::new(2).expect("position 2")));

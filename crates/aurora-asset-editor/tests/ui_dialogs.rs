@@ -21,8 +21,6 @@ use tempfile::TempDir;
 use test_servers::{FakeConsole, FakeConsoleConfig};
 
 const HALO_TITLE_ID: &str = "4D5307E6";
-/// Set to a folder to keep the rendered dialogs as PNG files for a look.
-const SNAPSHOT_DIR_VARIABLE: &str = "AURORA_UI_SNAPSHOT_DIR";
 const THEMES: [(ThemeChoice, &str); 2] =
     [(ThemeChoice::Dark, "dark"), (ThemeChoice::Light, "light")];
 /// A window corner, far from any card.
@@ -190,16 +188,6 @@ fn png(folder: &Path, name: &str) -> PathBuf {
         .save(&path)
         .expect("the test image can be written");
     path
-}
-
-fn keep_snapshot(image: &RgbaImage, name: &str) {
-    if let Some(folder) = std::env::var_os(SNAPSHOT_DIR_VARIABLE) {
-        let folder = PathBuf::from(folder);
-        std::fs::create_dir_all(&folder).expect("the snapshot folder can be created");
-        image
-            .save(folder.join(format!("{name}.png")))
-            .expect("the snapshot can be written");
-    }
 }
 
 fn assert_close(actual: [u8; 3], expected: [u8; 3], tolerance: i16, what: &str) {
@@ -470,7 +458,6 @@ fn dialogs_render_in_both_themes() {
             let without_dialog = ui.snapshot();
             (flow.open)(&mut harness, &ui);
             let with_dialog = ui.snapshot();
-            keep_snapshot(&with_dialog, &format!("dialogs-{theme_name}-{}", flow.name));
 
             let (x, y) = BACKDROP_PROBE;
             let below = without_dialog.get_pixel(x, y);
@@ -597,7 +584,6 @@ fn long_message_caps_its_height_and_scrolls() {
     ui.act(|app| app.open_paths(missing));
     harness.run_jobs();
     ui.render();
-    keep_snapshot(&ui.snapshot(), "dialogs-dark-long-message");
 
     let scroller = ui.element("DialogText::scroller");
     assert_eq!(scroller.size().height, DIALOG_TEXT_MAX_HEIGHT);
@@ -843,7 +829,6 @@ fn bulk_source_switch_works_from_the_keyboard() {
     let queued = harness.queued_jobs();
 
     ui.press(Key::Tab);
-    keep_snapshot(&ui.snapshot(), "dialogs-dark-bulk-source-focused");
     ui.press(Key::Space);
     assert_eq!(bulk_form(&ui).source, CoverSource::InternetArchive, "Space");
     assert_eq!(ui.dialog().get_bulk_source_index(), 1);

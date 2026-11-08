@@ -1,6 +1,5 @@
 use std::cell::RefCell;
 use std::collections::HashSet;
-use std::path::PathBuf;
 use std::rc::Rc;
 
 use aurora_asset::{AssetSlot, Compression, ScreenshotNumber};
@@ -37,8 +36,6 @@ const ALL_PAGES: [Page; 6] = [
     Page::Online,
     Page::Console,
 ];
-/// Set to a folder to keep the rendered shells as PNG files for a look.
-const SNAPSHOT_DIR_VARIABLE: &str = "AURORA_UI_SNAPSHOT_DIR";
 
 struct Shell {
     ui: HeadlessUi,
@@ -128,16 +125,6 @@ fn top_bar_pixel(shell: &Shell) -> Rgba<u8> {
     *shell.snapshot().get_pixel(x, y)
 }
 
-fn keep_snapshot(image: &RgbaImage, name: &str) {
-    if let Some(folder) = std::env::var_os(SNAPSHOT_DIR_VARIABLE) {
-        let folder = PathBuf::from(folder);
-        std::fs::create_dir_all(&folder).expect("the snapshot folder can be created");
-        image
-            .save(folder.join(format!("{name}.png")))
-            .expect("the snapshot can be written");
-    }
-}
-
 fn halo() -> CurrentGame {
     CurrentGame {
         title: "Halo 3".to_owned(),
@@ -208,7 +195,6 @@ fn shell_renders_every_page_in_both_themes() {
         for page in ALL_PAGES {
             shell.act(|app| app.show_page(page));
             let snapshot = shell.snapshot();
-            keep_snapshot(&snapshot, &format!("shell-{name}-{page:?}"));
 
             assert!(
                 colour_count(&snapshot) > 1,
@@ -285,7 +271,6 @@ fn screenshots_label_never_elides_beside_its_count() {
                 count_text.absolute_position().x >= label.absolute_position().x + full_width,
                 "{theme:?}: {count} follows the label"
             );
-            keep_snapshot(&shell.snapshot(), &format!("shell-{theme:?}-count-{count}"));
         }
     }
 }
@@ -714,7 +699,6 @@ fn every_menu_renders_in_both_themes() {
         ] {
             shell.act(|app| app.toggle_menu(Some(menu)));
             let open = shell.snapshot();
-            keep_snapshot(&open, &format!("shell-{name}-{menu_name}-menu"));
             assert_ne!(open, closed, "{name} {menu_name} menu");
             shell.act(|app| app.toggle_menu(None));
         }
