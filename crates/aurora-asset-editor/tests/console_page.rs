@@ -4,8 +4,8 @@ use std::path::PathBuf;
 
 use aurora_asset::{AssetKind, AssetSlot, Compression, RgbaImage};
 use aurora_asset_editor::app::{
-    BUSY_TEXT, CONNECTION_FAILED_TITLE, LOG_WRITE_FAILED, NO_CONSOLE_TEXT, REFRESHING_TEXT,
-    TEMP_FILE_NOTE,
+    BUSY_TEXT, CONNECTION_FAILED_TITLE, CONNECTION_SAVED_TEXT, LOG_WRITE_FAILED, NO_CONSOLE_TEXT,
+    REFRESHING_TEXT, TEMP_FILE_NOTE,
 };
 use aurora_asset_editor::console::{ConsoleLink, GameColumn, PresenceCell, port_text_for_save};
 use aurora_asset_editor::dialogs::{ConnectionForm, Modal, ModalAnswer, ModalField};
@@ -266,13 +266,13 @@ fn a_saved_connection_is_confirmed_in_the_status_line_and_a_toast() {
 
     let app = harness.app();
     assert!(app.modal().is_none(), "the dialog closed");
-    assert_eq!(app.status().text, "Saved ftp.json");
+    assert_eq!(app.status().text, CONNECTION_SAVED_TEXT);
     let toasts: Vec<(String, Severity)> = app
         .toasts()
         .iter()
         .map(|toast| (toast.text.clone(), toast.severity))
         .collect();
-    assert_eq!(toasts, [("Saved ftp.json".to_owned(), Severity::Info)]);
+    assert_eq!(toasts, [(CONNECTION_SAVED_TEXT.to_owned(), Severity::Info)]);
 }
 
 #[test]
@@ -399,7 +399,7 @@ fn a_refresh_for_replaced_settings_lands_nowhere() {
     assert!(!app.locks().console_actions, "the console is free again");
     assert_eq!(
         app.status().text,
-        "Saved ftp.json",
+        CONNECTION_SAVED_TEXT,
         "the save shown since the refresh started stays"
     );
     assert!(

@@ -19,6 +19,7 @@ use super::{App, CurrentGame};
 pub const NO_CONSOLE_TEXT: &str = "No console connection is set up. Use Edit connection… first.";
 pub const REFRESHING_TEXT: &str = "Refreshing the game list…";
 pub const CONNECTION_FAILED_TITLE: &str = "Connection failed";
+pub const CONNECTION_SAVED_TEXT: &str = "Saved FTP Settings";
 pub const TEMP_FILE_NOTE: &str = "temp file left behind (see error.log)";
 pub(super) const CONNECTION_FAILED_PREFIX: &str = "FTP Connection could not be established";
 const CONNECTION_TEST_FAILED: &str = "The connection test failed";
@@ -75,7 +76,7 @@ impl App {
             Ok(()) => {
                 self.console.use_settings(settings);
                 self.modals.remove_connection_form();
-                self.report_done(format!("Saved {FTP_SETTINGS_FILE}"));
+                self.report_done(CONNECTION_SAVED_TEXT.to_owned());
             }
             // The dialog stays open and shows the failure.
             Err(error) => {
