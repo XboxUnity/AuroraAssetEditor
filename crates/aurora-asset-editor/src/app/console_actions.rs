@@ -76,6 +76,7 @@ impl App {
             Ok(()) => {
                 self.console.use_settings(settings);
                 self.modals.remove_connection_form();
+                self.report_done(format!("Saved {FTP_SETTINGS_FILE}"));
             }
             // The dialog stays open and shows the failure, so no toast.
             Err(error) => {

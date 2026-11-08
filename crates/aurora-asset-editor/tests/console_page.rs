@@ -256,12 +256,36 @@ fn unparsable_port_is_saved_as_21() {
 }
 
 #[test]
+fn a_saved_connection_is_confirmed_in_the_status_line_and_a_toast() {
+    let mut harness = AppHarness::new();
+    harness.app().edit_connection();
+    type_into_form(&mut harness, "10.0.0.7", "21");
+
+    harness.app().save_connection();
+
+    let app = harness.app();
+    assert!(app.modal().is_none(), "the dialog closed");
+    assert_eq!(app.status().text, "Saved ftp.json");
+    let toasts: Vec<(String, Severity)> = app
+        .toasts()
+        .iter()
+        .map(|toast| (toast.text.clone(), toast.severity))
+        .collect();
+    assert_eq!(toasts, [("Saved ftp.json".to_owned(), Severity::Info)]);
+}
+
+#[test]
 fn failed_save_keeps_the_form_and_says_why() {
     let mut harness = AppHarness::new();
     std::fs::create_dir(harness.config_dir().join(FTP_SETTINGS_FILE)).unwrap();
     harness.app().edit_connection();
 
     harness.app().save_connection();
+    assert_eq!(
+        harness.app().toasts().iter().count(),
+        0,
+        "the dialog shows the failure, so no toast"
+    );
 
     let (severity, text) = form(&mut harness)
         .test_status
@@ -339,7 +363,11 @@ fn a_refresh_for_replaced_settings_lands_nowhere() {
     let app = harness.app();
     assert!(app.console().table.visible().is_empty());
     assert!(!app.locks().console_actions, "the console is free again");
-    assert_eq!(app.status().text, "Ready");
+    assert_eq!(
+        app.status().text,
+        "Saved ftp.json",
+        "the save shown since the refresh started stays"
+    );
     assert!(
         links
             .borrow()
