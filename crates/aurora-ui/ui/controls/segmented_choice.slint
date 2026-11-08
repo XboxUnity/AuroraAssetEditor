@@ -31,7 +31,7 @@ export component SegmentedChoice inherits Rectangle {
     forward-focus: keys;
     height: Theme.pill-height;
     border-radius: Theme.pill-radius;
-    background: Theme.pill-background;
+    background: Theme.segment-background;
 
     keys := FocusScope {
         enabled: focusable;
@@ -72,7 +72,7 @@ export component SegmentedChoice inherits Rectangle {
                 padding-right: Theme.pill-padding-x;
                 Text {
                     text: option;
-                    color: is-selected ? Theme.chip-text : Theme.pill-text;
+                    color: is-selected ? Theme.chip-text : Theme.segment-text;
                     vertical-alignment: center;
                 }
             }

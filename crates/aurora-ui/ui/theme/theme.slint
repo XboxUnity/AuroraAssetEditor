@@ -12,8 +12,13 @@ export global Theme {
     out property <color> text-strong: dark ? #ffffff : #0f172a;
     out property <color> text-muted: dark ? #7d8596 : #6b7280;
     out property <color> row-text: dark ? #b8bdc8 : #3c4250;
-    out property <color> pill-background: dark ? #2e323a : #e6e8ec;
-    out property <color> pill-text: dark ? #aaaabb : #4a5060;
+    // Neutral buttons in the body text colour, so an enabled one never reads as disabled.
+    out property <color> pill-background: dark ? #353a44 : #e2e5ea;
+    out property <color> pill-text: text;
+    // The track and unselected options of a segmented choice: quieter than a button, so the selected option,
+    // in the chip colours, stands out.
+    out property <color> segment-background: dark ? #2e323a : #e6e8ec;
+    out property <color> segment-text: dark ? #aaaabb : #4a5060;
     out property <color> accent: #3b82f6;
     out property <color> accent-text: #ffffff;
     out property <color> chip-background: dark ? #2e3a52 : #dbe6fb;
@@ -43,7 +48,7 @@ export global Theme {
     out property <float> disabled-opacity: 0.5;
     // A disabled button looks like a disabled neutral one, accent or not.
     out property <color> disabled-button-background: pill-background;
-    out property <color> disabled-button-text: pill-text;
+    out property <color> disabled-button-text: text-muted;
     out property <color> focus-outline: accent;
     out property <length> focus-outline-width: 1px;
 
