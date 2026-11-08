@@ -504,7 +504,7 @@ fn bulk_progress_counts_positions() {
 }
 
 #[test]
-fn summary_reads_like_a_sentence() {
+fn summary_counts_each_outcome() {
     let outcome = |outcome| BulkEntry {
         game: game(FIRST_TITLE),
         outcome,
