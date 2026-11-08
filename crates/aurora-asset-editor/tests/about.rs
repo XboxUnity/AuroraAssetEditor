@@ -25,6 +25,11 @@ const DATE_EXAMPLE: &str = "2026-11-07T10:00:00Z";
 const MINIMUM_WINDOW: (f32, f32) = (760.0, 500.0);
 /// As long as a GitHub Actions run address gets.
 const LONG_RUN_URL: &str = "https://github.com/Swizzy/AuroraAssetEditor/actions/runs/19283746501";
+/// A rule of this many "=" is one word wider than the notices list (a line can break between words only). Some
+/// licence texts in the generated part have 79-character ones.
+const WIDE_RULE_LENGTH: usize = 70;
+/// More PageDown presses than the notices have pages before the first wide rule.
+const MAX_PAGE_DOWN_PRESSES: usize = 1000;
 /// A sideways wheel turn, more than any overhang a line of the notices could have.
 const SIDEWAYS_SCROLL: f32 = 200.0;
 /// The first two lines of `handwritten.txt`, each one line in the notices box.
@@ -541,6 +546,24 @@ fn notices_list_does_not_scroll_sideways() {
 
     let list = ui.element("AboutDialog::notices-keys");
     let (position, size) = (list.absolute_position(), list.size());
+    let wide_rule = notices_text()
+        .lines()
+        .find(|line| line.len() >= WIDE_RULE_LENGTH && line.chars().all(|c| c == '='))
+        .expect("the notices hold a rule wider than the list")
+        .to_owned();
+    for _ in 0..NOTICES_TAB_STOPS {
+        ui.press(Key::Tab);
+    }
+    let mut presses = 0;
+    while !line_is_in_view(&ui, &wide_rule, position.y, position.y + size.height) {
+        assert!(
+            presses < MAX_PAGE_DOWN_PRESSES,
+            "PageDown never brought the wide rule into view"
+        );
+        ui.press(Key::PageDown);
+        presses += 1;
+    }
+
     let crop = |image: &RgbaImage| {
         image::imageops::crop_imm(
             image,
@@ -567,4 +590,12 @@ fn notices_list_does_not_scroll_sideways() {
         crop(&ui.snapshot()).as_raw() == before.as_raw(),
         "the notices moved sideways"
     );
+}
+
+/// Whether the notices show at least part of `line` between `list_top` and `list_bottom`.
+fn line_is_in_view(ui: &Ui, line: &str, list_top: f32, list_bottom: f32) -> bool {
+    ElementHandle::find_by_accessible_label(ui.view.window(), line).any(|element| {
+        let top = element.absolute_position().y;
+        top < list_bottom && top + element.size().height > list_top
+    })
 }
