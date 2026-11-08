@@ -24,7 +24,7 @@ use aurora_asset_editor::platform::{
     SystemFolderOpener, SystemTheme, window_placement,
 };
 use aurora_asset_editor::settings::WindowGeometry;
-use aurora_asset_editor::view::MainWindowView;
+use aurora_asset_editor::view::{MainWindowView, run_when_app_free};
 use aurora_console::{
     FTP_SETTINGS_FILE, FtpSettings, Timeouts, app_config_dir, local_subnet_prefix,
 };
@@ -300,14 +300,16 @@ fn watch_window_events(app: &Rc<RefCell<App>>, view: &Rc<MainWindowView>) {
                     events_view.render(&app.borrow());
                 }
                 DropSignal::FirstFile => {
-                    let app = Rc::clone(&app);
+                    let app = Rc::downgrade(&app);
                     let view = Rc::clone(&events_view);
                     let collector = Rc::clone(&collector);
                     // Runs after the event loop has delivered the drop's other files, so one drop is one batch.
                     Timer::single_shot(Duration::ZERO, move || {
-                        let paths = collector.borrow_mut().take();
-                        app.borrow_mut().files_dropped(paths);
-                        view.render(&app.borrow());
+                        run_when_app_free(app, move |app| {
+                            let paths = collector.borrow_mut().take();
+                            app.files_dropped(paths);
+                            view.render(app);
+                        });
                     });
                 }
             }

@@ -22,7 +22,7 @@ mod toast_rows;
 mod toast_timers;
 mod toast_view;
 
-pub use app_when_free::APP_BUSY_RETRY;
+pub use app_when_free::{APP_BUSY_RETRY, run_when_app_free};
 pub use game_rows::GameRows;
 pub use image_cache::ImageCache;
 pub use kept_rows::KeptRows;
