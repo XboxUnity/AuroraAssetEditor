@@ -10,7 +10,7 @@ use crate::app::{App, Menu};
 use crate::console::{ConsoleLink, ConsoleState, GameColumn, PresenceCell};
 
 use super::GameRows;
-use super::shell_view::{Refresh, action_runner, arrow_step};
+use super::shell_view::{Refresh, action_runner, arrow_step, slint_int};
 
 const NOT_SET_UP_TEXT: &str = "Not set up";
 /// The table's sortable columns in the order `ConsoleModel.sort` numbers them.
@@ -105,12 +105,12 @@ pub(super) fn render_console(window: &MainWindow, app: &App, rows: &mut GameRows
     let visible = console.table.visible();
     let selected_row = console.table.selected_visible_row();
     rows.show(game_rows(console, &visible, selected_row), Clone::clone);
-    model.set_selected_row(selected_row.map_or(NO_ROW, row_number));
+    model.set_selected_row(selected_row.map_or(NO_ROW, slint_int));
     model.set_has_selection(selected_row.is_some());
 
     let sort = console.table.sort();
     let sort_column = sort.and_then(|(column, _)| COLUMNS.iter().position(|each| *each == column));
-    model.set_sort_column(sort_column.map_or(NO_ROW, row_number));
+    model.set_sort_column(sort_column.map_or(NO_ROW, slint_int));
     model.set_sort_ascending(sort.is_some_and(|(_, ascending)| ascending));
 
     let reason = app.console_actions_disabled_reason().unwrap_or_default();
@@ -177,10 +177,6 @@ fn kind_marks(cell: PresenceCell) -> KindMarks {
         icon_banner: mark(AssetKind::IconBanner),
         screenshots: mark(AssetKind::Screenshots),
     }
-}
-
-fn row_number(index: usize) -> i32 {
-    i32::try_from(index).unwrap_or(i32::MAX)
 }
 
 fn column_of(column: i32) -> Option<GameColumn> {

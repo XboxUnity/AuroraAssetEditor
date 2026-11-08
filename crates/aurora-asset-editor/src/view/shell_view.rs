@@ -53,6 +53,15 @@ pub(super) fn action_runner(
     }
 }
 
+/// A count or position as the window's `int`; one that does not fit is a bug, so it is logged and
+/// the largest `int` is shown.
+pub(super) fn slint_int(value: usize) -> i32 {
+    i32::try_from(value).unwrap_or_else(|_| {
+        log::error!("The value {value} does not fit the window's int");
+        i32::MAX
+    })
+}
+
 /// The window's arrow-key step as the app's; a step that does not fit is a bug of the window, so it
 /// is logged and the key does nothing.
 pub(super) fn arrow_step(step: i32) -> Option<isize> {
@@ -75,7 +84,7 @@ pub(super) fn render_shell(window: &MainWindow, app: &App, system_theme: SystemT
     render_game(&shell, app.current_game());
 
     let screenshots = app.pages().get(AssetKind::Screenshots).screenshot_count();
-    shell.set_screenshot_count(i32::try_from(screenshots).unwrap_or(i32::MAX));
+    shell.set_screenshot_count(slint_int(screenshots));
 
     let status = app.status();
     shell.set_status_text(status.text.as_str().into());
@@ -220,6 +229,12 @@ fn menu_action_of(item: MenuItem) -> MenuAction {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn counts_become_window_ints() {
+        assert_eq!(slint_int(0), 0);
+        assert_eq!(slint_int(7), 7);
+    }
 
     #[test]
     fn arrow_steps_keep_their_direction() {

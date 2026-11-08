@@ -12,7 +12,7 @@ use crate::dialogs::{BulkForm, ChoiceId, ConnectionForm, Modal, ModalAnswer, Mod
 use crate::status::Severity;
 
 use super::PickerRows;
-use super::shell_view::{Refresh, action_runner, arrow_step};
+use super::shell_view::{Refresh, action_runner, arrow_step, slint_int};
 
 /// The choice dialog draws a button for each of the app's choices, at most two (Icon or Banner, Replace or
 /// Add to free slots).
@@ -155,7 +155,7 @@ fn render_game_picker(dialog: &DialogModel<'_>, app: &App, rows: &mut PickerRows
         }) => (picker_games(&matches, highlighted), highlighted, ""),
     };
     rows.show(games, Clone::clone);
-    dialog.set_picker_highlighted(highlighted.map_or(NO_ROW, row_number));
+    dialog.set_picker_highlighted(highlighted.map_or(NO_ROW, slint_int));
     dialog.set_picker_note(note.into());
 }
 
@@ -172,10 +172,6 @@ fn picker_games(matches: &[&Game], highlighted: Option<usize>) -> Vec<PickerGame
             highlighted: highlighted == Some(row),
         })
         .collect()
-}
-
-fn row_number(index: usize) -> i32 {
-    i32::try_from(index).unwrap_or(i32::MAX)
 }
 
 /// The notices are unpacked and handed to the window only while they are expanded.
@@ -331,12 +327,18 @@ impl DialogContent {
         let source_index = BULK_SOURCES
             .iter()
             .position(|source| *source == form.source)
-            .unwrap_or_default();
+            .unwrap_or_else(|| {
+                log::error!(
+                    "The bulk source {:?} is not one the dialog offers",
+                    form.source
+                );
+                0
+            });
         DialogContent {
             kind: DialogKind::Bulk,
             title: BULK_TITLE.to_owned(),
             text: bulk_text(form),
-            bulk_source_index: i32::try_from(source_index).unwrap_or_default(),
+            bulk_source_index: slint_int(source_index),
             bulk_replace: form.replace_existing,
             ..shown
         }

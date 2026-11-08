@@ -9,7 +9,7 @@ use slint::{ComponentHandle, Image};
 use crate::app::App;
 use crate::online::{OnlineState, SearchMode, TileImage};
 
-use super::shell_view::{Refresh, action_runner};
+use super::shell_view::{Refresh, action_runner, slint_int};
 use super::{
     OnlineImageCache, PictureId, Previews, ResultImage, ResultImageKey, ResultTileContent,
     ResultTiles, ShownPicture, slint_image,
@@ -97,7 +97,7 @@ fn render_selection(
         Some(TileImage::Loaded { pixels, .. }) => Some(pixels),
         _ => None,
     };
-    online.set_selected(state.selected.map_or(NO_SELECTION, row_number));
+    online.set_selected(state.selected.map_or(NO_SELECTION, slint_int));
     online.set_selected_label(
         selected
             .map(|tile| tile.result.label.as_str())
@@ -202,11 +202,7 @@ fn position_of<T: PartialEq>(choices: &[T], value: T) -> i32 {
     choices
         .iter()
         .position(|choice| *choice == value)
-        .map_or(NO_SELECTION, row_number)
-}
-
-fn row_number(index: usize) -> i32 {
-    i32::try_from(index).unwrap_or(i32::MAX)
+        .map_or(NO_SELECTION, slint_int)
 }
 
 fn choice_of<T: Copy>(choices: &[T], index: i32, what: &str) -> Option<T> {

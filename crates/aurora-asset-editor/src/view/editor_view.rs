@@ -9,7 +9,7 @@ use slint::ComponentHandle;
 use crate::app::App;
 use crate::editor::{AssetDocument, SlotPreview, texture_caption};
 
-use super::shell_view::{Refresh, action_runner};
+use super::shell_view::{Refresh, action_runner, slint_int};
 use super::{
     ImageCache, PictureId, Placeholder, PlaceholderArt, Previews, ScreenshotTileContent,
     ScreenshotTiles, ShownPicture, slint_image,
@@ -116,7 +116,7 @@ pub(super) fn render_editor(
     editor.set_screenshot(screenshot);
     editor.set_selected_screenshot(i32::from(selected.get()));
     let position_count = shown_position_count(screenshots);
-    editor.set_screenshot_position_count(i32::try_from(position_count).unwrap_or(i32::MAX));
+    editor.set_screenshot_position_count(slint_int(position_count));
     tiles.show(
         tile_contents(screenshots, position_count, selected, pictures),
         screenshot_tile,
@@ -253,7 +253,7 @@ fn slot_caption(slot: AssetSlot, header: Option<&TextureHeader>) -> String {
 }
 
 fn slot_index(slot: AssetSlot) -> i32 {
-    i32::try_from(slot.index()).unwrap_or(i32::MAX)
+    slint_int(slot.index())
 }
 
 fn slot_of(index: i32) -> Option<AssetSlot> {
