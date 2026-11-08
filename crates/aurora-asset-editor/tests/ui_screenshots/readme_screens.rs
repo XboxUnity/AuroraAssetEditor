@@ -16,7 +16,7 @@ use crate::online_screens::{
 };
 use crate::real_art::{
     README_GAME_TITLE_ID, asset_bytes, console_games, decoded_cover, readme_current_game,
-    readme_game, screenshots_bytes, test_assets,
+    readme_game, test_assets,
 };
 use crate::sample_content::{load_asset_file, png_bytes};
 use crate::staged_outcomes::{mark_presence, show_games};
@@ -37,7 +37,7 @@ pub const README_SCREENS: &[Screen] = &[
     },
     Screen {
         name: "screenshots",
-        description: "The Screenshots page with NeverDead current and six real screenshots in the strip, the first selected.",
+        description: "The Screenshots page with NeverDead current and its two screenshots in the strip, the first selected.",
         stage: stage_screenshots,
     },
     Screen {
@@ -71,11 +71,12 @@ fn stage_cover(theme: ThemeChoice) -> Scene {
 }
 
 fn stage_screenshots(theme: ThemeChoice) -> Scene {
+    let screenshots = asset_bytes(&readme_game(), AssetKind::Screenshots);
     readme_game_on_page(
         theme,
         Page::Screenshots,
         AssetKind::Screenshots,
-        &screenshots_bytes(),
+        &screenshots,
     )
 }
 
