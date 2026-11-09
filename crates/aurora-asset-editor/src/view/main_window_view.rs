@@ -4,7 +4,6 @@ use std::rc::Rc;
 use aurora_ui::{
     ConsoleModel, DialogModel, EditorModel, MainWindow, OnlineModel, PreviewArea, ShellModel,
 };
-use slint::platform::WindowEvent;
 use slint::{CloseRequestResponse, ComponentHandle, Timer};
 
 use crate::app::App;
@@ -20,7 +19,7 @@ use super::shell_view::{Refresh, connect_shell, render_shell};
 use super::toast_view::{connect_toasts, render_toasts};
 use super::{
     APP_BUSY_RETRY, GameRows, ImageCache, OnlineImageCache, PickerRows, PictureId, PlaceholderArt,
-    Previews, ResultTiles, ScreenshotTiles, ToastRows, ToastTimers,
+    Previews, ResultTiles, ScreenshotTiles, ToastRows, ToastTimers, request_window_close,
 };
 
 /// The window: it shows what `App` holds and turns the window's callbacks into `App` calls.
@@ -164,10 +163,11 @@ impl MainWindowView {
             };
             let Ok(mut app) = app.try_borrow_mut() else {
                 log::debug!("A close request found the app busy and tries again");
-                let window = view.window.as_weak();
+                let view = Rc::downgrade(&view);
+                let app = Rc::downgrade(&app);
                 Timer::single_shot(APP_BUSY_RETRY, move || {
-                    if let Some(window) = window.upgrade() {
-                        window.window().dispatch_event(WindowEvent::CloseRequested);
+                    if let (Some(view), Some(app)) = (view.upgrade(), app.upgrade()) {
+                        view.request_close(&app);
                     }
                 });
                 return CloseRequestResponse::KeepWindowShown;
@@ -179,6 +179,16 @@ impl MainWindowView {
             view.render(&app);
             CloseRequestResponse::KeepWindowShown
         });
+    }
+
+    /// Asks the window to close the way the system does (`request_window_close`), then shows what that left
+    /// on screen.
+    pub fn request_close(&self, app: &RefCell<App>) {
+        request_window_close(self.window.window(), app);
+        // An app held by an action is rendered by that action once it ends.
+        if let Ok(app) = app.try_borrow() {
+            self.render(&app);
+        }
     }
 
     pub fn render(&self, app: &App) {

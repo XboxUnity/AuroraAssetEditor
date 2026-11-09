@@ -21,6 +21,7 @@ mod slint_image;
 mod toast_rows;
 mod toast_timers;
 mod toast_view;
+mod window_close;
 
 pub use app_when_free::{APP_BUSY_RETRY, run_when_app_free};
 pub use game_rows::GameRows;
@@ -39,3 +40,4 @@ pub use screenshot_tiles::{ScreenshotTileContent, ScreenshotTiles};
 pub use slint_image::slint_image;
 pub use toast_rows::ToastRows;
 pub use toast_timers::ToastTimers;
+pub use window_close::{CLOSE_FAILED, request_window_close};

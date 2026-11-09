@@ -262,6 +262,11 @@ impl App {
         }
     }
 
+    /// A failure the window met: logged, and shown in the status line and a red toast.
+    pub fn report_view_failure(&mut self, context: &str, error: &(dyn Error + 'static)) {
+        self.report_error(context, error);
+    }
+
     /// Logs the error and shows it in the status line.
     pub(super) fn report_error(&mut self, context: &str, error: &(dyn Error + 'static)) {
         let log_failure = self.record_error(context, error);

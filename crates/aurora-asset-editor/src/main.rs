@@ -339,7 +339,14 @@ fn install_app_menu(app: &Rc<RefCell<App>>, view: &Rc<MainWindowView>) -> Option
             }
         });
     };
-    match AppMenu::install(view.window().as_weak(), about) {
+    let quit_app = Rc::downgrade(app);
+    let quit_view = Rc::downgrade(view);
+    let quit = move || {
+        if let (Some(view), Some(app)) = (quit_view.upgrade(), quit_app.upgrade()) {
+            view.request_close(&app);
+        }
+    };
+    match AppMenu::install(about, quit) {
         Ok(menu) => Some(menu),
         Err(error) => {
             app.borrow_mut()

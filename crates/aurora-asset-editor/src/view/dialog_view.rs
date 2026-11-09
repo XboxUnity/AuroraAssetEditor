@@ -4,16 +4,15 @@ use std::rc::Rc;
 use aurora_console::Game;
 use aurora_online::CoverSource;
 use aurora_ui::{ChoiceView, DialogKind, DialogModel, MainWindow, PickerGameView};
-use slint::platform::WindowEvent;
-use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel, Weak};
+use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 
 use crate::about::{BuildInfo, notices_text};
 use crate::app::{ABOUT_TITLE, App, BULK_TITLE, PickerContent, REFRESHING_TEXT, source_name};
 use crate::dialogs::{BulkForm, ChoiceId, ConnectionForm, Modal, ModalAnswer, ModalField};
 use crate::status::Severity;
 
-use super::PickerRows;
 use super::shell_view::{Refresh, action_runner, arrow_step, slint_int};
+use super::{PickerRows, request_window_close};
 
 /// The choice dialog draws a button for each of the app's choices, at most two (Icon or Banner, Replace or
 /// Add to free slots).
@@ -121,18 +120,16 @@ fn answer_runner(
     let act = action_runner(app, refresh);
     let app = Rc::clone(app);
     let window = window.as_weak();
+    let refresh = Rc::clone(refresh);
     move |answer| {
         act(answer);
-        close_when_approved(&app, &window);
-    }
-}
-
-fn close_when_approved(app: &Rc<RefCell<App>>, window: &Weak<MainWindow>) {
-    if !app.borrow().close_approved() {
-        return;
-    }
-    if let Some(window) = window.upgrade() {
-        window.window().dispatch_event(WindowEvent::CloseRequested);
+        if !app.borrow().close_approved() {
+            return;
+        }
+        if let Some(window) = window.upgrade() {
+            request_window_close(window.window(), &app);
+            refresh(&app.borrow());
+        }
     }
 }
 
