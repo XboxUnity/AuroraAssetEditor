@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use aurora_asset::{AssetFile, AssetSlot};
+use aurora_asset::{AssetFile, AssetSlot, ScreenshotNumber};
 use aurora_asset_editor::app::Page;
 use aurora_asset_editor::settings::ThemeChoice;
 use editor_test_support::{AppHarness, Scene, Screen, ScreenArea};
@@ -104,6 +104,11 @@ pub const EDITOR_DIALOGS: ScreenArea = ScreenArea {
             name: "dialog-save-all-filtered",
             description: "\"Save all assets\" over the listed sample games with ar typed in the picker: Gears of War 2 and Perfect Dark, the first highlighted; the TitleID box still holds 4D5307E6.",
             stage: stage_save_all_filtered,
+        },
+        Screen {
+            name: "dialog-discard-changes",
+            description: "\"Unsaved changes\": \"Discard unsaved changes to Cover and Screenshots?\" with Discard in the danger colour and Cancel focused, after New asset set over a replaced cover and a removed screenshot.",
+            stage: stage_discard_changes,
         },
         Screen {
             name: "dialog-file-dialog-failed",
@@ -250,6 +255,21 @@ fn stage_save_all_filtered(theme: ThemeChoice) -> Scene {
     });
     scene.click(PICKER_FILTER);
     scene.type_text(TITLE_FILTER);
+    scene
+}
+
+fn stage_discard_changes(theme: ThemeChoice) -> Scene {
+    let mut scene = with_screenshots(with_cover(start(theme)), &FIRST_THREE);
+    let art = art_file(&mut scene);
+    scene.harness().dialogs().push_files(vec![art]);
+    scene.act(|app| app.replace_image(AssetSlot::Cover));
+    scene.run_jobs();
+    let second = ScreenshotNumber::new(2).expect("position 2 exists");
+    scene.act(|app| {
+        app.remove_image(AssetSlot::Screenshot(second));
+        app.show_page(Page::Cover);
+        app.new_asset_set();
+    });
     scene
 }
 
