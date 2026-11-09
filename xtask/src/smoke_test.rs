@@ -1,5 +1,5 @@
 use std::fs;
-use std::io::Read;
+use std::io::{self, Read};
 use std::path::Path;
 use std::process::{Child, Command, ExitStatus, Stdio};
 use std::sync::mpsc::{self, RecvTimeoutError};
@@ -74,7 +74,7 @@ fn smoke_test_in(folder: &Path, program: &str, arguments: &[&str]) -> Result<Pas
         .spawn()
         .with_context(|| format!("could not start {program}"))?;
     let stderr = read_stderr(&mut child);
-    let exit = wait_for_exit(&mut child, program)?;
+    let exit = wait_for_exit(&mut child, program);
     let stderr = match stderr.recv_timeout(STDERR_WAIT) {
         Ok(text) => text,
         Err(RecvTimeoutError::Timeout) => format!(
@@ -86,17 +86,9 @@ fn smoke_test_in(folder: &Path, program: &str, arguments: &[&str]) -> Result<Pas
     let with_stderr =
         |message: String| anyhow::anyhow!("{message}\nstderr of {program}:\n{stderr}");
 
-    match exit {
-        Exit::TimedOut => {
-            return Err(with_stderr(format!(
-                "{program} did not finish within {} s and was stopped",
-                XTASK_SMOKE_TIMEOUT.as_secs()
-            )));
-        }
-        Exit::Finished(status) if !status.success() => {
-            return Err(with_stderr(format!("{program} exited with {status}")));
-        }
-        Exit::Finished(_) => {}
+    let status = exit.map_err(with_stderr)?;
+    if !status.success() {
+        return Err(with_stderr(format!("{program} exited with {status}")));
     }
     let output = fs::read(&output_path).map_err(|error| {
         with_stderr(format!(
@@ -151,32 +143,34 @@ fn read_stderr(child: &mut Child) -> mpsc::Receiver<String> {
     receiver
 }
 
-enum Exit {
-    Finished(ExitStatus),
-    TimedOut,
-}
-
-/// Stops the child through its own handle when it runs longer than `XTASK_SMOKE_TIMEOUT`.
-fn wait_for_exit(child: &mut Child, program: &str) -> Result<Exit> {
+/// The child's exit status, or why there is none. A child that runs longer than `XTASK_SMOKE_TIMEOUT`, or that
+/// can no longer be waited for, is stopped through its own handle.
+fn wait_for_exit(child: &mut Child, program: &str) -> Result<ExitStatus, String> {
     let started = Instant::now();
     loop {
-        if let Some(status) = child
-            .try_wait()
-            .with_context(|| format!("could not wait for {program}"))?
-        {
-            return Ok(Exit::Finished(status));
-        }
-        if started.elapsed() > XTASK_SMOKE_TIMEOUT {
-            child
-                .kill()
-                .with_context(|| format!("could not stop {program}"))?;
-            child
-                .wait()
-                .with_context(|| format!("could not wait for {program} after stopping it"))?;
-            return Ok(Exit::TimedOut);
-        }
-        thread::sleep(EXIT_POLL_INTERVAL);
+        let problem = match child.try_wait() {
+            Ok(Some(status)) => return Ok(status),
+            Ok(None) if started.elapsed() > XTASK_SMOKE_TIMEOUT => format!(
+                "{program} did not finish within {} s",
+                XTASK_SMOKE_TIMEOUT.as_secs()
+            ),
+            Ok(None) => {
+                thread::sleep(EXIT_POLL_INTERVAL);
+                continue;
+            }
+            Err(error) => format!("could not wait for {program}: {error}"),
+        };
+        return Err(match stop(child) {
+            Ok(()) => format!("{problem}, so it was stopped"),
+            Err(error) => format!("{problem}, and stopping it failed: {error}"),
+        });
     }
+}
+
+fn stop(child: &mut Child) -> io::Result<()> {
+    child.kill()?;
+    child.wait()?;
+    Ok(())
 }
 
 #[cfg(test)]
