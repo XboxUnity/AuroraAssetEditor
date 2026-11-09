@@ -27,7 +27,6 @@ impl AssetKind {
         }
     }
 
-    /// The entries this page owns, in entry order.
     pub fn slots(self) -> impl Iterator<Item = AssetSlot> {
         AssetSlot::all().filter(move |slot| self.owns(*slot))
     }

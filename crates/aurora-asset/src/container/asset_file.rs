@@ -210,7 +210,7 @@ impl AssetFile {
         kind.slots().any(|slot| self.get(slot).is_some())
     }
 
-    /// The old `SetImage(AssetFile, index)` for every entry `kind` owns: texture and header of
+    /// Replaces every entry `kind` owns: texture and header of
     /// empty entries come from `source`, while this file's offsets stay.
     pub fn replace_kind(&mut self, kind: AssetKind, source: &AssetFile) {
         for slot in kind.slots() {

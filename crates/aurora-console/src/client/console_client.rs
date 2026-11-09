@@ -37,7 +37,7 @@ impl ConsoleClient {
         &self.settings
     }
 
-    /// Always connects fresh, like the old `TestConnection`.
+    /// Always connects fresh instead of reusing the live connection.
     pub fn test_connection(&mut self) -> Result<AuroraRevision, ConsoleError> {
         self.connect()
     }

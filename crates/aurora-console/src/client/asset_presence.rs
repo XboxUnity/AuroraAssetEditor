@@ -1,6 +1,5 @@
 use aurora_asset::AssetKind;
 
-/// Which asset files a game has on the console.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AssetPresence {
     pub cover: bool,

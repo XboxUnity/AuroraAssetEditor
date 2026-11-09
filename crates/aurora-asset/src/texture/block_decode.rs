@@ -30,7 +30,6 @@ type FloatTexel = [f32; 4];
 
 const TRANSPARENT_BLACK: FloatTexel = [0.0, 0.0, 0.0, 0.0];
 
-/// How the blocks of a surface are decoded.
 #[derive(Clone, Copy)]
 pub(super) enum BlockCodec {
     Bc1,

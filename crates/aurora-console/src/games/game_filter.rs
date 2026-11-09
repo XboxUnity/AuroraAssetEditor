@@ -1,7 +1,7 @@
 use super::Game;
 
-/// Mirrors `FtpAssetsControl.FiltersChanged`: blank filters are ignored, the others are ANDed
-/// case-insensitive substring matches on the untrimmed text.
+/// Blank filters are ignored, the others are ANDed case-insensitive substring matches on the
+/// untrimmed text.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct GameFilter {
     pub title: String,

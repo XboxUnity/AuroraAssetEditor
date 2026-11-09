@@ -46,7 +46,7 @@ fn game() -> GameIds {
 }
 
 /// What Aurora's `CreateAssetPack` writes: the header (magic, version 1, data size 0) and a zeroed
-/// entry table, nothing else (`ContentAssetPack.cpp:109-136`).
+/// entry table, nothing else.
 fn aurora_empty_pack() -> Vec<u8> {
     let mut bytes = Vec::new();
     bytes.extend_from_slice(&MAGIC.to_be_bytes());

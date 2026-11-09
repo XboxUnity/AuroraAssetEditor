@@ -458,7 +458,6 @@ fn move_screenshot_zeroes_header_of_emptied_slot() {
 
 #[test]
 fn file_prefixes_match_aurora_names() {
-    // Aurora: Tools/Content/ContentItem.cpp, "%sGC%08X.asset" etc.
     let prefixes: Vec<_> = AssetKind::ALL
         .iter()
         .map(|kind| kind.file_prefix())

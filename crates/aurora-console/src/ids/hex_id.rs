@@ -40,7 +40,7 @@ impl HexId {
     }
 
     pub fn from_database_value(value: i64) -> HexId {
-        // Mirrors the old ((int)(long)x).ToString("X08").
+        // Truncates to 32 bits like the old app's `(int)(long)` cast.
         HexId(format!("{:08X}", value as i32 as u32))
     }
 

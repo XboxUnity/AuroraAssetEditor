@@ -106,7 +106,7 @@ impl FakeFileSystem {
         }
     }
 
-    /// Returns whether the path exists.
+    /// Returns false when the path does not exist.
     pub(crate) fn set_modified(&mut self, segments: &[String], modified: FileDate) -> bool {
         let Some(node) = self.nodes.get_mut(&path_key(segments)) else {
             return false;

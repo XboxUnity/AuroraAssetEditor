@@ -2,7 +2,6 @@ use std::fmt;
 
 use super::AuroraRevision;
 
-/// Progress the client reports while it works.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ConsoleStatus {
     Connecting { host: String },
