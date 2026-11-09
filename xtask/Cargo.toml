@@ -12,7 +12,8 @@ aurora-asset = { path = "../crates/aurora-asset" }
 aurora-image = { path = "../crates/aurora-image" }
 aurora-online = { path = "../crates/aurora-online" }
 hex = "0.4"
-image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp", "tiff", "tga", "ico", "qoi"] }
+jpeg-encoder = { version = "=0.7.1", default-features = false }
 png = "0.18.1"
 rusqlite = { version = "0.41.1", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
