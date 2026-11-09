@@ -1,8 +1,11 @@
 @echo off
-call "<Visual Studio>\VC\Auxiliary\Build\vcvars32.bat" >NUL || exit /b 1
-set SP=<work folder>
-if not exist "%SP%\bin32" mkdir "%SP%\bin32"
-cl /nologo /O2 /D_CRT_SECURE_NO_WARNINGS "%SP%\work\dllharness.c" /Fe"%SP%\bin32\dllharness.exe" /Fo"%SP%\bin32\\" || exit /b 1
-copy /Y "<repository>\AuroraAssetEditor\AuroraAsset.dll" "%SP%\bin32\" >NUL
-copy /Y "<repository>\AuroraAssetEditor\msvcr100.dll" "%SP%\bin32\" >NUL
-echo built
+rem 32-bit harness around AuroraAsset.dll, with the DLL and its runtime copied next to it.
+rem usage: build32.bat [work folder]
+setlocal
+call "%~dp0setup.bat" 32 %1 || exit /b 1
+set "OUT=%WORK%\bin32"
+if not exist "%OUT%" mkdir "%OUT%" || exit /b 1
+cl /nologo /O2 /D_CRT_SECURE_NO_WARNINGS "%~dp0dllharness.c" /Fe"%OUT%\dllharness.exe" /Fo"%OUT%\\" || exit /b 1
+copy /Y "%~dp0..\dll\AuroraAsset.dll" "%OUT%\" >nul || exit /b 1
+copy /Y "%~dp0..\dll\msvcr100.dll" "%OUT%\" >nul || exit /b 1
+echo built "%OUT%"
