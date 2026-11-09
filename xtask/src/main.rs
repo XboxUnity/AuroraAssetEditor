@@ -16,6 +16,7 @@ mod package;
 mod prng;
 mod readme_screenshots;
 mod record_online;
+mod release_notes;
 mod release_tags;
 mod set_version;
 mod smoke_test;
@@ -29,7 +30,7 @@ mod ui_screenshots;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-const USAGE_LINES: [&str; 15] = [
+const USAGE_LINES: [&str; 16] = [
     "cargo xtask golden <generate [--refresh-inputs] | check>",
     "cargo xtask cross-decode [<image files>...]",
     "cargo xtask cross-samples",
@@ -45,6 +46,7 @@ const USAGE_LINES: [&str; 15] = [
     ui_baseline::USAGE_LINE,
     package::USAGE_LINE,
     package::checksums::USAGE_LINE,
+    release_notes::USAGE_LINE,
 ];
 
 fn main() -> ExitCode {
@@ -72,6 +74,7 @@ fn main() -> ExitCode {
         ["smoke-test", command @ ..] => smoke_test::run(command),
         ["package", options @ ..] => package::run(options),
         ["checksums", version, folder] => package::checksums::run(version, folder),
+        ["release-notes", options @ ..] => release_notes::run(options),
         ["cross-decode", files @ ..] => {
             let files: Vec<PathBuf> = files.iter().map(PathBuf::from).collect();
             cross_decode::run(&files)

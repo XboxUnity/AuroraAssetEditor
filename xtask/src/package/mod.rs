@@ -18,6 +18,7 @@ use anyhow::{Context, Result, bail};
 use crate::notices::repository_root;
 use crate::set_version::{read_table, validate_version};
 use linux_package::{LinuxInputs, package_linux};
+pub use macos_package::FIRST_LAUNCH_SOURCE;
 use macos_package::{MacosInputs, package_macos};
 use release_platform::ReleasePlatform;
 use staging::{create_folder, recreate_folder};

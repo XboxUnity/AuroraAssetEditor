@@ -29,7 +29,7 @@ const MINIMUM_SYSTEM_VERSION: &str = "11.0";
 const COPYRIGHT: &str = "Public domain (Unlicense)";
 
 const DMG_STAGING_FOLDER: &str = "dmg";
-const FIRST_LAUNCH_SOURCE: &str = "packaging/macos-first-launch.txt";
+pub const FIRST_LAUNCH_SOURCE: &str = "packaging/macos-first-launch.txt";
 const FIRST_LAUNCH_NAME: &str = "First launch.txt";
 const APPLICATIONS_LINK: &str = "Applications";
 const APPLICATIONS_FOLDER: &str = "/Applications";

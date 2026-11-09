@@ -1,0 +1,4 @@
+- Linux: dragging files into the window does not work under Wayland, a limit of the windowing library. Use Open instead.
+- macOS: the file dialogs filter by extension only, so the GC, BK, GL and SS file name filters of Windows and Linux are not offered.
+- On macOS, quitting from the Dock icon's menu, or logging out, restarting or shutting down, ends the app without asking about unsaved changes, and the window size and position are not saved; Cmd+Q, the app menu's Quit and the window's close button do ask.
+- macOS: the app is not signed by Apple, and the macOS build is tested automatically only. See the first-launch steps below.
