@@ -59,6 +59,9 @@ jobs:
           set -euo pipefail
           apt-get update
           apt-get install -y git curl ca-certificates build-essential pkg-config libwayland-dev libfontconfig1-dev libxkbcommon-dev libxkbcommon-x11-0 xvfb
+          # winit loads these X11 libraries at startup, and xvfb-run needs xauth; named here so
+          # the smoke test does not depend on what other packages happen to pull in.
+          apt-get install -y libx11-6 libx11-xcb1 libxcursor1 libxi6 xauth
           # gh from GitHub's own apt repository (cli.github.com).
           install -d -m 755 /etc/apt/keyrings
           curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg -o /etc/apt/keyrings/githubcli-archive-keyring.gpg
