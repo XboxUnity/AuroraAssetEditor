@@ -43,7 +43,7 @@ jobs:
           rustup show
 
       - name: Cache
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
 
       - name: Next v2 version
         id: version
@@ -73,13 +73,15 @@ jobs:
     env:
       VERSION: ${{ needs.version.outputs.version }}
       SHORT: ${{ needs.version.outputs.short }}
-      GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
+    # The write token goes only to the steps that call gh. The checkout keeps no credentials:
+    # the repository is public, so the later tag fetch works without them.
     steps:
       - name: Checkout
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Pinned toolchain
         run: |
@@ -92,7 +94,7 @@ jobs:
           rustup show
 
       - name: Cache
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
 
       - name: Download packages
         uses: actions/download-artifact@v8
@@ -150,6 +152,7 @@ jobs:
       - name: Generated notes
         if: steps.previous.outputs.tag != ''
         env:
+          GH_TOKEN: ${{ github.token }}
           PREVIOUS_TAG: ${{ steps.previous.outputs.tag }}
         run: |
           set -euo pipefail
@@ -190,6 +193,8 @@ jobs:
       # A draft has no git tag, so deleting it removes nothing else. Drafts are deleted by id,
       # since two drafts can share a tag name after a failed create.
       - name: Delete older v2 drafts
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           drafts=$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases" --jq '.[] | select(.draft and (.tag_name | startswith("v2."))) | .id')
@@ -199,6 +204,8 @@ jobs:
           done
 
       - name: Draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           gh release create "v$VERSION" --draft --target "$GITHUB_SHA" --title "v$VERSION ($SHORT)" --notes-file "$RUNNER_TEMP/notes.md" dist/*
