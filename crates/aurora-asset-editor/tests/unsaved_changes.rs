@@ -694,3 +694,24 @@ fn an_upload_that_saves_every_page_under_the_close_question_lets_the_window_clos
     assert_eq!(harness.app().modal(), None, "nothing is left to lose");
     assert!(harness.app().close_approved());
 }
+
+#[test]
+fn a_withdrawn_close_approval_asks_again() {
+    let folder = TempDir::new().unwrap();
+    let mut harness = edited_harness(&folder);
+    assert!(!harness.app().request_close());
+    harness.app().answer_modal(ModalAnswer::Accept);
+    assert!(harness.app().close_approved());
+
+    harness.app().withdraw_close_approval();
+
+    assert!(!harness.app().close_approved());
+    assert!(
+        !harness.app().request_close(),
+        "the pages are still unsaved"
+    );
+    assert_eq!(
+        discard_question(&harness.app(), &ConfirmedAction::CloseWindow),
+        "Discard unsaved changes to Cover and Background?"
+    );
+}

@@ -80,6 +80,11 @@ impl App {
         self.close_approved = true;
     }
 
+    /// The approved close did not happen and the window stays open: a later close asks again.
+    pub fn withdraw_close_approval(&mut self) {
+        self.close_approved = false;
+    }
+
     /// The pages a Discard question names can change after it was asked: the dialog it waited behind may have
     /// saved or replaced them, and a job may land while it is on screen. It names the pages unsaved now; when
     /// none is left, nothing would be lost, so it is not asked and its action runs as Discard would run it.
