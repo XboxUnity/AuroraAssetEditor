@@ -76,7 +76,6 @@ fn scene_on_page(theme: ThemeChoice, page: Page) -> Scene {
     scene
 }
 
-/// A scene with Halo 3 selected and `file_name` loaded.
 fn loaded_scene(theme: ThemeChoice, page: Page, file_name: &str, asset: SampleAsset) -> Scene {
     let mut scene = Scene::start(AppHarness::new(), theme);
     scene.act(|app| {

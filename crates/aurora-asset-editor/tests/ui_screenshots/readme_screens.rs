@@ -22,7 +22,6 @@ use crate::real_art::{
 use crate::sample_content::{load_asset_file, png_bytes};
 use crate::staged_outcomes::{mark_presence, show_games};
 
-/// The one result of the README's online search.
 const README_COVER: Cover = Cover {
     label: "NeverDead",
     slug: "neverdead",

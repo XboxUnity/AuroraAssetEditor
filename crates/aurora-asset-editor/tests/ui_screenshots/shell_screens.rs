@@ -132,7 +132,6 @@ fn stage_status_startup_problem(theme: ThemeChoice) -> Scene {
     Scene::start(harness, theme)
 }
 
-/// The console page with the sample games listed and Halo 3, the first, selected.
 fn console_with_halo_selected(theme: ThemeChoice) -> Scene {
     let scene = Scene::start(console_harness(), theme);
     scene.act(|app| {

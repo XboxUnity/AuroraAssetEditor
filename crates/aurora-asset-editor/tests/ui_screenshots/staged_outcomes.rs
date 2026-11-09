@@ -10,7 +10,6 @@ use aurora_console::{
 use aurora_online::{CoverResult, OnlineError};
 use editor_test_support::Scene;
 
-/// The revision the staged Aurora reports.
 const SAMPLE_REVISION: &str = "1655";
 
 /// Answers the queued online search with `result` instead of running it, for an answer whose text would
@@ -36,7 +35,6 @@ pub fn answer_search(scene: &mut Scene, result: Result<Vec<CoverResult>, OnlineE
     });
 }
 
-/// The Aurora a staged console reports.
 pub fn sample_revision() -> AuroraRevision {
     AuroraRevision::new(SAMPLE_REVISION.to_owned())
 }
@@ -55,7 +53,6 @@ pub fn answer_connection_test(scene: &mut Scene, result: Result<AuroraRevision, 
     scene.act(|app| app.on_job_outcome(JobOutcome::Console(ConsoleOutcome::Tested(result))));
 }
 
-/// Ends the running bulk run with `report`.
 pub fn finish_bulk(app: &mut App, report: BulkReport) {
     app.on_job_outcome(JobOutcome::Console(ConsoleOutcome::Bulk(Ok(report))));
 }
@@ -103,7 +100,6 @@ pub fn finish_upload(app: &mut App, report: TransferReport) {
     }));
 }
 
-/// The answer of a presence check for the game with `ids`.
 pub fn mark_presence(app: &mut App, ids: &GameIds, result: Result<AssetPresence, ConsoleError>) {
     let generation = app.console().refresh_generation();
     app.on_job_outcome(JobOutcome::Console(ConsoleOutcome::Presence {

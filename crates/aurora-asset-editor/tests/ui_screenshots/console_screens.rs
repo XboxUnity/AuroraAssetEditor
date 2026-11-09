@@ -100,7 +100,6 @@ pub const CONSOLE: ScreenArea = ScreenArea {
     ],
 };
 
-/// The Console page of an app with the console set up.
 pub fn start_console(theme: ThemeChoice) -> Scene {
     start_console_with(console_harness(), theme)
 }
@@ -111,14 +110,12 @@ fn start_console_with(harness: AppHarness, theme: ThemeChoice) -> Scene {
     scene
 }
 
-/// The Console page listing the sample games.
 fn start_with_games(theme: ThemeChoice) -> Scene {
     let scene = start_console(theme);
     scene.act(|app| show_games(app, sample_games()));
     scene
 }
 
-/// The sample games with the presence of the first three rows answered.
 fn start_with_presence(theme: ThemeChoice) -> Scene {
     let scene = start_with_games(theme);
     let games = sample_games();

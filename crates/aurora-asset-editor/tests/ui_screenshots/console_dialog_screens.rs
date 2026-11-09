@@ -92,28 +92,24 @@ pub const CONSOLE_DIALOGS: ScreenArea = ScreenArea {
     ],
 };
 
-/// The Console page of an app with the console set up.
 fn start_console(theme: ThemeChoice) -> Scene {
     let scene = Scene::start(console_harness(), theme);
     scene.act(|app| app.show_page(Page::Console));
     scene
 }
 
-/// The Console page listing `games`.
 fn start_with_games(theme: ThemeChoice, games: Vec<Game>) -> Scene {
     let scene = start_console(theme);
     scene.act(|app| show_games(app, games));
     scene
 }
 
-/// The Console page listing the sample games with Halo 3, the first row, selected.
 fn start_with_halo_3_selected(theme: ThemeChoice) -> Scene {
     let scene = start_with_games(theme, sample_games());
     scene.act(|app| app.select_game(HALO_3_ROW));
     scene
 }
 
-/// A scene with the console set up, whose connection dialog is open.
 fn start_with_connection_dialog(theme: ThemeChoice) -> Scene {
     let scene = Scene::start(console_harness(), theme);
     scene.act(|app| app.edit_connection());
@@ -127,7 +123,6 @@ fn stage_upload_target_loading(theme: ThemeChoice) -> Scene {
     scene
 }
 
-/// The upload-target dialog over the listed sample games, `filter` typed in its picker.
 fn upload_target_with_filter(theme: ThemeChoice, filter: &str) -> Scene {
     let scene = start_with_games(theme, sample_games());
     scene.act(|app| app.save_all_to_console());

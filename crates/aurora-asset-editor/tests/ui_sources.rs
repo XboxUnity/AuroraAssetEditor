@@ -195,8 +195,6 @@ fn assert_all_differ(states: &[(&str, RgbaImage)], theme: &str) {
     }
 }
 
-// Online
-
 fn png(width: u32, height: u32, shade: u8) -> Vec<u8> {
     let image = image::RgbaImage::from_fn(width, height, |x, y| {
         image::Rgba([shade, (x * 2 % 251) as u8, (y * 3 % 251) as u8, 255])
@@ -640,8 +638,6 @@ fn title_id_input_filters_typed_text() {
     );
     assert_eq!(field.accessible_value().as_deref(), Some("4D5307E6"));
 }
-
-// Console
 
 fn game(title: &str, title_id: &str, database_id: i64, disc: u32) -> Game {
     Game {

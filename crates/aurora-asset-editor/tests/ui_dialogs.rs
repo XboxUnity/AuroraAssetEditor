@@ -210,7 +210,7 @@ fn assert_close(actual: [u8; 3], expected: [u8; 3], tolerance: i16, what: &str) 
     assert!(close, "{what}: {actual:?} is not close to {expected:?}");
 }
 
-/// One way to reach each dialog kind, with the title the "UI copy" gives it.
+/// One way to reach each dialog kind, with the title it shows.
 struct DialogFlow {
     name: &'static str,
     kind: DialogKind,
@@ -993,7 +993,6 @@ fn picker_titles(ui: &Ui) -> Vec<String> {
         .collect()
 }
 
-/// The picker's row for the game titled `title`.
 fn picker_row(ui: &Ui, title: &str) -> ElementHandle {
     ElementHandle::find_by_accessible_label(ui.view.window(), title)
         .find(|element| element.accessible_role() == Some(AccessibleRole::ListItem))

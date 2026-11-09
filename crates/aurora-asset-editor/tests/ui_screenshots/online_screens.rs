@@ -40,7 +40,6 @@ const COVERS: [Cover; 3] = [
     },
 ];
 
-/// One entry of XboxUnity's listing.
 pub struct Cover {
     pub label: &'static str,
     /// Names the cover's two image routes.
@@ -190,14 +189,12 @@ fn stage_title_id_missing(theme: ThemeChoice) -> Scene {
     scene
 }
 
-/// The results page with the tile at `index` clicked and its image downloaded.
 fn select_result(theme: ThemeChoice, index: usize) -> Scene {
     let mut scene = stage_results(theme);
     select_result_at(&mut scene, index);
     scene
 }
 
-/// Clicks the result tile at `index` and downloads its image.
 pub fn select_result_at(scene: &mut Scene, index: usize) {
     // The tile's label is the one the app built from the listing's entry, not the entry's name.
     let label = scene.harness().app().online().results[index]
@@ -216,7 +213,6 @@ pub fn search_for_title_id(scene: &Scene, title_id: &str) {
     });
 }
 
-/// XboxUnity's listing for the game and the images it points to.
 fn halo_3_routes() -> Vec<Route> {
     let mut routes = vec![json_route(
         &listing_path(TITLE_ID),
@@ -246,7 +242,6 @@ fn halo_3_routes() -> Vec<Route> {
     routes
 }
 
-/// Where the test server answers the search for `title_id`.
 pub fn listing_path(title_id: &str) -> String {
     format!("{COVERS_PREFIX}{title_id}")
 }

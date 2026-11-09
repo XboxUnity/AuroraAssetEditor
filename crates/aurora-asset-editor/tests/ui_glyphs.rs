@@ -22,7 +22,6 @@ fn files_with_extension(folder: &Path, extension: &str, found: &mut Vec<PathBuf>
     }
 }
 
-/// The characters inside the double-quoted string literals of `source`.
 fn string_literal_chars(source: &str, chars: &mut BTreeSet<char>) {
     let mut in_literal = false;
     let mut escaped = false;

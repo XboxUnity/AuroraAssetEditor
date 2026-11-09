@@ -122,7 +122,6 @@ fn start(theme: ThemeChoice) -> Scene {
     Scene::start(AppHarness::new(), theme)
 }
 
-/// A scene with Halo 3 selected.
 fn start_with_game(theme: ThemeChoice) -> Scene {
     let scene = start(theme);
     scene.act(|app| app.set_current_game(Some(halo_3())));

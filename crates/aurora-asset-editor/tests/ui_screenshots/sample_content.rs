@@ -334,7 +334,6 @@ fn icon_only_bytes() -> Vec<u8> {
     .to_bytes()
 }
 
-/// A cover whose texture carries the tiled flag.
 fn tiled_cover_bytes() -> Vec<u8> {
     let art = sample_art(TILED_COVER_SIZE.0, TILED_COVER_SIZE.1, COVER_SEED);
     let mut texture = encode(&art, Compression::Dxt).expect("an 8x8 image encodes");
@@ -346,7 +345,6 @@ fn tiled_cover_bytes() -> Vec<u8> {
     file.to_bytes()
 }
 
-/// Opens an `.asset` file with the given name and bytes and runs the load.
 pub fn load_asset_file(scene: &mut Scene, file_name: &str, bytes: &[u8]) {
     let path = write_to_scene_folder(scene, file_name, bytes);
     scene.act(|app| app.open_paths(vec![path]));
@@ -358,7 +356,6 @@ pub fn png_file(scene: &mut Scene, file_name: &str, image: &RgbaImage) -> PathBu
     write_to_scene_folder(scene, file_name, &png_bytes(image))
 }
 
-/// `image` encoded as a PNG.
 pub fn png_bytes(image: &RgbaImage) -> Vec<u8> {
     let mut bytes = Cursor::new(Vec::new());
     image
@@ -401,7 +398,6 @@ pub fn undecodable_entry_asset() -> Vec<u8> {
     file.to_bytes()
 }
 
-/// An FSD file holding `count` screenshots.
 pub fn fsd_with_screenshots(count: usize) -> Vec<u8> {
     let screenshot = png_bytes(&sample_art(
         FSD_SCREENSHOT_SIZE.0,

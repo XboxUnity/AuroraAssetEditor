@@ -248,7 +248,6 @@ fn error_log_write_failure_shows_in_status() {
     assert!(status.text.starts_with(&expected_start), "{}", status.text);
 }
 
-/// The red toasts the app shows.
 fn error_toasts(harness: &mut AppHarness) -> Vec<String> {
     harness
         .app()
