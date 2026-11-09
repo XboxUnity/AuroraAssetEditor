@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::path::{Path, PathBuf};
 
-use aurora_asset::ScreenshotNumber;
+use aurora_asset::{AssetKind, ScreenshotNumber};
 
 use crate::about::BuildInfo;
 use crate::console::ConsoleState;
@@ -44,6 +44,8 @@ pub struct App {
     /// The About dialog's "Copy build info" worked; it says so until the dialog closes.
     pub(super) about_copied: bool,
     pub(super) about_notices_expanded: bool,
+    /// The change count of each page the running upload sends, so a page that reached the console is saved.
+    pub(super) upload_change_counts: Vec<(AssetKind, u64)>,
 }
 
 impl App {
@@ -71,6 +73,7 @@ impl App {
             pending_import_status: None,
             about_copied: false,
             about_notices_expanded: false,
+            upload_change_counts: Vec::new(),
         };
         app.report_startup_problems(&startup_problems);
         app

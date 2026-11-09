@@ -13,6 +13,10 @@ pub struct AssetDocument {
     file: AssetFile,
     previews: [SlotPreview; ENTRY_COUNT],
     revisions: [u64; ENTRY_COUNT],
+    /// Counts every change to what the page saves, edits and loads alike.
+    changes: u64,
+    /// `changes` when the page last matched what was opened or saved.
+    saved_at: u64,
 }
 
 impl AssetDocument {
@@ -22,6 +26,8 @@ impl AssetDocument {
             file: AssetFile::new(),
             previews: std::array::from_fn(|_| SlotPreview::Empty),
             revisions: [0; ENTRY_COUNT],
+            changes: 0,
+            saved_at: 0,
         }
     }
 
@@ -46,15 +52,36 @@ impl AssetDocument {
         self.file.has_entries_for(self.kind)
     }
 
+    /// Whether the page changed since it was last opened or saved.
+    pub fn has_unsaved_changes(&self) -> bool {
+        self.changes != self.saved_at
+    }
+
+    /// Identifies the page's content as it is now, for `mark_saved` once its bytes are stored.
+    pub fn change_count(&self) -> u64 {
+        self.changes
+    }
+
+    /// The bytes taken at `change_count` were saved. A page changed since keeps its unsaved changes.
+    pub fn mark_saved(&mut self, change_count: u64) {
+        if change_count == self.changes {
+            self.saved_at = self.changes;
+        }
+    }
+
     pub fn set_prepared(&mut self, slot: AssetSlot, prepared: PreparedImage) {
         self.assert_owns(slot);
         self.file.set(slot, Some(prepared.texture));
         self.previews[slot.index()] = SlotPreview::Pixels(prepared.pixels);
         self.bump(slot);
+        self.record_edit();
     }
 
     pub fn remove(&mut self, slot: AssetSlot) {
         self.assert_owns(slot);
+        if self.file.get(slot).is_some() {
+            self.record_edit();
+        }
         self.file.set(slot, None);
         self.previews[slot.index()] = SlotPreview::Empty;
         self.bump(slot);
@@ -75,6 +102,7 @@ impl AssetDocument {
         for (slot, preview) in decoded.previews {
             self.previews[slot.index()] = preview;
         }
+        self.record_load();
     }
 
     pub fn screenshot_count(&self) -> usize {
@@ -120,6 +148,9 @@ impl AssetDocument {
 
     /// Packs the screenshots into positions 1, 2, 3, ... by moving stored bytes and previews.
     pub fn compact_screenshots(&mut self) {
+        if !self.screenshots_are_compact() {
+            self.record_edit();
+        }
         self.file.compact_screenshots();
         // A preview is Empty exactly when its slot holds no texture, so sorting the empty ones
         // last mirrors what `compact_screenshots` did to the entries.
@@ -135,12 +166,16 @@ impl AssetDocument {
         for revision in &mut self.revisions {
             *revision += 1;
         }
+        self.record_load();
     }
 
     /// Drag-reorder: the screenshot at `from` lands at `to`, shifting those in between.
     pub fn move_screenshot(&mut self, from: ScreenshotNumber, to: ScreenshotNumber) {
         if self.file.get(AssetSlot::Screenshot(from)).is_none() {
             return;
+        }
+        if from != to {
+            self.record_edit();
         }
         self.file.move_screenshot(from, to);
         let (from, to) = (usize::from(from.get()) - 1, usize::from(to.get()) - 1);
@@ -163,6 +198,16 @@ impl AssetDocument {
 
     fn screenshot_previews(&mut self) -> &mut [SlotPreview] {
         &mut self.previews[ENTRY_COUNT - SCREENSHOT_COUNT..]
+    }
+
+    fn record_edit(&mut self) {
+        self.changes += 1;
+    }
+
+    /// The page now holds what was opened, which nothing needs to save.
+    fn record_load(&mut self) {
+        self.changes += 1;
+        self.saved_at = self.changes;
     }
 
     fn bump(&mut self, slot: AssetSlot) {

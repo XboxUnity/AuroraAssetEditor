@@ -222,6 +222,7 @@ impl App {
             .map(|kind| AssetUpload {
                 kind: *kind,
                 bytes: self.page_bytes(*kind),
+                change_count: self.pages.get(*kind).change_count(),
             })
             .collect()
     }
@@ -263,6 +264,10 @@ impl App {
             return;
         }
         self.active_work.console = Some(ConsoleActivity::Uploading);
+        self.upload_change_counts = uploads
+            .iter()
+            .map(|upload| (upload.kind, upload.change_count))
+            .collect();
         let job = ConsoleJob::Upload {
             ids,
             uploads,
@@ -402,6 +407,7 @@ impl App {
     }
 
     pub(super) fn apply_uploaded(&mut self, report: TransferReport, purpose: UploadPurpose) {
+        self.mark_uploaded_pages_saved(&report.done);
         let success = match purpose {
             UploadPurpose::UploadCurrent => {
                 format!("Uploaded {} to the console", kind_list(&report.done))
@@ -411,6 +417,17 @@ impl App {
             }
         };
         self.apply_transferred(report, "upload", success);
+    }
+
+    /// A page whose bytes reached the console is saved, unless it changed while they were on their way.
+    fn mark_uploaded_pages_saved(&mut self, done: &[AssetKind]) {
+        let sent = std::mem::take(&mut self.upload_change_counts);
+        for kind in done {
+            match sent.iter().find(|(sent_kind, _)| sent_kind == kind) {
+                Some((_, change_count)) => self.pages.get_mut(*kind).mark_saved(*change_count),
+                None => log::error!("The console reports {kind:?} uploaded, which was not sent"),
+            }
+        }
     }
 
     pub(super) fn apply_removed(&mut self, report: TransferReport) {

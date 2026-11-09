@@ -60,6 +60,14 @@ impl EditorPages {
         }
     }
 
+    /// The pages among `kinds` that changed since they were last opened or saved, in sidebar order.
+    pub fn unsaved_among(&self, kinds: &[AssetKind]) -> Vec<AssetKind> {
+        AssetKind::ALL
+            .into_iter()
+            .filter(|kind| kinds.contains(kind) && self.get(*kind).has_unsaved_changes())
+            .collect()
+    }
+
     /// How many of cover, background, icon, banner and screenshots hold something (0 to 5).
     pub fn present_types(&self) -> usize {
         [

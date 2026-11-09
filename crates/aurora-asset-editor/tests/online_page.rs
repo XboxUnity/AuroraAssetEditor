@@ -2,7 +2,7 @@ use std::io::Cursor;
 use std::path::PathBuf;
 use std::time::Duration;
 
-use aurora_asset::{AssetSlot, RgbaImage, TextureFormat};
+use aurora_asset::{AssetKind, AssetSlot, RgbaImage, TextureFormat};
 use aurora_asset_editor::app::{
     BUSY_TEXT, ENTER_KEYWORDS_TEXT, ENTER_TITLE_ID_TEXT, IMAGE_FAILED_TEXT, IMPORTING_COVER_TEXT,
     Page, SAVE_RESULT_DEFAULT_NAME, SAVE_RESULT_TITLE, SEARCH_FAILED,
@@ -677,6 +677,24 @@ fn save_result_image_reencodes_by_extension() {
         );
         assert_eq!(request.default_name.as_deref(), Some("cover.png"));
     }
+}
+
+#[test]
+fn use_as_cover_marks_the_cover_changed() {
+    let server = server_with(two_cover_routes());
+    let mut harness = harness_for(&server);
+    search_for(&mut harness, FIRST_TITLE);
+    harness.run_jobs();
+    harness.app().select_result(0);
+    harness.run_jobs();
+
+    harness.app().use_result_as_cover();
+    harness.run_jobs();
+
+    assert_eq!(
+        harness.app().pages().unsaved_among(&AssetKind::ALL),
+        vec![AssetKind::Cover]
+    );
 }
 
 #[test]

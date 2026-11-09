@@ -33,10 +33,11 @@ impl App {
                 match kind {
                     ConsoleJobKind::Bulk => self.console.finish_bulk_run(),
                     ConsoleJobKind::Refresh => self.console.finish_refresh(),
+                    // Which pages reached the console is not known, so they keep their unsaved changes.
+                    ConsoleJobKind::Upload => self.upload_change_counts.clear(),
                     ConsoleJobKind::Test
                     | ConsoleJobKind::Presence
                     | ConsoleJobKind::Download
-                    | ConsoleJobKind::Upload
                     | ConsoleJobKind::Remove => {}
                 }
             }

@@ -38,7 +38,8 @@ impl Error for LocalSaveError {
 }
 
 /// Writes the page's stored bytes. Screenshots are packed into positions 1, 2, 3, ... first, by moving
-/// stored bytes, so the file and the page agree (the old app only compacted the file).
+/// stored bytes, so the file and the page agree (the old app only compacted the file). Once the file is
+/// written, the page has no unsaved changes.
 pub fn save_page(document: &mut AssetDocument, path: &Path) -> Result<(), LocalSaveError> {
     write_page(document, path, Vec::new())
 }
@@ -75,9 +76,12 @@ fn write_page(
     if document.kind() == AssetKind::Screenshots {
         document.compact_screenshots();
     }
+    let change_count = document.change_count();
     fs::write(path, document.to_bytes()).map_err(|source| LocalSaveError {
         path: path.to_path_buf(),
         written,
         source,
-    })
+    })?;
+    document.mark_saved(change_count);
+    Ok(())
 }

@@ -903,6 +903,100 @@ fn a_transfer_clears_the_unreachable_mark_so_presence_is_rechecked() {
     assert!(presence.cover);
 }
 
+/// Puts a new image in `slot` the way Replace does, which leaves its page with unsaved changes.
+fn replace_with_art(harness: &mut AppHarness, slot: AssetSlot) {
+    let path = harness.config_dir().join("art.png");
+    solid(77)
+        .save_with_format(&path, image::ImageFormat::Png)
+        .expect("the temp folder is writable");
+    harness.dialogs().push_files(vec![path]);
+    harness.app().replace_image(slot);
+    harness.run_jobs();
+}
+
+fn unsaved(harness: &mut AppHarness) -> Vec<AssetKind> {
+    harness.app().pages().unsaved_among(&AssetKind::ALL)
+}
+
+#[test]
+fn an_upload_saves_the_pages_that_reached_the_console() {
+    let (mut harness, console) = harness_with_empty_console();
+    console.add_dir(&asset_folder(&halo()));
+    load_into_editor(&mut harness, "cover.asset", &mut cover_file(10));
+    load_into_editor(&mut harness, "background.asset", &mut background_file());
+    replace_with_art(&mut harness, AssetSlot::Cover);
+    replace_with_art(&mut harness, AssetSlot::Background);
+    select_halo(&mut harness);
+
+    harness
+        .app()
+        .upload_current(KindChoice::One(AssetKind::Cover));
+    harness.run_jobs();
+    assert_eq!(unsaved(&mut harness), vec![AssetKind::Background]);
+
+    harness.app().save_all_to_console();
+    harness.run_jobs();
+    assert_eq!(unsaved(&mut harness), Vec::new());
+}
+
+#[test]
+fn a_failed_upload_keeps_the_changes_of_the_pages_it_did_not_send() {
+    let (mut harness, console) = harness_with_empty_console();
+    console.add_dir(&asset_folder(&halo()));
+    load_into_editor(&mut harness, "cover.asset", &mut cover_file(10));
+    load_into_editor(&mut harness, "background.asset", &mut background_file());
+    replace_with_art(&mut harness, AssetSlot::Cover);
+    replace_with_art(&mut harness, AssetSlot::Background);
+    select_halo(&mut harness);
+    let uploading = Cell::new(0);
+
+    harness.app().save_all_to_console();
+    harness.run_jobs_with(|_, stage| {
+        let OutcomeStage::Progress(Progress::Console {
+            status: ConsoleStatus::Uploading { .. },
+            ..
+        }) = stage
+        else {
+            return;
+        };
+        uploading.set(uploading.get() + 1);
+        if uploading.get() == 2 {
+            console.refuse_data_connections();
+        }
+    });
+
+    assert_eq!(harness.app().status().severity, Severity::Error);
+    assert_eq!(unsaved(&mut harness), vec![AssetKind::Background]);
+}
+
+#[test]
+fn a_page_edited_while_its_upload_runs_keeps_the_changes() {
+    let (mut harness, console) = harness_with_empty_console();
+    console.add_dir(&asset_folder(&halo()));
+    load_into_editor(&mut harness, "icon-banner.asset", &mut icon_banner_file());
+    select_halo(&mut harness);
+
+    harness
+        .app()
+        .upload_current(KindChoice::One(AssetKind::IconBanner));
+    harness.run_jobs_with(|app, stage| {
+        if let OutcomeStage::Progress(Progress::Console {
+            status: ConsoleStatus::Uploading { .. },
+            ..
+        }) = stage
+        {
+            app.remove_image(AssetSlot::Icon);
+        }
+    });
+
+    assert!(
+        console
+            .file(&console_path(&halo(), AssetKind::IconBanner))
+            .is_some()
+    );
+    assert_eq!(unsaved(&mut harness), vec![AssetKind::IconBanner]);
+}
+
 /// Fills every page of the editor from local files, each different from what the console tests put there.
 fn load_every_page(harness: &mut AppHarness) {
     load_into_editor(harness, "cover.asset", &mut cover_file(50));
