@@ -51,6 +51,19 @@ fn drive(harness: &mut AppHarness, driver: &mut SmokeTestDriver) -> SmokeStep {
     panic!("the driver was still waiting after {MAX_STEPS} steps");
 }
 
+/// Steps the driver through opening the asset and saving it; the next step checks the saved file.
+fn step_until_saved(harness: &mut AppHarness, driver: &mut SmokeTestDriver) {
+    assert_eq!(
+        driver.step(&mut harness.app(), Duration::ZERO),
+        SmokeStep::Waiting
+    );
+    harness.run_jobs();
+    assert_eq!(
+        driver.step(&mut harness.app(), STEP_TIME),
+        SmokeStep::Waiting
+    );
+}
+
 #[test]
 fn smoke_dialogs_answer_save_with_the_output_and_refuse_open() {
     let output = PathBuf::from("out.asset");
@@ -89,6 +102,49 @@ fn driver_passes_after_loading_and_saving() {
     let mut app = harness.app();
     assert!(app.request_close());
     assert_eq!(app.modal(), None);
+}
+
+#[test]
+fn driver_waits_for_running_jobs_after_saving() {
+    let folder = TempDir::new().unwrap();
+    let asset = write_cover_asset(folder.path());
+    let output = folder.path().join("saved.asset");
+    // An output file that is there from the start does not pass the run on its own.
+    fs::write(&output, "left from an earlier run").unwrap();
+    let mut harness = AppHarness::new();
+    harness.dialogs().push_save(output.clone());
+    let mut driver = SmokeTestDriver::new(asset.clone(), output.clone(), AssetKind::Cover);
+    step_until_saved(&mut harness, &mut driver);
+    // A load still queued holds the editor while the saved file is already there.
+    harness.app().open_paths(vec![asset.clone()]);
+
+    assert_eq!(
+        driver.step(&mut harness.app(), STEP_TIME * 2),
+        SmokeStep::Waiting
+    );
+    harness.run_jobs();
+    assert_eq!(
+        driver.step(&mut harness.app(), STEP_TIME * 3),
+        SmokeStep::Passed
+    );
+    assert_eq!(fs::read(&output).unwrap(), fs::read(&asset).unwrap());
+}
+
+#[test]
+fn driver_fails_when_a_page_is_unsaved_after_saving() {
+    let folder = TempDir::new().unwrap();
+    let asset = write_cover_asset(folder.path());
+    let output = folder.path().join("saved.asset");
+    let mut harness = AppHarness::new();
+    harness.dialogs().push_save(output.clone());
+    let mut driver = SmokeTestDriver::new(asset, output, AssetKind::Cover);
+    step_until_saved(&mut harness, &mut driver);
+    harness.app().remove_image(AssetSlot::Cover);
+
+    assert_eq!(
+        driver.step(&mut harness.app(), STEP_TIME * 2),
+        SmokeStep::Failed("After the save, unsaved changes remain on Cover".to_owned())
+    );
 }
 
 #[test]
