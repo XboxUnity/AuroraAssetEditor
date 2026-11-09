@@ -8,7 +8,7 @@ use rusqlite::{Connection, params};
 
 const SAMPLES_DIRECTORY: [&str; 3] = ["fixtures", "console", "content-db"];
 
-/// Aurora's `ContentItems` table (`AuroraSql.cpp`), including its `INTEGET` typo on `ContentGroup`.
+/// Aurora's `ContentItems` table, including its `INTEGET` typo on `ContentGroup`.
 /// Columns Aurora leaves unspecified say `NULL` here, which SQLite treats the same way.
 const AURORA_CONTENT_ITEMS: &str = "CREATE TABLE IF NOT EXISTS ContentItems (
     Id INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -303,7 +303,6 @@ fn rgb_of(image: &RgbaImage) -> RgbImage {
     })
 }
 
-/// Writes the gate inputs into `directory` and returns their file names.
 pub fn write_gate_set(paths: &Paths, directory: &Path) -> Result<Vec<String>> {
     let mut prng = Prng::with_seed(CLOSENESS_SEED);
     let alpha_noise = synthetic_crop("alphanoise", ICON_SIDE, ICON_SIDE)?;

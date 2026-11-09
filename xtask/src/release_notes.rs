@@ -150,7 +150,6 @@ fn first_launch_markdown(text: &str) -> Result<String> {
     Ok(blocks.join("\n\n"))
 }
 
-/// The `release-notes` command line, checked.
 #[derive(Debug, PartialEq, Eq)]
 struct NotesOptions {
     version: String,

@@ -5,16 +5,15 @@ Test-only. Nothing in this folder is part of a release.
 ## `dll/`
 
 The original `AuroraAsset.dll` (MaesterRowen, 32-bit x86, built against the Xbox 360 XDK) and the
-`msvcr100.dll` it needs, byte-identical to the copies on `master`. They are the reference the Rust
+`msvcr100.dll` it needs. They are the reference the Rust
 codec is tested against: encode and decode goldens are generated with them, and the Windows CI
 cross-decode job runs them against the Rust output.
 
 ## `spike/`
 
-The black-box investigation of the old AuroraAsset.dll, kept as it was run. The
-scripts still carry the session scratchpad paths they were written with; they are a record, not
-the maintained tooling. The fixture generators and harnesses the tests use are built from them
-under `tools/golden`.
+The black-box investigation of the old AuroraAsset.dll. It is a record, not maintained tooling:
+the build scripts hard-code local paths and need editing to run. The fixture generators and
+harnesses the tests use are built from it under `tools/golden`.
 
 | File | Purpose |
 |---|---|

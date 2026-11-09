@@ -56,7 +56,6 @@ struct PassedRun {
     stderr: String,
 }
 
-/// Runs the smoke test with its files in `folder`.
 fn smoke_test_in(folder: &Path, program: &str, arguments: &[&str]) -> Result<PassedRun> {
     let input_path = folder.join("smoke-input.asset");
     let output_path = folder.join("smoke-output.asset");
