@@ -240,7 +240,14 @@ impl App {
         }
     }
 
+    /// Applies what a job found. An outcome can change pages under a Discard question on screen, so the question
+    /// is checked again; the close it approves is the caller's to carry out (`close_approved`).
     pub fn on_job_outcome(&mut self, outcome: JobOutcome) {
+        self.apply_outcome(outcome);
+        self.recheck_discard_question();
+    }
+
+    fn apply_outcome(&mut self, outcome: JobOutcome) {
         match outcome {
             JobOutcome::Loaded(loaded) => self.apply_loaded(loaded),
             JobOutcome::Imported(results) => self.apply_imported(results),

@@ -280,6 +280,10 @@ fn receive_outcomes(
                 }
             }
             view.render(&app.borrow());
+            let close_approved = app.borrow().close_approved();
+            if close_approved {
+                view.request_close(&app);
+            }
         }
     })?;
     Ok(())

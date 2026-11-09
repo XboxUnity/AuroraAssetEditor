@@ -80,9 +80,9 @@ impl App {
         self.close_approved = true;
     }
 
-    /// A Discard question waited behind another dialog, whose answer may have saved or replaced pages. Once it
-    /// comes up it names the pages unsaved now; when none is left, nothing would be lost, so it is not asked
-    /// and its action runs as Discard would run it.
+    /// The pages a Discard question names can change after it was asked: the dialog it waited behind may have
+    /// saved or replaced them, and a job may land while it is on screen. It names the pages unsaved now; when
+    /// none is left, nothing would be lost, so it is not asked and its action runs as Discard would run it.
     pub(super) fn recheck_discard_question(&mut self) {
         while let Some(action) = self.discard_question_on_screen() {
             let kinds = match &action {

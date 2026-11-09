@@ -3,10 +3,11 @@ use std::io::Cursor;
 use std::path::{Path, PathBuf};
 
 use aurora_asset::{AssetFile, AssetKind, AssetSlot, Compression, RgbaImage, ScreenshotNumber};
-use aurora_asset_editor::app::{App, DISCARD_LABEL, DISCARD_TITLE, Page};
+use aurora_asset_editor::app::{App, CurrentGame, DISCARD_LABEL, DISCARD_TITLE, KindChoice, Page};
 use aurora_asset_editor::dialogs::{ChoiceId, ConfirmedAction, Modal, ModalAnswer, ModalField};
+use aurora_asset_editor::jobs::{ConsoleOutcome, JobOutcome, TransferReport, UploadPurpose};
 use aurora_asset_editor::status::StatusLine;
-use aurora_console::HexId;
+use aurora_console::{FtpSettings, GameIds, HexId};
 use editor_test_support::{AppHarness, COVER, FsdBuilder, ICON, asset_file_with};
 use image::{ImageFormat, Rgba};
 use tempfile::TempDir;
@@ -629,4 +630,67 @@ fn a_queued_replacement_with_nothing_left_to_lose_runs_without_asking() {
     assert_eq!(app.page_bytes(AssetKind::Cover), cover_bytes);
     assert_eq!(app.pages().present_types(), 1);
     assert_eq!(unsaved(app), Vec::new());
+}
+
+#[test]
+fn an_import_landing_under_the_close_question_adds_its_page_to_it() {
+    let folder = TempDir::new().unwrap();
+    let mut harness = opened_harness(&folder);
+    let art = png(&folder, "art.png");
+    replace(&mut harness, AssetSlot::Cover, &art);
+    harness.dialogs().push_files(vec![art]);
+    harness.app().replace_image(AssetSlot::Background);
+    assert!(!harness.app().request_close());
+    assert_eq!(
+        discard_question(&harness.app(), &ConfirmedAction::CloseWindow),
+        "Discard unsaved changes to Cover?"
+    );
+
+    harness.run_jobs();
+
+    assert_eq!(
+        discard_question(&harness.app(), &ConfirmedAction::CloseWindow),
+        "Discard unsaved changes to Cover and Background?"
+    );
+    assert!(!harness.app().close_approved());
+}
+
+#[test]
+fn an_upload_that_saves_every_page_under_the_close_question_lets_the_window_close() {
+    let folder = TempDir::new().unwrap();
+    let mut harness = AppHarness::new();
+    harness.with_ftp_settings(FtpSettings {
+        host: "192.168.1.50".to_owned(),
+        port: "21".to_owned(),
+        ..FtpSettings::default()
+    });
+    open(&mut harness, page_files(&folder));
+    replace(&mut harness, AssetSlot::Cover, &png(&folder, "art.png"));
+    let ids = GameIds {
+        title_id: HexId::parse(TITLE_ID).unwrap(),
+        database_id: HexId::from_database_value(18),
+    };
+    harness.app().set_current_game(Some(CurrentGame {
+        title: "Halo 3".to_owned(),
+        ids: ids.clone(),
+    }));
+    harness
+        .app()
+        .upload_current(KindChoice::One(AssetKind::Cover));
+    assert!(harness.take_next_job().is_some(), "the upload is queued");
+    assert!(!harness.app().request_close());
+
+    harness
+        .app()
+        .on_job_outcome(JobOutcome::Console(ConsoleOutcome::Uploaded {
+            report: TransferReport {
+                ids,
+                done: vec![AssetKind::Cover],
+                failure: None,
+            },
+            purpose: UploadPurpose::UploadCurrent,
+        }));
+
+    assert_eq!(harness.app().modal(), None, "nothing is left to lose");
+    assert!(harness.app().close_approved());
 }
