@@ -11,6 +11,10 @@ use crate::ui_screenshots::{BASELINE_VARIABLE, current_platform, repository_root
 
 pub const USAGE_LINE: &str = "cargo xtask ui-baseline <dest> --env-file <file>";
 
+// Mirrors `editor-test-support`, which xtask does not depend on.
+const MANIFEST_FORMAT: &str = "1";
+const FORMAT_KEY: &str = "format: ";
+
 /// The environment line that points the screenshot suite at this platform's earlier run, or
 /// `None` when the unpacked release holds no run of this platform.
 fn baseline_env_line(unpacked: &Path, platform: &str) -> Option<String> {
@@ -19,6 +23,19 @@ fn baseline_env_line(unpacked: &Path, platform: &str) -> Option<String> {
         return None;
     }
     Some(format!("{BASELINE_VARIABLE}={}", folder.display()))
+}
+
+/// The `format:` of the platform folder's manifest when the suite cannot read it, so that a
+/// future format change leaves the next release without a baseline instead of failing every run.
+fn other_manifest_format(unpacked: &Path, platform: &str) -> Result<Option<String>> {
+    let path = unpacked.join(platform).join(MANIFEST_FILE);
+    let text =
+        fs::read_to_string(&path).with_context(|| format!("could not read {}", path.display()))?;
+    let format = text
+        .lines()
+        .find_map(|line| line.strip_prefix(FORMAT_KEY))
+        .filter(|format| *format != MANIFEST_FORMAT);
+    Ok(format.map(str::to_owned))
 }
 
 /// Downloads the screenshots of the previous v2 release into `<dest>/unpacked` and appends the
@@ -40,13 +57,15 @@ pub fn run(dest: &str, env_file: &str) -> Result<()> {
         .with_context(|| format!("could not unpack the screenshots of {tag}"))?;
 
     let platform = current_platform();
-    match baseline_env_line(&unpacked, &platform) {
-        Some(line) => append_line(&working_folder.join(env_file), &line),
-        None => {
-            println!("{tag} has no {platform} screenshots: every image is new");
-            Ok(())
-        }
+    let Some(line) = baseline_env_line(&unpacked, &platform) else {
+        println!("{tag} has no {platform} screenshots: every image is new");
+        return Ok(());
+    };
+    if let Some(format) = other_manifest_format(&unpacked, &platform)? {
+        println!("{tag}'s screenshots use manifest format {format}; every image is new");
+        return Ok(());
     }
+    append_line(&working_folder.join(env_file), &line)
 }
 
 fn download_screenshots(root: &Path, tag: &str, download: &Path) -> Result<()> {
@@ -102,5 +121,33 @@ mod tests {
             Some(format!("AURORA_UI_BASELINE={}", folder.display()))
         );
         assert_eq!(baseline_env_line(unpacked.path(), "macos-aarch64"), None);
+    }
+
+    #[test]
+    fn manifest_of_another_format_is_reported() {
+        let unpacked = tempfile::tempdir().unwrap();
+        let folder = unpacked.path().join("linux-x86_64");
+        fs::create_dir_all(&folder).unwrap();
+        let manifest = folder.join(MANIFEST_FILE);
+
+        fs::write(
+            &manifest,
+            "format: 2
+platform: linux-x86_64
+",
+        )
+        .unwrap();
+        let other = other_manifest_format(unpacked.path(), "linux-x86_64").unwrap();
+        fs::write(
+            &manifest,
+            "format: 1
+platform: linux-x86_64
+",
+        )
+        .unwrap();
+        let current = other_manifest_format(unpacked.path(), "linux-x86_64").unwrap();
+
+        assert_eq!(other.as_deref(), Some("2"));
+        assert_eq!(current, None);
     }
 }
