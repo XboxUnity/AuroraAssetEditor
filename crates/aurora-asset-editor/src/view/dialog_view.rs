@@ -37,20 +37,17 @@ const CONNECTION_FIELDS: [ModalField; 4] = [
 pub(super) fn connect_dialogs(window: &MainWindow, app: &Rc<RefCell<App>>, refresh: &Refresh) {
     let dialog = window.global::<DialogModel>();
 
-    let act = action_runner(app, refresh);
-    let closing_app = Rc::clone(app);
-    let closing_window = window.as_weak();
-    dialog.on_accept(move || {
-        act(&mut |app| app.answer_modal(ModalAnswer::Accept));
-        close_when_approved(&closing_app, &closing_window);
-    });
+    // Any answer can approve the close: Discard on its question, or another answer after which the queued
+    // question finds nothing left to lose.
+    let answer = answer_runner(window, app, refresh);
+    dialog.on_accept(move || answer(&mut |app| app.answer_modal(ModalAnswer::Accept)));
 
-    let act = action_runner(app, refresh);
-    dialog.on_cancel(move || act(&mut |app| app.answer_modal(ModalAnswer::Cancel)));
+    let answer = answer_runner(window, app, refresh);
+    dialog.on_cancel(move || answer(&mut |app| app.answer_modal(ModalAnswer::Cancel)));
 
-    let act = action_runner(app, refresh);
+    let answer = answer_runner(window, app, refresh);
     dialog.on_choose(move |index| {
-        act(&mut |app| {
+        answer(&mut |app| {
             if let Some(choice) = offered_choice(app.modal(), index) {
                 app.answer_modal(ModalAnswer::Choice(choice));
             }
@@ -114,7 +111,22 @@ pub(super) fn connect_dialogs(window: &MainWindow, app: &Rc<RefCell<App>>, refre
     dialog.on_open_log_folder(move || act(&mut |app| app.open_log_folder()));
 }
 
-/// After Discard on the close question, the window is asked to close again, the way the system asks.
+/// Runs an answer like `action_runner`. Once the close is approved, the window is asked to close again, the
+/// way the system asks.
+fn answer_runner(
+    window: &MainWindow,
+    app: &Rc<RefCell<App>>,
+    refresh: &Refresh,
+) -> impl Fn(&mut dyn FnMut(&mut App)) + use<> {
+    let act = action_runner(app, refresh);
+    let app = Rc::clone(app);
+    let window = window.as_weak();
+    move |answer| {
+        act(answer);
+        close_when_approved(&app, &window);
+    }
+}
+
 fn close_when_approved(app: &Rc<RefCell<App>>, window: &Weak<MainWindow>) {
     if !app.borrow().close_approved() {
         return;

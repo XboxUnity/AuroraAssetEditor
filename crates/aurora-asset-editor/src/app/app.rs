@@ -18,7 +18,8 @@ use crate::settings::AppSettings;
 use crate::status::{ActiveWork, Locks, STATUS_SEPARATOR, StatusLine, Toasts};
 
 use super::{
-    AppEnvironment, CurrentGame, Menu, Page, PendingImportStatus, Replacement, StartupProblem,
+    AppEnvironment, CurrentGame, Menu, Page, PendingImportStatus, PendingReplacement,
+    StartupProblem,
 };
 
 pub const LOG_WRITE_FAILED: &str = "Could not write error.log";
@@ -52,7 +53,7 @@ pub struct App {
     /// The change count of each page the running upload sends, so a page that reached the console is saved.
     pub(super) upload_change_counts: Vec<(AssetKind, u64)>,
     /// Work that replaces pages with unsaved changes, oldest first, each waiting for its Discard question.
-    pub(super) pending_replacements: VecDeque<Replacement>,
+    pub(super) pending_replacements: VecDeque<PendingReplacement>,
     /// The user discarded the unsaved changes to close the window.
     pub(super) close_approved: bool,
 }
@@ -123,6 +124,11 @@ impl App {
     }
 
     pub fn answer_modal(&mut self, answer: ModalAnswer) {
+        self.apply_answer(answer);
+        self.recheck_discard_question();
+    }
+
+    fn apply_answer(&mut self, answer: ModalAnswer) {
         if let Some(rejected) = self.unoffered_choice(answer) {
             self.report_error(
                 "A dialog was answered with a button it does not have",

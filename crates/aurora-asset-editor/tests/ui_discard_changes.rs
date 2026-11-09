@@ -191,3 +191,20 @@ fn closing_the_window_without_unsaved_changes_does_not_ask() {
     assert_eq!(ui.dialog().get_kind(), DialogKind::None);
     assert_eq!(ui.closed.get(), 1);
 }
+
+#[test]
+fn closing_behind_another_question_closes_once_that_one_leaves_nothing_to_lose() {
+    let mut harness = edited_harness();
+    let ui = Ui::start(&mut harness);
+    ui.act(|app| app.new_asset_set());
+
+    ui.window().dispatch_event(WindowEvent::CloseRequested);
+    assert!(ui.window().is_visible());
+    ui.click(CONFIRM_BUTTON);
+
+    assert!(
+        !ui.window().is_visible(),
+        "New asset set left nothing unsaved, so the window closes without asking again"
+    );
+    assert_eq!(ui.closed.get(), 1);
+}

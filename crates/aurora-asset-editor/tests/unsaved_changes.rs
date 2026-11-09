@@ -571,3 +571,62 @@ fn closing_without_unsaved_changes_does_not_ask() {
     assert!(harness.app().request_close());
     assert_eq!(harness.app().modal(), None);
 }
+
+#[test]
+fn a_queued_close_question_with_nothing_left_to_lose_lets_the_window_close() {
+    let folder = TempDir::new().unwrap();
+    let mut harness = opened_harness(&folder);
+    replace(&mut harness, AssetSlot::Cover, &png(&folder, "art.png"));
+    let cover = write(&folder, "GC.asset", &asset_bytes(&[AssetSlot::Cover]));
+    open(&mut harness, vec![cover]);
+    assert!(
+        !harness.app().request_close(),
+        "the close waits behind the open"
+    );
+
+    harness.app().answer_modal(ModalAnswer::Accept);
+
+    assert_eq!(unsaved(&harness.app()), Vec::new());
+    assert_eq!(
+        harness.app().modal(),
+        None,
+        "the close question is not asked"
+    );
+    assert!(harness.app().close_approved());
+    assert!(harness.app().request_close());
+}
+
+#[test]
+fn a_queued_question_names_the_pages_still_unsaved_when_it_comes_up() {
+    let folder = TempDir::new().unwrap();
+    let mut harness = edited_harness(&folder);
+    let cover = write(&folder, "GC.asset", &asset_bytes(&[AssetSlot::Cover]));
+    open(&mut harness, vec![cover]);
+    assert!(!harness.app().request_close());
+
+    harness.app().answer_modal(ModalAnswer::Accept);
+
+    assert_eq!(
+        discard_question(&harness.app(), &ConfirmedAction::CloseWindow),
+        "Discard unsaved changes to Background?"
+    );
+    assert!(!harness.app().close_approved());
+}
+
+#[test]
+fn a_queued_replacement_with_nothing_left_to_lose_runs_without_asking() {
+    let folder = TempDir::new().unwrap();
+    let mut harness = edited_harness(&folder);
+    let cover_bytes = asset_bytes(&[AssetSlot::Cover]);
+    let cover = write(&folder, "GC.asset", &cover_bytes);
+    harness.app().new_asset_set();
+    open(&mut harness, vec![cover]);
+
+    harness.app().answer_modal(ModalAnswer::Accept);
+
+    let app = &mut *harness.app();
+    assert_eq!(app.modal(), None, "the open finds nothing left to lose");
+    assert_eq!(app.page_bytes(AssetKind::Cover), cover_bytes);
+    assert_eq!(app.pages().present_types(), 1);
+    assert_eq!(unsaved(app), Vec::new());
+}

@@ -1,3 +1,4 @@
+use aurora_asset::AssetKind;
 use aurora_console::GameIds;
 
 use crate::files::LoadedFiles;
@@ -13,4 +14,10 @@ pub(super) enum Replacement {
         results: Vec<KindDownload>,
     },
     NewAssetSet,
+}
+
+/// A replacement waiting for its Discard question, with the pages it replaces.
+pub(super) struct PendingReplacement {
+    pub(super) kinds: Vec<AssetKind>,
+    pub(super) work: Replacement,
 }

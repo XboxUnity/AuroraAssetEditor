@@ -57,6 +57,6 @@ pub use online_actions::{
 pub use page::Page;
 pub use pending_import_status::PendingImportStatus;
 pub use picker_content::PickerContent;
-use replacement::Replacement;
+use replacement::{PendingReplacement, Replacement};
 pub use settings_actions::SETTINGS_SAVE_FAILED;
 pub use startup_settings::{SETTINGS_LOAD_FAILED, StartupSettings};
