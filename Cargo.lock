@@ -6173,6 +6173,7 @@ dependencies = [
  "jpeg-encoder",
  "png",
  "rusqlite",
+ "rustix 1.1.6",
  "serde",
  "serde_json",
  "sha2",

@@ -64,13 +64,16 @@ fn smoke_test_in(folder: &Path, program: &str, arguments: &[&str]) -> Result<Pas
     fs::write(&input_path, &input)
         .with_context(|| format!("could not write {}", input_path.display()))?;
 
-    let mut child = Command::new(program)
+    let mut command = Command::new(program);
+    command
         .args(arguments)
         .arg(SMOKE_TEST_FLAG)
         .arg(&input_path)
         .arg(&output_path)
         .stdin(Stdio::null())
-        .stderr(Stdio::piped())
+        .stderr(Stdio::piped());
+    start_in_own_process_group(&mut command);
+    let mut child = command
         .spawn()
         .with_context(|| format!("could not start {program}"))?;
     let stderr = read_stderr(&mut child);
@@ -144,7 +147,7 @@ fn read_stderr(child: &mut Child) -> mpsc::Receiver<String> {
 }
 
 /// The child's exit status, or why there is none. A child that runs longer than `XTASK_SMOKE_TIMEOUT`, or that
-/// can no longer be waited for, is stopped through its own handle.
+/// can no longer be waited for, is stopped along with the processes it started.
 fn wait_for_exit(child: &mut Child, program: &str) -> Result<ExitStatus, String> {
     let started = Instant::now();
     loop {
@@ -167,6 +170,30 @@ fn wait_for_exit(child: &mut Child, program: &str) -> Result<ExitStatus, String>
     }
 }
 
+/// On Unix the program leads a process group of its own, so that stopping it reaches the processes it started
+/// too: an AppImage's runtime runs the app as its child, and killing only the runtime would leave the app
+/// running.
+#[cfg(unix)]
+fn start_in_own_process_group(command: &mut Command) {
+    use std::os::unix::process::CommandExt;
+    command.process_group(0);
+}
+
+/// Windows runs the packaged exe directly, with no launcher in between.
+#[cfg(not(unix))]
+fn start_in_own_process_group(_command: &mut Command) {}
+
+/// Kills the child's process group, whose id is the child's own (`start_in_own_process_group`), then reaps the
+/// child.
+#[cfg(unix)]
+fn stop(child: &mut Child) -> io::Result<()> {
+    use rustix::process::{Pid, Signal, kill_process_group};
+    kill_process_group(Pid::from_child(child), Signal::KILL)?;
+    child.wait()?;
+    Ok(())
+}
+
+#[cfg(not(unix))]
 fn stop(child: &mut Child) -> io::Result<()> {
     child.kill()?;
     child.wait()?;
@@ -184,5 +211,39 @@ mod tests {
         let file = AssetFile::parse(&smoke_input()?)?;
         assert_eq!(file.primary_kind(), Some(AssetKind::Cover));
         Ok(())
+    }
+
+    /// A shell that starts a background `sleep` stands in for an AppImage runtime and its app: once both are
+    /// stopped, nothing holds the stdout pipe they share any more.
+    #[cfg(unix)]
+    #[test]
+    fn stopping_ends_the_processes_the_program_started() {
+        use std::io::{BufRead, BufReader};
+
+        let mut command = Command::new("sh");
+        command
+            .args(["-c", "sleep 600 & echo started; wait"])
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped());
+        start_in_own_process_group(&mut command);
+        let mut child = command.spawn().unwrap();
+        let mut stdout = BufReader::new(child.stdout.take().unwrap());
+        let mut first_line = String::new();
+        stdout.read_line(&mut first_line).unwrap();
+        assert_eq!(first_line.trim_end(), "started");
+
+        stop(&mut child).unwrap();
+
+        let (sender, receiver) = mpsc::channel();
+        thread::spawn(move || {
+            let mut rest = Vec::new();
+            sender
+                .send(stdout.read_to_end(&mut rest).map(|_| rest))
+                .expect("the test waits for stdout to close");
+        });
+        let rest = receiver
+            .recv_timeout(Duration::from_secs(10))
+            .expect("the background sleep was stopped, so stdout closes");
+        assert_eq!(rest.unwrap(), b"");
     }
 }
