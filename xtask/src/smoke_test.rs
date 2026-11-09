@@ -34,8 +34,12 @@ pub fn run(command: &[&str]) -> Result<()> {
         .close()
         .context("could not delete the smoke test's temporary folder");
     match (result, closed) {
-        (Ok(bytes), Ok(())) => {
-            println!("Smoke test passed: {program}, {bytes} bytes");
+        (Ok(passed), Ok(())) => {
+            println!("Smoke test passed: {program}, {} bytes", passed.bytes);
+            // A passing app may still have reported something, such as a folder it could not delete.
+            if !passed.stderr.trim().is_empty() {
+                eprintln!("warning: {program} wrote to stderr:\n{}", passed.stderr);
+            }
             Ok(())
         }
         (Err(error), Ok(())) | (Ok(_), Err(error)) => Err(error),
@@ -46,8 +50,14 @@ pub fn run(command: &[&str]) -> Result<()> {
     }
 }
 
-/// Runs the smoke test with its files in `folder`; the number of bytes saved when it passes.
-fn smoke_test_in(folder: &Path, program: &str, arguments: &[&str]) -> Result<usize> {
+/// What a passing run saved, and what the program wrote to stderr meanwhile.
+struct PassedRun {
+    bytes: usize,
+    stderr: String,
+}
+
+/// Runs the smoke test with its files in `folder`.
+fn smoke_test_in(folder: &Path, program: &str, arguments: &[&str]) -> Result<PassedRun> {
     let input_path = folder.join("smoke-input.asset");
     let output_path = folder.join("smoke-output.asset");
     let input = smoke_input()?;
@@ -101,7 +111,10 @@ fn smoke_test_in(folder: &Path, program: &str, arguments: &[&str]) -> Result<usi
             input.len()
         )));
     }
-    Ok(output.len())
+    Ok(PassedRun {
+        bytes: output.len(),
+        stderr,
+    })
 }
 
 /// A cover asset made the way the app makes one: the placeholder cover, DXT-compressed.
