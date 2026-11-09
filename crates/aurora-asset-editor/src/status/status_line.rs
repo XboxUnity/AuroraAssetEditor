@@ -1,5 +1,4 @@
 pub const READY_TEXT: &str = "Ready";
-/// Between the parts of one status text.
 pub(crate) const STATUS_SEPARATOR: &str = " · ";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

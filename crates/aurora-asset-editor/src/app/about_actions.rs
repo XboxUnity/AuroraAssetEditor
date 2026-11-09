@@ -32,7 +32,6 @@ impl App {
         self.about_notices_expanded = !self.about_notices_expanded;
     }
 
-    /// The About dialog's "Copy build info".
     pub fn copy_build_info(&mut self) {
         let text = self.environment.build.copy_text();
         match self.environment.clipboard.set_text(&text) {

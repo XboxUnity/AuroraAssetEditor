@@ -34,7 +34,6 @@ impl Placeholder {
         }
     }
 
-    /// The PNG file of the art.
     pub fn png(self) -> &'static [u8] {
         match self {
             Placeholder::Cover => placeholder_art::COVER,

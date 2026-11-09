@@ -44,7 +44,7 @@ pub fn save_page(document: &mut AssetDocument, path: &Path) -> Result<(), LocalS
     write_page(document, path, Vec::new())
 }
 
-/// The old `SaveAllAssetsOnClick`: a page is written when it has content or its file does not exist yet, so an
+/// A page is written when it has content or its file does not exist yet, so an
 /// empty page never overwrites an existing file. Stops at the first failure.
 pub fn save_all_to_folder(
     pages: &mut EditorPages,

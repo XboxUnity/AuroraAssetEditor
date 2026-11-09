@@ -66,7 +66,7 @@ impl App {
         self.import_screenshots(files, FIRST_FREE_SCREENSHOT);
     }
 
-    /// Empties the slot; there is no confirmation, as with the old Remove of a screenshot.
+    /// Empties the slot without asking for confirmation.
     pub fn remove_image(&mut self, slot: AssetSlot) {
         if self.refuse_while_busy() {
             return;

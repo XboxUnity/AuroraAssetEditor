@@ -2,13 +2,11 @@ const APP_NAME: &str = "Aurora Asset Editor";
 const CREDITS: &str = "by Swizzy thanks to MaesterRowen";
 const DIRTY_MARK: &str = ".dirty";
 
-/// What was built, from which commit, when and for which target.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BuildInfo {
     pub version: String,
     pub short_hash: String,
     pub full_hash: String,
-    /// The working tree had uncommitted changes.
     pub dirty: bool,
     pub build_date: String,
     pub target: String,
@@ -37,7 +35,6 @@ impl BuildInfo {
         format!("{} ({}{dirty_mark})", self.version, self.short_hash)
     }
 
-    /// The old title, `Aurora Asset Editor v{0}.{1}.{2} by Swizzy thanks to MaesterRowen`.
     pub fn window_title(&self) -> String {
         format!("{APP_NAME} v{} {CREDITS}", self.version)
     }

@@ -32,7 +32,6 @@ pub const DROP_DURING_QUESTION_TEXT: &str =
 const MAGIC_LEN: u64 = 4;
 
 impl App {
-    /// The Open menu's "Open asset files…".
     pub fn open_files_with_dialog(&mut self) {
         if self.refuse_while_busy() {
             return;
@@ -83,7 +82,6 @@ impl App {
         self.drop_hover = hover;
     }
 
-    /// Whether files are being dragged over the window.
     pub fn drop_hover(&self) -> bool {
         self.drop_hover
     }
@@ -101,7 +99,6 @@ impl App {
         self.status = StatusLine::ready();
     }
 
-    /// The old busy indicator blocked all input while a load ran; here the request is refused and says so.
     pub(super) fn refuse_while_busy(&mut self) -> bool {
         if !self.locks().editor {
             return false;

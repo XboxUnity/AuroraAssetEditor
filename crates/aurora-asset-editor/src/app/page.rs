@@ -12,7 +12,6 @@ pub enum Page {
 }
 
 impl Page {
-    /// The editor page that shows `kind`.
     pub fn of_kind(kind: AssetKind) -> Page {
         match kind {
             AssetKind::Cover => Page::Cover,

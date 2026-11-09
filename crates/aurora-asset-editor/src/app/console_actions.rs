@@ -37,7 +37,6 @@ impl App {
         &self.console
     }
 
-    /// Opens the connection dialog.
     pub fn edit_connection(&mut self) {
         if self.modals.connection_form_mut().is_some() {
             return;
@@ -124,7 +123,6 @@ impl App {
         self.console.table.sort_by(column);
     }
 
-    /// Selecting a row makes its game the current game.
     pub fn select_game(&mut self, visible_row: usize) {
         let Some(game) = self.console.table.select_visible_row(visible_row) else {
             return;
@@ -149,7 +147,6 @@ impl App {
         self.select_game(row);
     }
 
-    /// Home and End in the table.
     pub fn select_first_game(&mut self) {
         self.select_game(0);
     }
@@ -441,8 +438,6 @@ impl App {
     }
 }
 
-/// The old test said "Connection test Failed..." when the console did not answer like Aurora, and
-/// "Error: {message}" for everything else.
 fn test_failure_text(error: &ConsoleError) -> String {
     match error {
         ConsoleError::NotAurora { .. } => {

@@ -1,7 +1,6 @@
 use std::error::Error;
 use std::fmt;
 
-/// The system could not show a file or folder dialog.
 #[derive(Debug)]
 pub struct DialogError {
     pub source: Box<dyn Error + Send + Sync>,

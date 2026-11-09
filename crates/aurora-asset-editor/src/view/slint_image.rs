@@ -1,7 +1,6 @@
 use aurora_asset::RgbaImage;
 use slint::{Image, Rgba8Pixel, SharedPixelBuffer};
 
-/// `pixels` copied into an image the window can show.
 pub fn slint_image(pixels: &RgbaImage) -> Image {
     let buffer = SharedPixelBuffer::<Rgba8Pixel>::clone_from_slice(
         pixels.as_raw(),

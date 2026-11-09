@@ -66,7 +66,6 @@ impl App {
         self.load_games_for_picker();
     }
 
-    /// OK of the TitleID prompt.
     pub(super) fn save_all_for_form(&mut self, form: &TitleIdForm) {
         let title_id = match form.parse() {
             Ok(title_id) => title_id,

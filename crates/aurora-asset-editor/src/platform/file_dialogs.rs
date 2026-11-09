@@ -14,7 +14,7 @@ pub struct FileFilter {
 pub struct OpenRequest {
     pub title: String,
     pub filters: Vec<FileFilter>,
-    /// Indexes `filters` from 0; the old `FilterIndex` counted from 1.
+    /// Indexes `filters` from 0.
     pub default_filter: usize,
     pub default_name: Option<String>,
 }
@@ -23,7 +23,7 @@ pub struct OpenRequest {
 pub struct SaveRequest {
     pub title: String,
     pub filters: Vec<FileFilter>,
-    /// Indexes `filters` from 0; the old `FilterIndex` counted from 1.
+    /// Indexes `filters` from 0.
     pub default_filter: usize,
     pub default_name: Option<String>,
 }

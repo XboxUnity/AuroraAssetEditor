@@ -394,7 +394,6 @@ fn bulk_text(form: &BulkForm) -> String {
     )
 }
 
-/// The choice behind the dialog's button `index`.
 fn offered_choice(modal: Option<&Modal>, index: i32) -> Option<ChoiceId> {
     let choice = match modal {
         Some(Modal::Choice { choices, .. }) => usize::try_from(index)
@@ -409,7 +408,6 @@ fn offered_choice(modal: Option<&Modal>, index: i32) -> Option<ChoiceId> {
     choice
 }
 
-/// The form field behind the dialog's box `index`.
 fn form_field(modal: Option<&Modal>, index: i32) -> Option<ModalField> {
     let fields: &[ModalField] = match modal {
         Some(Modal::TitleId { .. }) => &TITLE_ID_FIELDS,

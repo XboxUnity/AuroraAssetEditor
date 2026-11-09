@@ -54,7 +54,6 @@ pub struct App {
     pub(super) upload_change_counts: Vec<(AssetKind, u64)>,
     /// Work that replaces pages with unsaved changes, oldest first, each waiting for its Discard question.
     pub(super) pending_replacements: VecDeque<PendingReplacement>,
-    /// The user discarded the unsaved changes to close the window.
     pub(super) close_approved: bool,
 }
 
@@ -274,7 +273,6 @@ impl App {
         self.report_error(context, error);
     }
 
-    /// Logs the error and shows it in the status line.
     pub(super) fn report_error(&mut self, context: &str, error: &(dyn Error + 'static)) {
         let log_failure = self.record_error(context, error);
         self.set_error_status(format!("{context}: {error}"), log_failure);

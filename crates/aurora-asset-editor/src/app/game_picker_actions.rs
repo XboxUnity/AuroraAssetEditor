@@ -32,7 +32,6 @@ impl App {
         }
     }
 
-    /// Up and Down in the picker's box.
     pub fn move_picker_highlight(&mut self, step: isize) {
         let match_count = self.picker_matches().len();
         if let Some(picker) = self.picker_mut() {
@@ -58,7 +57,6 @@ impl App {
         }
     }
 
-    /// Return in the picker's box picks the highlighted game.
     pub fn pick_highlighted_game(&mut self) {
         let match_count = self.picker_matches().len();
         let highlighted = self

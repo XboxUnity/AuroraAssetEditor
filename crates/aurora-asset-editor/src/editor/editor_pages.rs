@@ -53,7 +53,6 @@ impl EditorPages {
         Some(self.get_mut(kind))
     }
 
-    /// Empty documents, as the old `Reset()`.
     pub fn reset(&mut self) {
         for kind in AssetKind::ALL {
             self.get_mut(kind).clear();

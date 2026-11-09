@@ -2,13 +2,13 @@ use aurora_image::IMPORT_EXTENSIONS;
 
 use crate::platform::FileFilter;
 
-/// The old `FilterIndex = 5`, counted from 0 here: "Aurora Asset Files (*.asset)".
+/// The index of "Aurora Asset Files (*.asset)", counted from 0.
 pub const ASSET_OPEN_DEFAULT_FILTER: usize = 4;
 
 /// "All supported images" is the first entry.
 pub const IMAGE_OPEN_DEFAULT_FILTER: usize = 0;
 
-/// The old app's seven filters in the old order. The old names carried a stray "(defaultFilename)", which is left out.
+/// The seven filters in the order the old app listed them, without the stray "(defaultFilename)" its names carried.
 pub fn asset_open_filters() -> Vec<FileFilter> {
     [
         ("Game Cover/Boxart Asset File (GC*.asset)", "GC*.asset"),

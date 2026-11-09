@@ -159,7 +159,7 @@ fn run_bulk(
     })
 }
 
-/// A file without entries of its kind counts as missing, like one that is not there (U9).
+/// A file without entries of its kind counts as missing, like one that is not there.
 fn download_kinds(
     client: &mut ConsoleClient,
     ids: &GameIds,

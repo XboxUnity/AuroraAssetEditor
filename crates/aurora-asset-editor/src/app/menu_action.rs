@@ -2,7 +2,6 @@ use crate::settings::ThemeChoice;
 
 use super::KindChoice;
 
-/// An item of one of the menus.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MenuAction {
     OpenAssetFiles,

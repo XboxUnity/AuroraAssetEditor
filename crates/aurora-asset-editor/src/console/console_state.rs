@@ -17,9 +17,7 @@ pub struct ConsoleState {
     presence_gate: PresenceGate,
     /// The generation of the refresh that is running, if one is.
     running_refresh: Option<u64>,
-    /// What started the last refresh.
     refresh_origin: RefreshOrigin,
-    /// The stop flag of the bulk run in progress.
     bulk_stop: Option<Arc<AtomicBool>>,
 }
 

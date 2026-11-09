@@ -23,7 +23,6 @@ impl App {
         self.set_current_game(None);
     }
 
-    /// The game chip menu's "Copy TitleID {id}".
     pub fn copy_title_id(&mut self) {
         if let Some(game) = &self.current_game {
             let id = game.ids.title_id.to_string();
@@ -31,7 +30,6 @@ impl App {
         }
     }
 
-    /// The game chip menu's "Copy DatabaseID {id}".
     pub fn copy_database_id(&mut self) {
         if let Some(game) = &self.current_game {
             let id = game.ids.database_id.to_string();

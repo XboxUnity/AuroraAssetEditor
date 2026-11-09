@@ -3,7 +3,6 @@ use std::time::Duration;
 
 use super::Severity;
 
-/// How long a toast shows before it goes by itself.
 pub const TOAST_DURATION: Duration = Duration::from_secs(4);
 /// The most toasts on screen at once; a new one beyond it pushes out the oldest.
 pub const MAX_TOASTS: usize = 3;

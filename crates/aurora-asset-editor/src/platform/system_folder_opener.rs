@@ -3,7 +3,6 @@ use std::path::Path;
 
 use super::FolderOpener;
 
-/// Opens folders in the system's file manager.
 #[derive(Default)]
 pub struct SystemFolderOpener;
 

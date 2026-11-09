@@ -149,7 +149,6 @@ impl App {
         }
     }
 
-    /// OK of the upload target dialog.
     pub(super) fn save_all_to_console_for_form(&mut self, form: &UploadTargetForm) {
         let ids = match form.parse() {
             Ok(ids) => ids,
@@ -167,7 +166,7 @@ impl App {
         self.save_all_to(ids);
     }
 
-    /// Uploads the pages that have content to the game with `ids`, the old app's `SaveAllAssetsFtpOnClick`.
+    /// Uploads the pages that have content to the game with `ids`; pages without content are skipped.
     fn save_all_to(&mut self, ids: GameIds) {
         let kinds_with_content: Vec<AssetKind> = AssetKind::ALL
             .into_iter()

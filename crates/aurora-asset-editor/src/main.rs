@@ -242,7 +242,6 @@ fn run_smoke_test(asset: &Path, output: PathBuf) -> ExitCode {
     exit_code
 }
 
-/// The reason the smoke test failed, when it did.
 fn smoke_test_result(launch: Launch, asset: &Path, output: PathBuf) -> Result<(), String> {
     let kind = asset_kind(asset).map_err(|error| {
         let reason = error_chain(error.as_ref()).join(": ");
