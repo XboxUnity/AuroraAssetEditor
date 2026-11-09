@@ -147,7 +147,8 @@ fn read_stderr(child: &mut Child) -> mpsc::Receiver<String> {
 }
 
 /// The child's exit status, or why there is none. A child that runs longer than `XTASK_SMOKE_TIMEOUT`, or that
-/// can no longer be waited for, is stopped along with the processes it started.
+/// can no longer be waited for, is stopped; on Unix together with every process in its group
+/// (`start_in_own_process_group`).
 fn wait_for_exit(child: &mut Child, program: &str) -> Result<ExitStatus, String> {
     let started = Instant::now();
     loop {
