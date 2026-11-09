@@ -5,7 +5,7 @@ use aurora_image::{ImageTarget, RESIZE_FILTER, decode_image, encoder_pixels, fit
 const BYTES_PER_PIXEL: usize = 4;
 const CHOSEN_FILTER_PREFIX: &str = "Chosen filter: ";
 
-/// The target-size gate set of spec 6.2, written by `cargo xtask closeness-inputs`.
+/// The target-size gate set, written by `cargo xtask closeness-inputs`.
 const GATE_INPUTS: [(&str, ImageTarget); 14] = [
     ("bmp_24.bmp", ImageTarget::Icon),
     ("bmp_32.bmp", ImageTarget::Icon),

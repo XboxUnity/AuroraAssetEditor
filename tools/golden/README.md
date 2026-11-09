@@ -11,11 +11,10 @@ cross-decode job runs them against the Rust output.
 
 ## `spike/`
 
-The black-box investigation from the design (section 13 of
-`docs/superpowers/specs/2026-11-06-rust-cross-platform-design.md`), kept as it was run. The
+The black-box investigation of the old AuroraAsset.dll, kept as it was run. The
 scripts still carry the session scratchpad paths they were written with; they are a record, not
 the maintained tooling. The fixture generators and harnesses the tests use are built from them
-under `tools/golden` as part of the implementation plan.
+under `tools/golden`.
 
 | File | Purpose |
 |---|---|

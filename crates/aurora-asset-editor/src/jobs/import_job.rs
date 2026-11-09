@@ -23,7 +23,7 @@ pub struct ImportJob {
 pub struct ImportRequest {
     pub source: ImageSource,
     pub slot: ImportSlot,
-    /// Whether Auto Resize may stretch this image: files yes, results fetched from elsewhere no (spec 6.3).
+    /// Whether Auto Resize may stretch this image: files yes, results fetched from elsewhere no.
     pub resize: bool,
 }
 

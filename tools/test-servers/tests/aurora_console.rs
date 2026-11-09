@@ -1,5 +1,4 @@
-//! The fake console's default behaviour, checked on the wire against what Aurora's FtpDll sends
-//! (see `.superpowers/sdd/cleanroom-ftp/aurora-ftp-server.md`).
+//! The fake console's default behaviour, checked on the wire against what Aurora's FtpDll sends.
 
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpStream;

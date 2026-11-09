@@ -7,7 +7,7 @@ use aurora_image::{ImportError, decode_image, encoder_pixels};
 use aurora_online::{CoverSource, OnlineClient, OnlineError, QueryError, TitleId};
 
 /// Bulk covers from an online source: a random one of the title's covers, as the pixels `encode` takes.
-/// Covers are never resized (spec 6.3).
+/// Covers are never resized, so they stay as the source made them.
 pub struct OnlineCoverProvider {
     client: OnlineClient,
     source: CoverSource,

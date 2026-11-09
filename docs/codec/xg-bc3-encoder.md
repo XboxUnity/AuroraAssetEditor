@@ -105,7 +105,7 @@ Theories tested on the way:
   picked code 1 over code 7 for 116 of 254 values of `lo`, round-to-nearest predicted 2. Every
   case is explained by the truncating loop.
 
-### Byte loading (ruling R19)
+### Byte loading
 
 The A8R8G8B8 loader multiplies each byte by the `f32` constant `1/255` (stored as a double,
 `0x1001ac20`) and stores the product as `f32`. That is `n * (1.0f / 255.0f)`, not `n / 255`; the

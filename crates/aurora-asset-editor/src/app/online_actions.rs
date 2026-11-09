@@ -120,7 +120,7 @@ impl App {
         self.submit_download(job, JobPriority::User);
     }
 
-    /// Makes the selected result the cover, as it came: results are never resized (spec 6.3). The page
+    /// Makes the selected result the cover, as it came: results are never resized. The page
     /// stays on Online.
     pub fn use_result_as_cover(&mut self) {
         if self.refuse_while_busy() {

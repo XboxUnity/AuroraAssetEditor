@@ -1,5 +1,5 @@
 <#
-Writes GDI+ reference pixels for the GDI+ closeness report (spec 6.2): every input goes
+Writes GDI+ reference pixels for the GDI+ closeness report: every input goes
 through the old app's image path, MainWindow.GetImage followed by AuroraAsset.ImageToRawArgb,
 and comes out as the A, R, G, B bytes the old app handed to AuroraAsset.dll.
 

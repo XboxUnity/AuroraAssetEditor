@@ -7,7 +7,7 @@ const PITCH_SHIFT: u32 = 22;
 const PITCH_MASK: u32 = 0x1FF;
 const TEXELS_PER_PITCH_UNIT: usize = 32;
 
-/// The bytes a linear decode reads (ruling R32): every row above the last at the header's row
+/// The bytes a linear decode reads: every row above the last at the header's row
 /// pitch, then only the visible units of the last row.
 pub fn minimum_data_len(texture: &EncodedTexture, unit: SurfaceUnit) -> usize {
     let header = texture.header.to_bytes();

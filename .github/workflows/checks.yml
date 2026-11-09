@@ -395,7 +395,7 @@ jobs:
           fi
           cargo xtask smoke-test arch -x86_64 "$MACOS_BUNDLE_BINARY"
 
-      # Informational (spec 10 item 10): its numbers never fail the job, a broken tool does. It
+      # Informational: its numbers never fail the job, a broken tool does. It
       # rewrites a tracked file, which is why it runs after the release build.
       - name: GDI+ closeness report
         if: runner.os == 'Windows'

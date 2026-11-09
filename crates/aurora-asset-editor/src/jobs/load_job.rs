@@ -118,7 +118,6 @@ fn load_fsd(bytes: &[u8], compression: Compression) -> Result<FsdImages, LoadPro
     })
 }
 
-/// FSD contents are never resized (spec 6.3).
 fn prepare_image(
     image: &FsdImage,
     compression: Compression,
