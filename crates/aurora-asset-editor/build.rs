@@ -23,17 +23,21 @@ const REF_PREFIX: &str = "ref: ";
 const NOTICE_FILES: [&str; 2] = ["notices/handwritten.txt", "notices/third-party.txt"];
 const COMPRESSED_NOTICES: &str = "notices.gz";
 const APP_ICON: &str = "../aurora-ui/ui/app_icon.ico";
+const PRODUCT_NAME: &str = "Aurora Asset Editor";
+const LEGAL_COPYRIGHT: &str = "Public domain (Unlicense)";
+const DIRTY_MARK: &str = ".dirty";
 
 fn main() {
     watch_git_state();
     pack_notices();
-    embed_exe_icon();
     println!("cargo:rerun-if-env-changed=SOURCE_DATE_EPOCH");
     println!("cargo:rerun-if-env-changed=AURORA_BUILD_RUN_URL");
 
+    let version = std::env::var("CARGO_PKG_VERSION").expect("cargo sets CARGO_PKG_VERSION");
     let full_hash = git(&["rev-parse", "HEAD"]).unwrap_or_else(|| UNKNOWN.to_owned());
-    let short_hash = git(&["rev-parse", "--short", "HEAD"]).unwrap_or_else(|| UNKNOWN.to_owned());
+    let short_hash = git(&["rev-parse", "--short=7", "HEAD"]).unwrap_or_else(|| UNKNOWN.to_owned());
     let dirty = git(&["status", "--porcelain"]).is_some_and(|status| !status.is_empty());
+    embed_windows_resources(&version, &pill_text(&version, &short_hash, dirty));
     let target = std::env::var("TARGET").unwrap_or_else(|_| UNKNOWN.to_owned());
     let run_url = std::env::var("AURORA_BUILD_RUN_URL").unwrap_or_default();
 
@@ -86,9 +90,16 @@ fn pack_notices() {
         .unwrap_or_else(|error| panic!("could not write {}: {error}", target.display()));
 }
 
-/// The exe's own icon, which Explorer and a pinned taskbar entry show, as the old app's `ApplicationIcon` did.
+/// The same text as `BuildInfo::pill_text`; `exe_version_resource_names_this_build` keeps the two together.
+fn pill_text(version: &str, short_hash: &str, dirty: bool) -> String {
+    let dirty_mark = if dirty { DIRTY_MARK } else { "" };
+    format!("{version} ({short_hash}{dirty_mark})")
+}
+
+/// The exe's icon, which Explorer and a pinned taskbar entry show as the old app's `ApplicationIcon` did, and
+/// the version and product strings of its file properties.
 #[cfg(windows)]
-fn embed_exe_icon() {
+fn embed_windows_resources(version: &str, pill: &str) {
     println!("cargo:rerun-if-changed={APP_ICON}");
     if !targets_windows() {
         return;
@@ -96,17 +107,26 @@ fn embed_exe_icon() {
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR")
         .expect("cargo sets CARGO_MANIFEST_DIR for build scripts");
     let icon = Path::new(&manifest_dir).join(APP_ICON);
-    winresource::WindowsResource::new()
+    let mut resource = winresource::WindowsResource::new();
+    resource
         .set_icon(&icon.to_string_lossy())
+        .set("FileVersion", version)
+        .set("ProductVersion", pill)
+        .set("ProductName", PRODUCT_NAME)
+        .set("FileDescription", PRODUCT_NAME)
+        .set("LegalCopyright", LEGAL_COPYRIGHT);
+    resource
         .compile()
-        .unwrap_or_else(|error| panic!("could not embed {} in the exe: {error}", icon.display()));
+        .unwrap_or_else(|error| panic!("could not embed the resources in the exe: {error}"));
 }
 
 /// `winresource` needs the Windows resource compiler, which only a Windows host has.
 #[cfg(not(windows))]
-fn embed_exe_icon() {
+fn embed_windows_resources(_version: &str, _pill: &str) {
     if targets_windows() {
-        println!("cargo:warning=the exe icon is embedded only when building on Windows");
+        println!(
+            "cargo:warning=the exe icon and file properties are embedded only when building on Windows"
+        );
     }
 }
 
