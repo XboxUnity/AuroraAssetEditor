@@ -19,7 +19,6 @@ pub fn write_opaque_png(path: &Path, image: &RgbaImage) -> Result<(), PngFileErr
     write_replacing(path, &bytes)
 }
 
-/// The PNG `write_opaque_png` writes, in memory.
 pub(super) fn opaque_png_bytes(image: &RgbaImage) -> Result<Vec<u8>, PngFileError> {
     if let Some((x, y)) = first_translucent_pixel(image) {
         return Err(PngFileError::NotOpaque { x, y });
@@ -98,14 +97,9 @@ pub(super) fn first_translucent_pixel(image: &RgbaImage) -> Option<(u32, u32)> {
 
 #[derive(Debug)]
 pub enum PngFileError {
-    NotOpaque {
-        x: u32,
-        y: u32,
-    },
+    NotOpaque { x: u32, y: u32 },
     Io(io::Error),
-    /// The file is not a PNG the decoder can read.
     Decode(image::ImageError),
-    /// The image could not be encoded as a PNG.
     Encode(image::ImageError),
 }
 

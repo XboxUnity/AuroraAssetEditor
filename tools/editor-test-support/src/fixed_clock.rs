@@ -14,7 +14,6 @@ impl FixedClock {
         }
     }
 
-    /// 2026-11-07 20:41:05 +01:00.
     pub fn harness_time() -> FixedClock {
         let offset = FixedOffset::east_opt(3600).expect("one hour is a valid offset");
         let now = NaiveDate::from_ymd_opt(2026, 11, 7)

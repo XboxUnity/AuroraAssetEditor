@@ -37,7 +37,6 @@ impl FakeClipboardHandle {
         self.state.borrow().text.clone()
     }
 
-    /// Every later copy fails with an error whose source carries `message`.
     pub fn fail_with(&self, message: &str) {
         self.state.borrow_mut().failure = Some(message.to_owned());
     }

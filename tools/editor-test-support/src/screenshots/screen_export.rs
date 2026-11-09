@@ -18,7 +18,6 @@ pub struct ScreenExport {
     folder: PathBuf,
 }
 
-/// What became of each image of an export.
 #[derive(Debug, Default)]
 pub struct ExportReport {
     pub written: Vec<String>,
@@ -28,7 +27,6 @@ pub struct ExportReport {
     pub errors: Vec<String>,
 }
 
-/// What an export does with one capture.
 enum ExportOutcome {
     Written,
     Kept,

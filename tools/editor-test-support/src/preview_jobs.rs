@@ -18,7 +18,6 @@ impl PreviewJobs {
         PreviewJobs::default()
     }
 
-    /// The runner to build the view with.
     pub fn runner(&self) -> Box<dyn JobRunner> {
         Box::new(self.queue.clone())
     }

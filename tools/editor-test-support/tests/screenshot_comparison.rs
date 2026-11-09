@@ -246,7 +246,6 @@ fn image_with_changed_pixels(base: &RgbaImage, changed: &[(u32, u32)]) -> RgbaIm
     image
 }
 
-/// The left edge of panel `index` in a diff whose panels are `panel_width` wide.
 fn panel_left(index: u32, panel_width: u32) -> u32 {
     index * (panel_width + DIFF_PANEL_GAP)
 }

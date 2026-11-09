@@ -45,7 +45,6 @@ fn loopback_only_client(endpoints: Endpoints) -> OnlineClient {
     )
 }
 
-/// The build every harness app reports.
 pub fn test_build_info() -> BuildInfo {
     BuildInfo {
         version: "2.0.7".to_owned(),
@@ -135,7 +134,6 @@ impl AppHarness {
         }
     }
 
-    /// The app, borrowed until the returned guard is dropped.
     pub fn app(&mut self) -> RefMut<'_, App> {
         self.running().app.borrow_mut()
     }
@@ -179,7 +177,6 @@ impl AppHarness {
         environment.startup_problems.extend(startup.problem);
     }
 
-    /// Starts the app reporting `build` in place of `test_build_info()`.
     pub fn with_build(&mut self, build: BuildInfo) {
         self.setup("with_build").environment.build = build;
     }

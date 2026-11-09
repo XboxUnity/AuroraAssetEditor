@@ -82,7 +82,6 @@ impl FakeDialogsHandle {
         self.push(DialogAnswer::Folder(path));
     }
 
-    /// The user closes the next dialog without choosing.
     pub fn push_cancel(&self) {
         self.push(DialogAnswer::Cancel);
     }

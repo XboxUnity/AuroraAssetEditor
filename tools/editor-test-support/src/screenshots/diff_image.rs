@@ -95,7 +95,6 @@ fn outline_bounds(diff: &mut RgbaImage, left: u32, panel_width: u32, bounds: &Pi
     }
 }
 
-/// The left edge of panel `index` when every panel is `panel_width` wide.
 fn panel_left(index: u32, panel_width: u32) -> u32 {
     index * (panel_width + DIFF_PANEL_GAP)
 }

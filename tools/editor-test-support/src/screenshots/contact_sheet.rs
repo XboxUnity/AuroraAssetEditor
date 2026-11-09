@@ -177,7 +177,6 @@ fn screens_in<'a, 'r>(
         .collect()
 }
 
-/// The header's links to the sections the page has, each with its id and count.
 fn section_links(report: &SuiteReport, screens: &[ShownScreen<'_>]) -> Vec<(&'static str, String)> {
     let mut links = Vec::new();
     for section in [
@@ -397,7 +396,6 @@ fn push_outcome(html: &mut String, text: &str) {
     html.push_str(&format!("<p class=\"outcome\">{}</p>\n", escape(text)));
 }
 
-/// An image linking to its full-size PNG.
 fn push_panel(html: &mut String, caption: Option<&str>, folder: &str, image: &str) {
     let path = escape(&format!("{folder}/{image}.{PNG_EXTENSION}"));
     html.push_str("<div class=\"panel\">\n");

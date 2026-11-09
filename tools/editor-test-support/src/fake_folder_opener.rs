@@ -38,7 +38,6 @@ impl FakeFolderOpenerHandle {
         self.state.borrow().opened.clone()
     }
 
-    /// Every later open fails with an error that carries `message`.
     pub fn fail_with(&self, message: &str) {
         self.state.borrow_mut().failure = Some(message.to_owned());
     }

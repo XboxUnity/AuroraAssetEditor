@@ -125,7 +125,6 @@ pub struct PixelBounds {
 }
 
 impl PixelBounds {
-    /// The box holding just the pixel (x, y).
     pub fn around(x: u32, y: u32) -> Self {
         Self {
             left: x,
@@ -135,7 +134,6 @@ impl PixelBounds {
         }
     }
 
-    /// Grows the box to hold the pixel (x, y) as well.
     pub fn include(&mut self, x: u32, y: u32) {
         self.left = self.left.min(x);
         self.top = self.top.min(y);
