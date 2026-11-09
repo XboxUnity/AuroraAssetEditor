@@ -1,0 +1,204 @@
+# Every push to rust-cross-platform builds the next v2 version: the newest published v2 tag plus
+# one in the patch, or 2.0.0. A green run replaces the one v2 draft release; the user publishes it
+# with GitHub's Publish button, which creates the tag.
+name: Release
+
+on:
+  push:
+    # A branch filter never fires for tags, so pushes of tags are skipped.
+    branches: [rust-cross-platform]
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      short: ${{ steps.version.outputs.short }}
+      label: ${{ steps.version.outputs.label }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Pinned toolchain
+        run: |
+          set -euo pipefail
+          if ! command -v rustup >/dev/null; then
+            echo "::error::rustup is not on this runner image"
+            exit 1
+          fi
+          rustup toolchain install
+          rustup show
+
+      - name: Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Next v2 version
+        id: version
+        run: |
+          set -euo pipefail
+          version=$(cargo xtask next-v2-version)
+          short=$(git rev-parse --short=7 HEAD)
+          {
+            echo "version=$version"
+            echo "short=$short"
+            echo "label=v$version ($short)"
+          } >> "$GITHUB_OUTPUT"
+          echo "This run builds v$version ($short)"
+
+  checks:
+    needs: version
+    uses: ./.github/workflows/checks.yml
+    with:
+      version: ${{ needs.version.outputs.version }}
+      label: ${{ needs.version.outputs.label }}
+
+  draft:
+    needs: [version, checks]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      SHORT: ${{ needs.version.outputs.short }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Pinned toolchain
+        run: |
+          set -euo pipefail
+          if ! command -v rustup >/dev/null; then
+            echo "::error::rustup is not on this runner image"
+            exit 1
+          fi
+          rustup toolchain install
+          rustup show
+
+      - name: Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Download packages
+        uses: actions/download-artifact@v8
+        with:
+          pattern: package-*
+          merge-multiple: true
+          path: dist
+
+      - name: Download screenshots
+        uses: actions/download-artifact@v8
+        with:
+          pattern: ui-screenshots-*
+          path: ui-review
+
+      - name: Name the screenshot folders by platform
+        run: |
+          set -euo pipefail
+          for folder in ui-review/ui-screenshots-*; do
+            if [ ! -d "$folder" ]; then
+              echo "::error::no ui-screenshots artifact was downloaded"
+              exit 1
+            fi
+            mv "$folder" "ui-review/${folder#ui-review/ui-screenshots-}"
+          done
+
+      - name: Screenshot zip
+        run: |
+          set -euo pipefail
+          cargo xtask ui-zip ui-review dist/ui-screenshots.zip
+
+      - name: Checksums
+        run: |
+          set -euo pipefail
+          cargo xtask checksums "$VERSION" dist
+
+      - name: Previous v2 release
+        id: previous
+        run: |
+          set -euo pipefail
+          tag=$(cargo xtask latest-v2-tag)
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "Previous v2 release: ${tag:-none}"
+
+      - name: Commits since the previous release
+        env:
+          PREVIOUS_TAG: ${{ steps.previous.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if [ -n "$PREVIOUS_TAG" ]; then
+            git log --format='%h %s' "$PREVIOUS_TAG..HEAD" > "$RUNNER_TEMP/commits.txt"
+          else
+            : > "$RUNNER_TEMP/commits.txt"
+          fi
+
+      - name: Generated notes
+        if: steps.previous.outputs.tag != ''
+        env:
+          PREVIOUS_TAG: ${{ steps.previous.outputs.tag }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/releases/generate-notes" \
+            -f tag_name="v$VERSION" \
+            -f target_commitish="$GITHUB_SHA" \
+            -f previous_tag_name="$PREVIOUS_TAG" \
+            --jq .body > "$RUNNER_TEMP/generated.md"
+
+      - name: Release notes
+        env:
+          PREVIOUS_TAG: ${{ steps.previous.outputs.tag }}
+        run: |
+          set -euo pipefail
+          arguments=(--version "$VERSION" --commit "$GITHUB_SHA" --short "$SHORT"
+            --repository "$GITHUB_REPOSITORY"
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            --commits "$RUNNER_TEMP/commits.txt"
+            --checksums dist/SHA256SUMS.txt
+            --out "$RUNNER_TEMP/notes.md")
+          if [ -n "$PREVIOUS_TAG" ]; then
+            arguments+=(--previous-tag "$PREVIOUS_TAG" --generated "$RUNNER_TEMP/generated.md")
+          fi
+          cargo xtask release-notes "${arguments[@]}"
+
+      # A run that computed its version before the user published that version would otherwise
+      # attach a second release to the published tag.
+      - name: Version still unpublished
+        run: |
+          set -euo pipefail
+          git fetch --tags --force
+          current=$(cargo xtask next-v2-version)
+          if [ "$current" != "$VERSION" ]; then
+            echo "::error::v$VERSION was published while this run was building; push again to build the next version"
+            exit 1
+          fi
+
+      # A draft has no git tag, so deleting it removes nothing else. Drafts are deleted by id,
+      # since two drafts can share a tag name after a failed create.
+      - name: Delete older v2 drafts
+        run: |
+          set -euo pipefail
+          drafts=$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases" --jq '.[] | select(.draft and (.tag_name | startswith("v2."))) | .id')
+          for id in $drafts; do
+            echo "Deleting draft release $id"
+            gh api -X DELETE "repos/${GITHUB_REPOSITORY}/releases/$id"
+          done
+
+      - name: Draft release
+        run: |
+          set -euo pipefail
+          gh release create "v$VERSION" --draft --target "$GITHUB_SHA" --title "v$VERSION ($SHORT)" --notes-file "$RUNNER_TEMP/notes.md" dist/*

@@ -1,0 +1,13 @@
+# Categories for GitHub's generated release notes. GitHub groups pull requests by their labels,
+# not by commit prefixes, and lists pull requests only: with direct pushes the generated part is
+# just the Full Changelog line, and the notes' Commits section is the change list.
+changelog:
+  categories:
+    - title: Features
+      labels: [feat]
+    - title: Bug Fixes
+      labels: [fix]
+    - title: Internal
+      labels: [chore, docs, refactor, style]
+    - title: Other Changes
+      labels: ["*"]

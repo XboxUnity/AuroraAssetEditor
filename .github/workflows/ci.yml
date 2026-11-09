@@ -1,0 +1,22 @@
+# Pull requests and pushes to other branches run every gate, unstamped. Only release.yml stamps a
+# version or touches a draft release.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches-ignore: [rust-cross-platform]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    uses: ./.github/workflows/checks.yml
+    with:
+      version: ""
+      label: ""

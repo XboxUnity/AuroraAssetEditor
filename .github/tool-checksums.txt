@@ -1,0 +1,9 @@
+# SHA-256 of every tool downloaded for this repository, checked with `sha256sum -c` before use.
+# One line per tool: <sha256>  <exact versioned URL>. actionlint is the local workflow linter.
+6e7241b51e6817ea6a047693d8e6fed13b31819c9a0dd6c5a726e1592d22f6e9  https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_windows_amd64.zip
+b1c8cb14e30889e7e2999e6b69e62d9e9b9ffc0f4df8180564d306d9680e6c55  https://static.rust-lang.org/rustup/archive/1.29.3/x86_64-unknown-linux-gnu/rustup-init
+9f608c142e0e38a78957d0661ba1dfaf0b6fb37184cfaa4b9a0aa57af6184282  https://static.rust-lang.org/rustup/archive/1.29.3/aarch64-unknown-linux-gnu/rustup-init
+ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0  https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage
+f0837e7448a0c1e4e650a93bb3e85802546e60654ef287576f46c71c126a9158  https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-aarch64.AppImage
+2fca8b443c92510f1483a883f60061ad09b46b978b2631c807cd873a47ec260d  https://github.com/AppImage/type2-runtime/releases/download/20251108/runtime-x86_64
+00cbdfcf917cc6c0ff6d3347d59e0ca1f7f45a6df1a428a0d6d8a78664d87444  https://github.com/AppImage/type2-runtime/releases/download/20251108/runtime-aarch64

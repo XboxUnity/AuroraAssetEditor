@@ -1,0 +1,416 @@
+# Every gate on every OS, then the packages and their smoke test. Called by ci.yml (unstamped)
+# and by release.yml (with the release version and screenshot label).
+name: Checks
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: The version to stamp into the build; empty builds the workspace's own version
+        type: string
+        required: false
+        default: ""
+      label:
+        description: The screenshot label; empty means "CI run <run number> (<short hash>)"
+        type: string
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  platform:
+    name: ${{ matrix.platform }}
+    runs-on: ${{ matrix.runner }}
+    # Linux builds inside Ubuntu 22.04, so the binaries need no glibc newer than 2.35.
+    container: ${{ matrix.container }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-x86_64
+            runner: windows-latest
+            package_platform: windows-x86_64
+          - platform: linux-x86_64
+            runner: ubuntu-24.04
+            container: ubuntu:22.04
+            package_platform: linux-x86_64
+          - platform: linux-aarch64
+            runner: ubuntu-24.04-arm
+            container: ubuntu:22.04
+            package_platform: linux-aarch64
+          - platform: macos-aarch64
+            runner: macos-latest
+            package_platform: macos-universal
+    env:
+      VERSION: ${{ inputs.version }}
+      PACKAGE_PLATFORM: ${{ matrix.package_platform }}
+    steps:
+      - name: Container tools and libraries
+        if: runner.os == 'Linux'
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          set -euo pipefail
+          apt-get update
+          apt-get install -y git curl ca-certificates build-essential pkg-config libwayland-dev libfontconfig1-dev libxkbcommon-dev libxkbcommon-x11-0 xvfb
+          # gh from GitHub's own apt repository (cli.github.com).
+          install -d -m 755 /etc/apt/keyrings
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg -o /etc/apt/keyrings/githubcli-archive-keyring.gpg
+          chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" > /etc/apt/sources.list.d/github-cli.list
+          apt-get update
+          apt-get install -y gh
+
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # The checkout belongs to the runner's user, not the container's root, so git refuses it
+      # until it is marked safe; build.rs, the tag queries and the tree checks all need git.
+      - name: Trust the checkout in the container
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Pinned tools
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          arch=$(uname -m)
+          tools="$RUNNER_TEMP/tools"
+          mkdir -p "$tools"
+          # Downloads the one URL in .github/tool-checksums.txt that ends with $1 to $2, and checks it.
+          download_pinned() {
+            local suffix="$1" file="$2" line sha256 url
+            line=$(awk -v suffix="$suffix" 'substr($2, length($2) - length(suffix) + 1) == suffix { print $1 " " $2 }' .github/tool-checksums.txt)
+            if [ -z "$line" ] || [ "$(wc -l <<<"$line")" -ne 1 ]; then
+              echo "::error::.github/tool-checksums.txt needs exactly one URL ending in $suffix"
+              exit 1
+            fi
+            sha256=${line%% *}
+            url=${line#* }
+            echo "Downloading $url"
+            curl -fsSL --retry 3 -o "$file" "$url"
+            echo "$sha256  $file" | sha256sum -c -
+            chmod +x "$file"
+          }
+          download_pinned "/${arch}-unknown-linux-gnu/rustup-init" "$tools/rustup-init"
+          download_pinned "/appimagetool-${arch}.AppImage" "$tools/appimagetool"
+          download_pinned "/runtime-${arch}" "$tools/appimage-runtime"
+
+      - name: Rustup
+        run: |
+          set -euo pipefail
+          if [ "$RUNNER_OS" = Linux ]; then
+            "$RUNNER_TEMP/tools/rustup-init" -y --default-toolchain none
+            echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          elif ! command -v rustup >/dev/null; then
+            echo "::error::rustup is not on this runner image"
+            exit 1
+          fi
+
+      - name: Pinned toolchain
+        run: |
+          set -euo pipefail
+          rustup toolchain install
+          rustup show
+          if [ "$RUNNER_OS" = macOS ]; then
+            rustup target add x86_64-apple-darwin
+          fi
+
+      - name: Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.platform }}
+
+      - name: Screenshot label
+        env:
+          LABEL: ${{ inputs.label }}
+        run: |
+          set -euo pipefail
+          label="$LABEL"
+          if [ -z "$label" ]; then
+            label="CI run ${GITHUB_RUN_NUMBER} ($(git rev-parse --short=7 HEAD))"
+          fi
+          echo "AURORA_UI_LABEL=$label" >> "$GITHUB_ENV"
+
+      - name: Version stamp
+        if: inputs.version != ''
+        run: |
+          set -euo pipefail
+          cargo xtask set-version "$VERSION"
+          git update-index --assume-unchanged Cargo.toml Cargo.lock
+
+      - name: Version stamp leaves the tree clean
+        if: inputs.version != ''
+        run: |
+          set -euo pipefail
+          changes=$(git status --porcelain)
+          if [ -n "$changes" ]; then
+            echo "::error::the version stamp left changes in the tree"
+            echo "$changes"
+            exit 1
+          fi
+
+      - name: Format
+        if: matrix.platform == 'linux-x86_64'
+        run: |
+          set -euo pipefail
+          cargo fmt --all --check
+
+      - name: Clippy
+        run: |
+          set -euo pipefail
+          cargo clippy --workspace --all-targets --locked -- -D warnings
+
+      - name: Clippy, 32-bit harness
+        if: runner.os == 'Windows'
+        run: |
+          set -euo pipefail
+          cargo clippy -p golden-harness --target i686-pc-windows-msvc --all-targets --locked -- -D warnings
+
+      - name: Notices
+        if: matrix.platform == 'linux-x86_64'
+        run: |
+          set -euo pipefail
+          cargo install cargo-about --version 0.9.3 --locked --features cli
+          cargo xtask notices --check
+
+      - name: Screenshot baseline
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cargo xtask ui-baseline "$RUNNER_TEMP/ui-baseline" --env-file "$GITHUB_ENV"
+
+      - name: Tests
+        run: |
+          set -euo pipefail
+          if [ "$RUNNER_OS" = Linux ]; then
+            xvfb-run -a cargo test --workspace --locked
+          else
+            cargo test --workspace --locked
+          fi
+
+      - name: 32-bit harness tests
+        if: runner.os == 'Windows'
+        run: |
+          set -euo pipefail
+          cargo test -p golden-harness --target i686-pc-windows-msvc --locked
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ui-screenshots-${{ matrix.platform }}
+          path: target/ui-screenshots/${{ matrix.platform }}/
+          if-no-files-found: error
+
+      # build.rs marks a binary built from a changed tree as .dirty. CI has no global gitignore,
+      # so a file any earlier step left behind fails here too.
+      - name: Tree clean before the release build
+        run: |
+          set -euo pipefail
+          changes=$(git status --porcelain)
+          if [ -n "$changes" ]; then
+            echo "::error::the tree changed before the release build, which would mark the release binary .dirty"
+            echo "$changes"
+            exit 1
+          fi
+
+      - name: Release build
+        env:
+          AURORA_BUILD_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          if [ "$RUNNER_OS" = macOS ]; then
+            export MACOSX_DEPLOYMENT_TARGET=11.0
+            cargo build --release --locked -p aurora-asset-editor --target aarch64-apple-darwin
+            cargo build --release --locked -p aurora-asset-editor --target x86_64-apple-darwin
+          else
+            cargo build --release --locked -p aurora-asset-editor
+          fi
+
+      # .cargo/config.toml links the C runtime statically, so the exe needs no Visual C++
+      # Redistributable on the user's machine.
+      - name: Windows exe imports no C runtime DLL
+        if: runner.os == 'Windows'
+        run: |
+          set -euo pipefail
+          exe=target/release/aurora-asset-editor.exe
+          vswhere="/c/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe"
+          installation=$("$vswhere" -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath | tr -d '\r')
+          if [ -z "$installation" ]; then
+            echo "::error::vswhere found no Visual Studio with the C++ tools"
+            exit 1
+          fi
+          visual_studio=$(cygpath -u "$installation")
+          tools_version=$(tr -d '\r\n ' < "$visual_studio/VC/Auxiliary/Build/Microsoft.VCToolsVersion.default.txt")
+          dumpbin="$visual_studio/VC/Tools/MSVC/$tools_version/bin/Hostx64/x64/dumpbin.exe"
+          if ! listing=$("$dumpbin" -nologo -dependents "$exe" 2>&1); then
+            echo "::error::dumpbin could not list the imports of $exe"
+            echo "$listing"
+            exit 1
+          fi
+          imports=$(tr -d '\r' <<<"$listing" | awk 'tolower($0) ~ /^ +[^ ]+\.dll$/ { print $1 }')
+          echo "$exe imports:"
+          echo "$imports"
+          if [ -z "$imports" ]; then
+            echo "::error::dumpbin listed no DLL imports for $exe, so the check cannot tell"
+            echo "$listing"
+            exit 1
+          fi
+          runtime_imports=$(awk 'tolower($0) ~ /^(vcruntime|msvcp|api-ms-win-crt-)/' <<<"$imports")
+          if [ -n "$runtime_imports" ]; then
+            echo "::error::$exe imports C runtime DLLs that a clean Windows may lack: $(tr '\n' ' ' <<<"$runtime_imports")"
+            exit 1
+          fi
+
+      - name: Package
+        run: |
+          set -euo pipefail
+          if [ -n "$VERSION" ]; then
+            build_label="$VERSION ($(git rev-parse --short=7 HEAD))"
+          else
+            build_label="$AURORA_UI_LABEL"
+          fi
+          arguments=(package "$PACKAGE_PLATFORM")
+          if [ -n "$VERSION" ]; then
+            arguments+=(--version "$VERSION")
+          fi
+          arguments+=(--build-label "$build_label" --out dist)
+          case "$PACKAGE_PLATFORM" in
+            windows-x86_64)
+              arguments+=(--binary target/release/aurora-asset-editor.exe)
+              ;;
+            linux-x86_64 | linux-aarch64)
+              arguments+=(--binary target/release/aurora-asset-editor
+                --appimagetool "$RUNNER_TEMP/tools/appimagetool"
+                --appimage-runtime "$RUNNER_TEMP/tools/appimage-runtime")
+              ;;
+            macos-universal)
+              arguments+=(--binary target/aarch64-apple-darwin/release/aurora-asset-editor
+                --binary target/x86_64-apple-darwin/release/aurora-asset-editor)
+              ;;
+            *)
+              echo "::error::no package arguments for $PACKAGE_PLATFORM"
+              exit 1
+              ;;
+          esac
+          cargo xtask "${arguments[@]}"
+
+          # The smoke test runs what ships: the exe or the AppImage, and on macOS the bundle at
+          # MACOS_BUNDLE_BINARY. The file name holds the version, which only xtask knows when
+          # nothing was stamped.
+          shopt -s nullglob
+          case "$PACKAGE_PLATFORM" in
+            windows-x86_64) packaged=(dist/*.exe) ;;
+            linux-x86_64 | linux-aarch64) packaged=(dist/*.AppImage) ;;
+            macos-universal) exit 0 ;;
+          esac
+          if [ "${#packaged[@]}" -ne 1 ]; then
+            echo "::error::dist should hold one program to smoke-test, found ${#packaged[@]}: ${packaged[*]}"
+            exit 1
+          fi
+          echo "PACKAGED_APP=${packaged[0]}" >> "$GITHUB_ENV"
+
+      - name: Smoke test
+        if: runner.os == 'Windows'
+        run: |
+          set -euo pipefail
+          cargo xtask smoke-test "$PACKAGED_APP"
+
+      - name: Smoke test, release binary
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          xvfb-run -a cargo xtask smoke-test target/release/aurora-asset-editor
+
+      - name: Smoke test, AppImage
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          xvfb-run -a cargo xtask smoke-test "$PACKAGED_APP" --appimage-extract-and-run
+
+      # An extra argument makes the app open its window and stay, so xtask's own timeout has to
+      # stop the AppImage runtime and the app it started (the process group kill).
+      - name: Forced AppImage timeout leaves no process
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          appimage="$PACKAGED_APP"
+          log="$RUNNER_TEMP/forced-timeout.log"
+          if xvfb-run -a cargo xtask smoke-test "$appimage" --appimage-extract-and-run keep-window-open >"$log" 2>&1; then
+            cat "$log"
+            echo "::error::the forced-timeout smoke test passed, so it did not time out"
+            exit 1
+          fi
+          cat "$log"
+          grep -F "did not finish within 90 s, so it was stopped" "$log"
+          # After the group kill nothing holds the app's stderr, so xtask never waits it out.
+          if grep -F "stderr was still open" "$log"; then
+            echo "::error::a process kept stderr open after the forced timeout"
+            exit 1
+          fi
+          left=""
+          for cmdline in /proc/[0-9]*/cmdline; do
+            if ! arguments=$(tr '\0' ' ' < "$cmdline" 2>/dev/null); then
+              # Only a process that ended during the scan may be unreadable.
+              if [ -e "$cmdline" ]; then echo "::error::could not read $cmdline"; exit 1; fi
+              continue
+            fi
+            case "$arguments" in
+              *--smoke-test*) left="$left
+          ${cmdline%/cmdline}: $arguments" ;;
+            esac
+          done
+          if [ -n "$left" ]; then
+            echo "::error::processes left after the forced timeout:$left"
+            exit 1
+          fi
+          echo "No AppImage runtime or app left after the forced timeout"
+
+      - name: Smoke test, both macOS slices
+        if: runner.os == 'macOS'
+        env:
+          MACOS_BUNDLE_BINARY: target/package/macos-universal/Aurora Asset Editor.app/Contents/MacOS/aurora-asset-editor
+        run: |
+          set -euo pipefail
+          cargo xtask smoke-test "$MACOS_BUNDLE_BINARY"
+          if ! arch -x86_64 /usr/bin/true; then
+            echo "Rosetta is missing; installing it"
+            sudo softwareupdate --install-rosetta --agree-to-license
+            arch -x86_64 /usr/bin/true
+          fi
+          cargo xtask smoke-test arch -x86_64 "$MACOS_BUNDLE_BINARY"
+
+      # Informational (spec 10 item 10): its numbers never fail the job, a broken tool does. It
+      # rewrites a tracked file, which is why it runs after the release build.
+      - name: GDI+ closeness report
+        if: runner.os == 'Windows'
+        run: |
+          set -euo pipefail
+          cargo xtask gdiplus-report
+
+      - name: Upload GDI+ closeness report
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v7
+        with:
+          name: gdiplus-closeness
+          path: docs/image/gdiplus-closeness.md
+          if-no-files-found: error
+
+      - name: Upload package
+        uses: actions/upload-artifact@v7
+        with:
+          name: package-${{ matrix.package_platform }}
+          path: dist/
+          if-no-files-found: error
