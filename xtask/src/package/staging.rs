@@ -28,7 +28,8 @@ pub fn copy_file(from: &Path, to: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Copies `from` into a new folder `to`, file modes included.
+/// Copies `from` into a new folder `to`, file modes included. Symbolic links are copied as links, not
+/// followed, so a signed bundle keeps its seal.
 pub fn copy_folder(from: &Path, to: &Path) -> Result<()> {
     create_folder(to)?;
     let listing =
@@ -37,7 +38,14 @@ pub fn copy_folder(from: &Path, to: &Path) -> Result<()> {
         let entry = entry.with_context(|| format!("could not read {}", from.display()))?;
         let source = entry.path();
         let target = to.join(entry.file_name());
-        if source.is_dir() {
+        let kind = entry
+            .file_type()
+            .with_context(|| format!("could not read the type of {}", source.display()))?;
+        if kind.is_symlink() {
+            let link_target = fs::read_link(&source)
+                .with_context(|| format!("could not read the link {}", source.display()))?;
+            symlink(&link_target, &target)?;
+        } else if kind.is_dir() {
             copy_folder(&source, &target)?;
         } else {
             copy_file(&source, &target)?;
@@ -65,18 +73,19 @@ pub fn make_executable(path: &Path) -> Result<()> {
     )
 }
 
-/// Creates the symbolic link `link` pointing at `target`, which is relative to the link's folder.
+/// Creates the symbolic link `link` pointing at `target`; a relative target is relative to the link's folder.
 #[cfg(unix)]
-pub fn symlink(target: &str, link: &Path) -> Result<()> {
+pub fn symlink(target: &Path, link: &Path) -> Result<()> {
     std::os::unix::fs::symlink(target, link)
-        .with_context(|| format!("could not link {} to {target}", link.display()))
+        .with_context(|| format!("could not link {} to {}", link.display(), target.display()))
 }
 
 #[cfg(not(unix))]
-pub fn symlink(target: &str, link: &Path) -> Result<()> {
+pub fn symlink(target: &Path, link: &Path) -> Result<()> {
     anyhow::bail!(
-        "could not link {} to {target}: build this package on Linux or macOS",
-        link.display()
+        "could not link {} to {}: build this package on Linux or macOS",
+        link.display(),
+        target.display()
     )
 }
 
@@ -108,5 +117,27 @@ mod tests {
             fs::read_to_string(copy.join("MacOS/app")).unwrap(),
             "binary"
         );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn copy_keeps_symbolic_links_as_links() {
+        let work = tempfile::tempdir().unwrap();
+        let source = work.path().join("Bundle.app");
+        create_folder(&source).unwrap();
+        write_text(&source.join("real"), "data").unwrap();
+        symlink(Path::new("real"), &source.join("link")).unwrap();
+
+        let copy = work.path().join("copy.app");
+        copy_folder(&source, &copy).unwrap();
+
+        let link = copy.join("link");
+        assert!(
+            fs::symlink_metadata(&link)
+                .unwrap()
+                .file_type()
+                .is_symlink()
+        );
+        assert_eq!(fs::read_link(&link).unwrap(), Path::new("real"));
     }
 }

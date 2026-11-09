@@ -138,7 +138,7 @@ fn stage_app_dir(root: &Path, paths: &LinuxPaths) -> Result<()> {
     create_folder(binary_folder)?;
     copy_file(&paths.binary, &binary)?;
     make_executable(&binary)?;
-    symlink(APP_DIR_BINARY, &paths.app_dir.join(APP_RUN))?;
+    symlink(Path::new(APP_DIR_BINARY), &paths.app_dir.join(APP_RUN))?;
     write_text(&paths.app_dir.join(DESKTOP_FILE), &desktop_entry())?;
     write_png(&load_app_icon(root)?, &paths.app_dir.join(ICON_FILE))
 }

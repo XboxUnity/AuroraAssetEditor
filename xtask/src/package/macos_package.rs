@@ -74,6 +74,8 @@ struct MacosPaths {
     universal_binary: PathBuf,
     iconset: PathBuf,
     dmg_staging: PathBuf,
+    /// The copy of the signed bundle that goes into the disk image.
+    staged_app: PathBuf,
     dmg: PathBuf,
     volume_name: String,
 }
@@ -87,6 +89,10 @@ impl MacosPaths {
             universal_binary: root.join(MACOS_BUNDLE_BINARY),
             iconset: inputs.work_folder.join(ICONSET_FOLDER),
             dmg_staging: inputs.work_folder.join(DMG_STAGING_FOLDER),
+            staged_app: inputs
+                .work_folder
+                .join(DMG_STAGING_FOLDER)
+                .join(BUNDLE_FOLDER),
             dmg: inputs.out.join(asset_name(
                 ReleasePlatform::MacosUniversal,
                 inputs.version,
@@ -111,9 +117,10 @@ impl MacosPaths {
 }
 
 /// The tools the macOS packaging runs, in order: the universal binary, the icon, the ad-hoc
-/// signature and its check, the disk image.
+/// signature and its check, the check of the copy that ships, the disk image.
 fn macos_commands(paths: &MacosPaths) -> Vec<ToolCommand> {
     let app = path_argument(&paths.app);
+    let staged_app = path_argument(&paths.staged_app);
     vec![
         ToolCommand::new(
             "lipo",
@@ -139,6 +146,7 @@ fn macos_commands(paths: &MacosPaths) -> Vec<ToolCommand> {
         // reach the first-launch prompt.
         ToolCommand::new("codesign", ["--force", "--deep", "--sign", "-", &app]),
         ToolCommand::new("codesign", ["--verify", "--deep", "--strict", &app]),
+        ToolCommand::new("codesign", ["--verify", "--deep", "--strict", &staged_app]),
         ToolCommand::new(
             "hdiutil",
             [
@@ -165,9 +173,10 @@ pub fn package_macos(root: &Path, inputs: &MacosInputs) -> Result<Vec<PathBuf>> 
         create_icon,
         sign,
         verify_signature,
+        verify_staged_signature,
         create_dmg,
-    ] = <[ToolCommand; 5]>::try_from(macos_commands(&paths))
-        .expect("macos_commands builds five commands");
+    ] = <[ToolCommand; 6]>::try_from(macos_commands(&paths))
+        .expect("macos_commands builds six commands");
 
     create_folder(&paths.universal_binary_folder())?;
     create_folder(&paths.resources())?;
@@ -185,6 +194,7 @@ pub fn package_macos(root: &Path, inputs: &MacosInputs) -> Result<Vec<PathBuf>> 
     verify_signature.run()?;
 
     stage_dmg(root, &paths)?;
+    verify_staged_signature.run()?;
     run_hdiutil(&create_dmg)?;
     Ok(vec![paths.dmg])
 }
@@ -193,9 +203,9 @@ pub fn package_macos(root: &Path, inputs: &MacosInputs) -> Result<Vec<PathBuf>> 
 /// the first-launch note.
 fn stage_dmg(root: &Path, paths: &MacosPaths) -> Result<()> {
     recreate_folder(&paths.dmg_staging)?;
-    copy_folder(&paths.app, &paths.dmg_staging.join(BUNDLE_FOLDER))?;
+    copy_folder(&paths.app, &paths.staged_app)?;
     symlink(
-        APPLICATIONS_FOLDER,
+        Path::new(APPLICATIONS_FOLDER),
         &paths.dmg_staging.join(APPLICATIONS_LINK),
     )?;
     copy_file(
@@ -352,6 +362,7 @@ mod tests {
     fn macos_commands_sign_and_verify_the_bundle() {
         let paths = sample_paths();
         let app = path_argument(&paths.app);
+        let staged_app = path_argument(&paths.staged_app);
 
         let commands = macos_commands(&paths);
 
@@ -361,7 +372,9 @@ mod tests {
             .collect();
         assert_eq!(
             programs,
-            ["lipo", "iconutil", "codesign", "codesign", "hdiutil"]
+            [
+                "lipo", "iconutil", "codesign", "codesign", "codesign", "hdiutil"
+            ]
         );
         assert_eq!(
             commands[2].arguments,
@@ -370,6 +383,11 @@ mod tests {
         assert_eq!(
             commands[3].arguments,
             ["--verify", "--deep", "--strict", app.as_str()]
+        );
+        assert!(paths.staged_app.starts_with(&paths.dmg_staging));
+        assert_eq!(
+            commands[4].arguments,
+            ["--verify", "--deep", "--strict", staged_app.as_str()]
         );
         assert_eq!(
             commands[0].arguments[..3],
@@ -380,7 +398,7 @@ mod tests {
             ]
         );
         assert_eq!(
-            commands[4].arguments,
+            commands[5].arguments,
             [
                 "create".to_owned(),
                 "-volname".to_owned(),
