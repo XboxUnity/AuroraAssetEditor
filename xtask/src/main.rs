@@ -16,6 +16,7 @@ mod prng;
 mod readme_screenshots;
 mod record_online;
 mod set_version;
+mod smoke_test;
 mod srgb_profile;
 mod surface_unit;
 mod synthetic;
@@ -24,7 +25,7 @@ mod ui_screenshots;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-const USAGE_LINES: [&str; 8] = [
+const USAGE_LINES: [&str; 9] = [
     "cargo xtask golden <generate [--refresh-inputs] | check>",
     "cargo xtask cross-decode [<image files>...]",
     "cargo xtask cross-samples",
@@ -33,6 +34,7 @@ const USAGE_LINES: [&str; 8] = [
     ui_screenshots::USAGE_LINE,
     readme_screenshots::USAGE_LINE,
     set_version::USAGE_LINE,
+    smoke_test::USAGE_LINE,
 ];
 
 fn main() -> ExitCode {
@@ -53,6 +55,7 @@ fn main() -> ExitCode {
         ["ui-screenshots", options @ ..] => ui_screenshots::run(options),
         ["readme-screenshots"] => readme_screenshots::run(),
         ["set-version", version] => set_version::run(version),
+        ["smoke-test", command @ ..] => smoke_test::run(command),
         ["cross-decode", files @ ..] => {
             let files: Vec<PathBuf> = files.iter().map(PathBuf::from).collect();
             cross_decode::run(&files)
