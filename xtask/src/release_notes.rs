@@ -175,7 +175,7 @@ struct PreviousRelease {
 /// them to `--out`.
 pub fn run(arguments: &[&str]) -> Result<()> {
     let options = parse_options(arguments)?;
-    let root = repository_root();
+    let copy = CopyTexts::read(&repository_root())?;
     let (previous_tag, generated) = match options.previous {
         Some(previous) => (
             Some(previous.tag),
@@ -193,17 +193,34 @@ pub fn run(arguments: &[&str]) -> Result<()> {
         generated,
         commits: read_commits(&options.commits)?,
         checksums: read_filled(&options.checksums, "the checksum list")?,
-        first_release: read_filled(&root.join(FIRST_RELEASE_SOURCE), "the first-release text")?,
-        known_limits: read_filled(&root.join(KNOWN_LIMITS_SOURCE), "the known limits")?,
-        macos_first_launch: read_filled(
-            &root.join(FIRST_LAUNCH_SOURCE),
-            "the macOS first-launch text",
-        )?,
+        first_release: copy.first_release,
+        known_limits: copy.known_limits,
+        macos_first_launch: copy.macos_first_launch,
     };
     std::fs::write(&options.out, compose_notes(&parts)?)
         .with_context(|| format!("could not write {}", options.out.display()))?;
     println!("Wrote {}", options.out.display());
     Ok(())
+}
+
+/// The texts every release's notes take from the repository.
+struct CopyTexts {
+    first_release: String,
+    known_limits: String,
+    macos_first_launch: String,
+}
+
+impl CopyTexts {
+    fn read(root: &Path) -> Result<Self> {
+        Ok(Self {
+            first_release: read_filled(&root.join(FIRST_RELEASE_SOURCE), "the first-release text")?,
+            known_limits: read_filled(&root.join(KNOWN_LIMITS_SOURCE), "the known limits")?,
+            macos_first_launch: read_filled(
+                &root.join(FIRST_LAUNCH_SOURCE),
+                "the macOS first-launch text",
+            )?,
+        })
+    }
 }
 
 fn parse_options(arguments: &[&str]) -> Result<NotesOptions> {
@@ -559,6 +576,60 @@ mod tests {
             })
         );
         assert_eq!(parse_options(&arguments(&[])).unwrap().previous, None);
+    }
+
+    #[test]
+    fn composes_from_the_repository_copy_files() {
+        let copy = CopyTexts::read(&repository_root()).unwrap();
+        let parts = NotesParts {
+            first_release: copy.first_release.clone(),
+            known_limits: copy.known_limits.clone(),
+            macos_first_launch: copy.macos_first_launch,
+            ..first_release_parts()
+        };
+        let notes = compose_notes(&parts).unwrap();
+        assert!(notes.starts_with(copy.first_release.trim_end()), "{notes}");
+        assert!(
+            notes.contains(&format!(
+                "{KNOWN_LIMITS_HEADING}\n\n{}",
+                copy.known_limits.trim_end()
+            )),
+            "{notes}"
+        );
+        assert!(notes.contains("```\nxattr "), "{notes}");
+    }
+
+    #[test]
+    fn read_commits_refuses_a_malformed_line() {
+        let folder = tempfile::TempDir::new().unwrap();
+        let path = folder.path().join("commits.txt");
+        std::fs::write(&path, "abc1234 fix(x): y\ndef5678\n").unwrap();
+        let message = read_commits(&path).unwrap_err().to_string();
+        assert!(message.contains("`def5678`"), "{message}");
+
+        std::fs::write(&path, "abc1234 fix(x): y\ndef5678 feat(z): w\n").unwrap();
+        assert_eq!(
+            read_commits(&path).unwrap(),
+            ["abc1234 fix(x): y", "def5678 feat(z): w"]
+        );
+        std::fs::write(&path, "").unwrap();
+        assert!(read_commits(&path).unwrap().is_empty());
+    }
+
+    #[test]
+    fn repeated_option_is_refused() {
+        let message = parse_options(&arguments(&["--version", "2.0.8"]))
+            .unwrap_err()
+            .to_string();
+        assert!(message.contains("--version is given twice"), "{message}");
+    }
+
+    #[test]
+    fn version_must_have_three_numbers() {
+        let mut all = arguments(&[]);
+        all[1] = "2.0";
+        let message = parse_options(&all).unwrap_err().to_string();
+        assert!(message.contains("major.minor.patch"), "{message}");
     }
 
     #[test]
