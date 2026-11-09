@@ -5,7 +5,7 @@ and comes out as the A, R, G, B bytes the old app handed to AuroraAsset.dll.
 
 Requires Windows PowerShell 5.1 (powershell.exe, .NET Framework 4.x, the old app's net48
 runtime). The old app ran as a 32-bit process (Prefer32Bit), so run the 32-bit host:
-C:\Windows\SysWOW64\WindowsPowerShell\v1.0\powershell.exe.
+$env:SystemRoot\SysWOW64\WindowsPowerShell\v1.0\powershell.exe.
 
 For an input already at one of the target sizes only that size is written; any other input
 is written at every target, as <name>.<width>x<height>.argb in the output folder.
