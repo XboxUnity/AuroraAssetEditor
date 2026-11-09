@@ -109,7 +109,11 @@ fn open_window(paths: Vec<PathBuf>) -> ExitCode {
         Box::new(NativeFileDialogs::new(window.as_weak()))
     };
     match run(launch, native_dialogs, |_, _| {}) {
-        Ok(()) => ExitCode::SUCCESS,
+        Ok(None) => ExitCode::SUCCESS,
+        Ok(Some(hide_failure)) => {
+            report_outside_event_loop(&error_log, HIDE_FAILED, &hide_failure);
+            ExitCode::SUCCESS
+        }
         Err(error) => {
             report_outside_event_loop(&error_log, STARTUP_FAILED, error.as_ref());
             ExitCode::FAILURE
@@ -127,12 +131,13 @@ fn start_logging(config_dir: &Path, problems: &mut Vec<StartupProblem>) -> Error
 }
 
 /// `make_dialogs` gets the window the dialogs belong to; `once_running` gets the app and its view just before
-/// the event loop starts.
+/// the event loop starts. A window that would not hide once the loop ended is returned for the caller to
+/// report, since a message box suits a normal launch but would block a smoke test.
 fn run(
     launch: Launch,
     make_dialogs: impl FnOnce(&MainWindow) -> Box<dyn FileDialogs>,
     once_running: impl FnOnce(&Rc<RefCell<App>>, &Rc<MainWindowView>),
-) -> Result<(), Box<dyn Error>> {
+) -> Result<Option<slint::PlatformError>, Box<dyn Error>> {
     let Launch {
         config_dir,
         error_log,
@@ -154,7 +159,6 @@ fn run(
     let timeouts = Timeouts::default();
     let online = OnlineClient::new(Endpoints::live(), DEFAULT_TIMEOUT);
     let runner = ThreadRunner::new(move || JobWorkers::new(timeouts, online.clone()), outcomes)?;
-    let exit_log = error_log.clone();
     let environment = AppEnvironment {
         config_dir,
         settings: startup.settings,
@@ -191,13 +195,11 @@ fn run(
     slint::run_event_loop()?;
     // A bulk run would otherwise keep the closed app running until its last game.
     app.borrow_mut().stop_bulk();
-    if let Err(error) = view.window().hide() {
-        report_outside_event_loop(&exit_log, HIDE_FAILED, &error);
-    }
+    let hide_failure = view.window().hide().err();
     runner.shutdown();
     app.borrow_mut()
         .apply_outcomes_after_close(&outcomes_after_close);
-    Ok(())
+    Ok(hide_failure)
 }
 
 /// The command line was not understood: shown like any other startup failure.
@@ -251,14 +253,23 @@ fn smoke_test_result(launch: Launch, asset: &Path, output: PathBuf) -> Result<()
     let finished = Rc::new(RefCell::new(None));
     let smoke_dialogs =
         |_: &MainWindow| -> Box<dyn FileDialogs> { Box::new(SmokeTestDialogs::new(output)) };
-    run(launch, smoke_dialogs, |app, view| {
+    let hide_failure = run(launch, smoke_dialogs, |app, view| {
         start_smoke_driver(&timer, driver, app, view, &finished);
     })
     .map_err(|error| error_chain(error.as_ref()).join(": "))?;
-    match finished.take() {
+    let result = match finished.take() {
         Some(SmokeStep::Passed) => Ok(()),
         Some(SmokeStep::Failed(reason)) => Err(reason),
         Some(SmokeStep::Waiting) | None => Err(SMOKE_WINDOW_CLOSED.to_owned()),
+    };
+    // A window that would not hide fails the run as well, and the driver's own result stays in the reason.
+    let Some(hide_failure) = hide_failure else {
+        return result;
+    };
+    let hide_text = format!("{HIDE_FAILED}: {hide_failure}");
+    match result {
+        Ok(()) => Err(hide_text),
+        Err(reason) => Err(format!("{reason}\n{hide_text}")),
     }
 }
 
