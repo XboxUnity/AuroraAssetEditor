@@ -10,6 +10,7 @@ pub const NEXT_VERSION_USAGE_LINE: &str = "cargo xtask next-v2-version";
 fn parse_v2_tag(tag: &str) -> Option<(u64, u64)> {
     let numbers = tag.strip_prefix("v2.")?;
     let (minor, patch) = numbers.split_once('.')?;
+    // `u64::from_str` accepts a leading '+', so the digits are checked first.
     let all_digits =
         |text: &str| !text.is_empty() && text.bytes().all(|byte| byte.is_ascii_digit());
     if !all_digits(minor) || !all_digits(patch) {
@@ -84,8 +85,11 @@ mod tests {
             "v20.0.0",
             "v2.0.2",
             "2.0.11",
+            "v2.0.+11",
         ]);
         assert_eq!(latest_v2_tag(&all).as_deref(), Some("v2.0.10"));
+        let minor_first = tags(&["v2.0.10", "v2.1.0", "v2.0.9"]);
+        assert_eq!(latest_v2_tag(&minor_first).as_deref(), Some("v2.1.0"));
     }
 
     #[test]
