@@ -1,5 +1,5 @@
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use anyhow::{Context, Result, bail};
 
@@ -7,21 +7,22 @@ use super::asset_names::expected_release_assets;
 use crate::golden::sha256_hex;
 use crate::set_version::validate_version;
 
-pub const USAGE_LINE: &str = "cargo xtask checksums <version> <folder>";
-pub const CHECKSUMS_FILE: &str = "SHA256SUMS.txt";
+pub const USAGE_LINE: &str = "cargo xtask checksums <version> <folder> --out <file>";
 
-/// Checks that `folder` holds exactly the release assets of `version` and writes their
-/// `SHA256SUMS.txt` beside them.
-pub fn run(version: &str, folder: &str) -> Result<()> {
+/// Checks that `folder` holds exactly the release assets of `version` and writes their checksum
+/// list to `out`, which the release notes show. The list is not a release asset itself, so it
+/// is written outside the folder.
+pub fn run(version: &str, folder: &str, out: &str) -> Result<()> {
     validate_version(version)?;
-    let written = write_checksums(version, Path::new(folder))?;
-    println!("Wrote {}", written.display());
+    write_checksums(version, Path::new(folder), Path::new(out))?;
+    println!("Wrote {out}");
     Ok(())
 }
 
 /// Writes `<sha256 hex>  <name>` per asset, sorted by name: the `sha256sum` format, so
 /// `sha256sum -c` checks a download.
-pub fn write_checksums(version: &str, folder: &Path) -> Result<PathBuf> {
+pub fn write_checksums(version: &str, folder: &Path, out: &Path) -> Result<()> {
+    check_outside(folder, out)?;
     let expected = expected_release_assets(version);
     check_folder_holds_exactly(folder, &expected)?;
     let mut text = String::new();
@@ -31,14 +32,31 @@ pub fn write_checksums(version: &str, folder: &Path) -> Result<PathBuf> {
             fs::read(&path).with_context(|| format!("could not read {}", path.display()))?;
         text.push_str(&format!("{}  {name}\n", sha256_hex(&bytes)));
     }
-    let checksums = folder.join(CHECKSUMS_FILE);
-    fs::write(&checksums, text)
-        .with_context(|| format!("could not write {}", checksums.display()))?;
-    Ok(checksums)
+    fs::write(out, text).with_context(|| format!("could not write {}", out.display()))
 }
 
-/// The folder's files, an earlier checksum list aside, must be the expected assets; a
-/// subfolder is refused too, since a release attaches only files.
+/// Everything in the release folder is uploaded, so the list must be written elsewhere.
+fn check_outside(folder: &Path, out: &Path) -> Result<()> {
+    let out_folder = match out.parent() {
+        Some(parent) if !parent.as_os_str().is_empty() => parent,
+        _ => Path::new("."),
+    };
+    let resolved = |path: &Path| {
+        path.canonicalize()
+            .with_context(|| format!("could not resolve {}", path.display()))
+    };
+    if resolved(out_folder)? == resolved(folder)? {
+        bail!(
+            "the checksum list {} must be written outside the release folder {}, whose files are all uploaded",
+            out.display(),
+            folder.display()
+        );
+    }
+    Ok(())
+}
+
+/// The folder's files must be the expected assets; a subfolder is refused too, since a release
+/// attaches only files.
 fn check_folder_holds_exactly(folder: &Path, expected: &[String]) -> Result<()> {
     let mut found = Vec::new();
     let listing =
@@ -56,9 +74,7 @@ fn check_folder_holds_exactly(folder: &Path, expected: &[String]) -> Result<()> 
                 folder.display()
             );
         }
-        if name != CHECKSUMS_FILE {
-            found.push(name.to_owned());
-        }
+        found.push(name.to_owned());
     }
 
     let missing: Vec<&str> = expected
@@ -92,6 +108,7 @@ fn check_folder_holds_exactly(folder: &Path, expected: &[String]) -> Result<()> 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
 
     const VERSION: &str = "2.0.7";
 
@@ -110,14 +127,28 @@ mod tests {
         folder
     }
 
+    /// Where the tests write the checksum list: beside the release folder, never in it.
+    fn list_path(outside: &tempfile::TempDir) -> PathBuf {
+        outside.path().join("checksums.txt")
+    }
+
+    fn file_names(folder: &Path) -> Vec<String> {
+        let mut names: Vec<String> = fs::read_dir(folder)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+            .collect();
+        names.sort();
+        names
+    }
+
     #[test]
     fn checksums_list_every_asset_sorted() {
         let folder = release_folder();
-        fs::write(folder.path().join(CHECKSUMS_FILE), "stale").unwrap();
+        let outside = tempfile::tempdir().unwrap();
 
-        let written = write_checksums(VERSION, folder.path()).unwrap();
+        write_checksums(VERSION, folder.path(), &list_path(&outside)).unwrap();
 
-        let text = fs::read_to_string(written).unwrap();
+        let text = fs::read_to_string(list_path(&outside)).unwrap();
         let lines: Vec<&str> = text.lines().collect();
         let expected = expected_release_assets(VERSION);
         assert_eq!(lines.len(), expected.len());
@@ -131,40 +162,62 @@ mod tests {
         let mut sorted = lines.clone();
         sorted.sort_by_key(|line| line.split_once("  ").unwrap().1);
         assert_eq!(lines, sorted);
+        assert_eq!(file_names(folder.path()), expected);
+    }
+
+    #[test]
+    fn checksum_list_inside_the_release_folder_is_refused() {
+        let folder = release_folder();
+        let inside = folder.path().join("SHA256SUMS.txt");
+
+        let message = write_checksums(VERSION, folder.path(), &inside)
+            .unwrap_err()
+            .to_string();
+
+        assert!(message.contains("outside"), "{message}");
+        assert!(!inside.exists());
     }
 
     #[test]
     fn checksums_refuse_a_missing_asset() {
         let folder = release_folder();
+        let outside = tempfile::tempdir().unwrap();
         let gone = "AuroraAssetEditor-2.0.7-macos-universal.dmg";
         fs::remove_file(folder.path().join(gone)).unwrap();
 
-        let message = write_checksums(VERSION, folder.path())
+        let message = write_checksums(VERSION, folder.path(), &list_path(&outside))
             .unwrap_err()
             .to_string();
 
         assert!(message.contains(&format!("missing {gone}")), "{message}");
-        assert!(!folder.path().join(CHECKSUMS_FILE).exists());
+        assert!(!list_path(&outside).exists());
     }
 
     #[test]
     fn checksums_refuse_an_unexpected_file() {
         let folder = release_folder();
+        let outside = tempfile::tempdir().unwrap();
         fs::write(folder.path().join("notes.md"), "notes").unwrap();
+        // A checksum list is not a release asset either.
+        fs::write(folder.path().join("SHA256SUMS.txt"), "stale").unwrap();
 
-        let message = write_checksums(VERSION, folder.path())
+        let message = write_checksums(VERSION, folder.path(), &list_path(&outside))
             .unwrap_err()
             .to_string();
 
-        assert!(message.contains("notes.md"), "{message}");
+        assert!(
+            message.contains("not release assets: SHA256SUMS.txt, notes.md"),
+            "{message}"
+        );
     }
 
     #[test]
     fn checksums_refuse_a_subfolder() {
         let folder = release_folder();
+        let outside = tempfile::tempdir().unwrap();
         fs::create_dir(folder.path().join("staging")).unwrap();
 
-        let message = write_checksums(VERSION, folder.path())
+        let message = write_checksums(VERSION, folder.path(), &list_path(&outside))
             .unwrap_err()
             .to_string();
 
@@ -174,8 +227,9 @@ mod tests {
     #[test]
     fn assets_of_another_version_are_refused() {
         let folder = release_folder();
+        let outside = tempfile::tempdir().unwrap();
 
-        let message = write_checksums("2.0.8", folder.path())
+        let message = write_checksums("2.0.8", folder.path(), &list_path(&outside))
             .unwrap_err()
             .to_string();
 

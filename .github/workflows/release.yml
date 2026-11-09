@@ -128,7 +128,8 @@ jobs:
       - name: Checksums
         run: |
           set -euo pipefail
-          cargo xtask checksums "$VERSION" dist
+          # The list goes into the notes only; every file in dist is uploaded.
+          cargo xtask checksums "$VERSION" dist --out "$RUNNER_TEMP/SHA256SUMS.txt"
 
       - name: Previous v2 release
         id: previous
@@ -171,7 +172,7 @@ jobs:
             --repository "$GITHUB_REPOSITORY"
             --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
             --commits "$RUNNER_TEMP/commits.txt"
-            --checksums dist/SHA256SUMS.txt
+            --checksums "$RUNNER_TEMP/SHA256SUMS.txt"
             --out "$RUNNER_TEMP/notes.md")
           if [ -n "$PREVIOUS_TAG" ]; then
             arguments+=(--previous-tag "$PREVIOUS_TAG" --generated "$RUNNER_TEMP/generated.md")

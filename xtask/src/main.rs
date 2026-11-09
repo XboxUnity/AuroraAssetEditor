@@ -73,7 +73,9 @@ fn main() -> ExitCode {
         ["set-version", version] => set_version::run(version),
         ["smoke-test", command @ ..] => smoke_test::run(command),
         ["package", options @ ..] => package::run(options),
-        ["checksums", version, folder] => package::checksums::run(version, folder),
+        ["checksums", version, folder, "--out", out] => {
+            package::checksums::run(version, folder, out)
+        }
         ["release-notes", options @ ..] => release_notes::run(options),
         ["cross-decode", files @ ..] => {
             let files: Vec<PathBuf> = files.iter().map(PathBuf::from).collect();
