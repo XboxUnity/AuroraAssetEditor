@@ -95,11 +95,17 @@ mod tests {
 
     const VERSION: &str = "2.0.7";
 
-    /// A folder holding every asset of `VERSION`, each file's text being its own name.
+    /// What the test writes into the asset `name`: not the name itself, so that hashing the name instead of
+    /// the file fails the test.
+    fn contents_of(name: &str) -> String {
+        format!("contents of {name}")
+    }
+
+    /// A folder holding every asset of `VERSION`.
     fn release_folder() -> tempfile::TempDir {
         let folder = tempfile::tempdir().unwrap();
         for name in expected_release_assets(VERSION) {
-            fs::write(folder.path().join(&name), &name).unwrap();
+            fs::write(folder.path().join(&name), contents_of(&name)).unwrap();
         }
         folder
     }
@@ -120,7 +126,7 @@ mod tests {
             assert_eq!(listed_name, name);
             assert_eq!(hash.len(), 64);
             assert!(hash.bytes().all(|byte| byte.is_ascii_hexdigit()), "{line}");
-            assert_eq!(hash, sha256_hex(name.as_bytes()));
+            assert_eq!(hash, sha256_hex(contents_of(name).as_bytes()));
         }
         let mut sorted = lines.clone();
         sorted.sort_by_key(|line| line.split_once("  ").unwrap().1);
