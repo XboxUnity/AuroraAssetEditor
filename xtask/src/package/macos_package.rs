@@ -2,10 +2,8 @@ use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::Duration;
 
-use anyhow::Result;
-use aurora_asset::RgbaImage;
+use anyhow::{Context, Result, bail};
 
-use super::app_icon::{load_app_icon, resized_icon, write_png};
 use super::asset_names::{DMG_EXTENSION, asset_name};
 use super::release_platform::ReleasePlatform;
 use super::staging::{
@@ -42,6 +40,8 @@ const HDIUTIL_ATTEMPTS: u32 = 3;
 const HDIUTIL_BUSY: &str = "Resource busy";
 const HDIUTIL_RETRY_DELAY: Duration = Duration::from_secs(5);
 
+/// The committed iconset images, made once from the app icon (see the README beside them).
+const ICONSET_SOURCE: &str = "packaging/macos-iconset";
 /// The images of an `.iconset` folder, with their side in pixels.
 const ICONSET_IMAGES: [(&str, u32); 10] = [
     ("icon_16x16.png", 16),
@@ -187,7 +187,7 @@ pub fn package_macos(root: &Path, inputs: &MacosInputs) -> Result<Vec<PathBuf>> 
     create_universal_binary.run()?;
     make_executable(&paths.universal_binary)?;
 
-    write_iconset(&load_app_icon(root)?, &paths.iconset)?;
+    copy_iconset(&root.join(ICONSET_SOURCE), &paths.iconset)?;
     create_icon.run()?;
 
     sign.run()?;
@@ -238,19 +238,23 @@ fn should_retry_hdiutil(stderr: &str, attempt: u32) -> bool {
     attempt < HDIUTIL_ATTEMPTS && stderr.contains(HDIUTIL_BUSY)
 }
 
-/// The iconset sizes that do not need the icon enlarged.
-fn iconset_images(icon_side: u32) -> Vec<(&'static str, u32)> {
-    ICONSET_IMAGES
-        .into_iter()
-        .filter(|&(_, side)| side <= icon_side)
-        .collect()
-}
-
-fn write_iconset(icon: &RgbaImage, folder: &Path) -> Result<()> {
+/// Copies every iconset image, and nothing else, from `source` into the `.iconset` folder `folder`, checking
+/// that each has the size its name promises, as iconutil requires.
+fn copy_iconset(source: &Path, folder: &Path) -> Result<()> {
     create_folder(folder)?;
-    let icon_side = icon.width().min(icon.height());
-    for (name, side) in iconset_images(icon_side) {
-        write_png(&resized_icon(icon, side), &folder.join(name))?;
+    for (name, side) in ICONSET_IMAGES {
+        let image = source.join(name);
+        let size = image::image_dimensions(&image)
+            .with_context(|| format!("could not read the size of {}", image.display()))?;
+        if size != (side, side) {
+            bail!(
+                "{} is {}x{} pixels, but its name needs {side}x{side}",
+                image.display(),
+                size.0,
+                size.1
+            );
+        }
+        copy_file(&image, &folder.join(name))?;
     }
     Ok(())
 }
@@ -444,31 +448,43 @@ mod tests {
     }
 
     #[test]
-    fn iconset_holds_the_sizes_the_app_icon_covers() {
+    fn iconset_copy_holds_every_size_and_nothing_else() {
         let folder = tempfile::tempdir().unwrap();
-        let icon = load_app_icon(&repository_root()).unwrap();
+        let iconset = folder.path().join(ICONSET_FOLDER);
 
-        write_iconset(&icon, folder.path()).unwrap();
+        copy_iconset(&repository_root().join(ICONSET_SOURCE), &iconset).unwrap();
 
-        let mut written: Vec<(String, u32)> = std::fs::read_dir(folder.path())
+        let mut copied: Vec<(String, (u32, u32))> = std::fs::read_dir(&iconset)
             .unwrap()
             .map(|entry| {
                 let path = entry.unwrap().path();
-                let image = image::open(&path).unwrap();
-                (
-                    path.file_name().unwrap().to_string_lossy().into_owned(),
-                    image.width(),
-                )
+                let name = path.file_name().unwrap().to_string_lossy().into_owned();
+                (name, image::image_dimensions(&path).unwrap())
             })
             .collect();
-        written.sort();
-        assert_eq!(
-            written,
-            [
-                ("icon_16x16.png".to_owned(), 16),
-                ("icon_16x16@2x.png".to_owned(), 32),
-                ("icon_32x32.png".to_owned(), 32),
-            ]
+        copied.sort();
+        let mut expected: Vec<(String, (u32, u32))> = ICONSET_IMAGES
+            .iter()
+            .map(|&(name, side)| (name.to_owned(), (side, side)))
+            .collect();
+        expected.sort();
+        assert_eq!(copied, expected);
+    }
+
+    #[test]
+    fn iconset_image_of_the_wrong_size_is_refused() {
+        let folder = tempfile::tempdir().unwrap();
+        let source = folder.path().join("source");
+        copy_iconset(&repository_root().join(ICONSET_SOURCE), &source).unwrap();
+        std::fs::copy(source.join("icon_16x16.png"), source.join("icon_32x32.png")).unwrap();
+
+        let message = copy_iconset(&source, &folder.path().join(ICONSET_FOLDER))
+            .unwrap_err()
+            .to_string();
+
+        assert!(
+            message.contains("icon_32x32.png is 16x16 pixels"),
+            "{message}"
         );
     }
 }
