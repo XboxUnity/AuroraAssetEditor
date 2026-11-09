@@ -64,16 +64,37 @@ pub fn compose_notes(parts: &NotesParts) -> Result<String> {
     Ok(sections.join("\n\n") + "\n")
 }
 
-/// One `- <subject> (<short hash>)` line per `%h %s` commit line.
+/// One `- <subject> (<short hash>)` line per `%h %s` commit line. The subject is code, so an
+/// `@name` or `#123` in it does not become a mention or a link on GitHub.
 fn commits_section(commits: &[String]) -> String {
     let lines: Vec<String> = commits
         .iter()
         .map(|line| {
             let (hash, subject) = line.split_once(' ').unwrap_or((line.as_str(), ""));
-            format!("- {subject} ({hash})")
+            if subject.is_empty() {
+                format!("- ({hash})")
+            } else {
+                format!("- {} ({hash})", code_span(subject))
+            }
         })
         .collect();
     format!("{COMMITS_HEADING}\n\n{}", lines.join("\n"))
+}
+
+/// `text` as a Markdown code span: fenced by one backtick more than its longest backtick run,
+/// with a space inside each fence when it starts or ends with a backtick (CommonMark strips them).
+fn code_span(text: &str) -> String {
+    let longest_run = text
+        .split(|character| character != '`')
+        .map(str::len)
+        .max()
+        .unwrap_or(0);
+    let fence = "`".repeat(longest_run + 1);
+    if text.starts_with('`') || text.ends_with('`') {
+        format!("{fence} {text} {fence}")
+    } else {
+        format!("{fence}{text}{fence}")
+    }
 }
 
 fn build_section(parts: &NotesParts) -> Result<String> {
@@ -380,8 +401,8 @@ mod tests {
         let ordered = [
             "**Full Changelog**: https://github.com/o/r/compare/v2.0.6...v2.0.7",
             COMMITS_HEADING,
-            "- fix(x): y (abc1234)",
-            "- feat(z): w (def5678)",
+            "- `fix(x): y` (abc1234)",
+            "- `feat(z): w` (def5678)",
             KNOWN_LIMITS_HEADING,
             BUILD_HEADING,
         ];
@@ -405,6 +426,26 @@ mod tests {
         assert!(!notes.contains(COMMITS_HEADING), "{notes}");
         assert!(notes.contains(KNOWN_LIMITS_HEADING), "{notes}");
         assert!(notes.contains(BUILD_HEADING), "{notes}");
+    }
+
+    #[test]
+    fn commit_subjects_cannot_mention_or_link() {
+        let parts = NotesParts {
+            commits: vec![
+                "abc1234 fix: thanks @someone for #123".to_owned(),
+                "def5678 docs: quote `code` here".to_owned(),
+                "aaa1111 `tick` first".to_owned(),
+                "bbb2222 ".to_owned(),
+            ],
+            ..later_release_parts()
+        };
+        let notes = compose_notes(&parts).unwrap();
+        let expected = "## Commits\n\n\
+                        - `fix: thanks @someone for #123` (abc1234)\n\
+                        - ``docs: quote `code` here`` (def5678)\n\
+                        - `` `tick` first `` (aaa1111)\n\
+                        - (bbb2222)\n";
+        assert!(notes.contains(expected), "{notes}");
     }
 
     #[test]
