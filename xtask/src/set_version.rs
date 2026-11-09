@@ -206,15 +206,23 @@ mod tests {
         assert!(set_workspace_version(without_line, "2.0.7").is_err());
     }
 
-    const LOCK: &str = "[[package]]\nname = \"aurora-asset-editor\"\nversion = \"2.0.0\"\ndependencies = [\"x\"]\n\n[[package]]\nname = \"aurora-asset-editor\"\nversion = \"9.9.9\"\nsource = \"registry+https://github.com/rust-lang/crates.io-index\"\n";
+    const LOCK: &str = "[[package]]
+name = \"aurora-asset-editor\"
+version = \"9.9.9\"
+source = \"registry+https://github.com/rust-lang/crates.io-index\"
+
+[[package]]
+name = \"aurora-asset-editor\"
+version = \"2.0.0\"
+dependencies = [\"x\"]
+";
 
     #[test]
     fn lock_entry_of_a_path_package_is_replaced() {
         let packages = ["aurora-asset-editor".to_string()];
         let stamped = set_lock_versions(LOCK, &packages, "2.0.7").unwrap();
         assert!(
-            stamped
-                .starts_with("[[package]]\nname = \"aurora-asset-editor\"\nversion = \"2.0.7\"\n")
+            stamped.contains("name = \"aurora-asset-editor\"\nversion = \"2.0.7\"\ndependencies")
         );
     }
 

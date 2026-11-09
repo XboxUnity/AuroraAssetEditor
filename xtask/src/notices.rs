@@ -110,61 +110,69 @@ fn workspace_member_names(root: &Path) -> Result<Vec<String>> {
 /// left with no user, and their share of the crate counts at the top.
 fn without_workspace_crates(generated: &str, members: &[String]) -> String {
     let lines: Vec<&str> = generated.split_inclusive('\n').collect();
-    let is_member_entry = |line: &str| {
-        members.iter().any(|name| {
-            line.strip_prefix("  ")
-                .and_then(|rest| rest.strip_prefix(name.as_str()))
-                .and_then(|rest| rest.strip_prefix(' '))
-                .is_some_and(|version| version.starts_with(|c: char| c.is_ascii_digit()))
-        })
-    };
-    let mut kept: Vec<&str> = Vec::new();
+    let section_starts: Vec<usize> = (0..lines.len())
+        .filter(|&index| starts_licence_section(&lines, index))
+        .collect();
+    let header_end = section_starts.first().copied().unwrap_or(lines.len());
+
+    let mut sections = String::new();
     let mut removed_per_licence: Vec<(&str, usize)> = Vec::new();
-    let mut header_end = None;
-    let mut index = 0;
-    while index < lines.len() {
-        if !starts_licence_section(&lines, index) {
-            kept.push(lines[index]);
-            index += 1;
-            continue;
-        }
-        header_end.get_or_insert(kept.len());
-        let section_end = (index + 1..lines.len())
-            .find(|&next| starts_licence_section(&lines, next))
+    for (position, &start) in section_starts.iter().enumerate() {
+        let end = section_starts
+            .get(position + 1)
+            .copied()
             .unwrap_or(lines.len());
-        let user_lines = index + 4..section_end;
-        let users = lines[user_lines]
-            .iter()
-            .take_while(|line| line.starts_with("  "))
-            .count();
-        let users = index + 4..index + 4 + users;
-        let member_users = lines[users.clone()]
-            .iter()
-            .filter(|line| is_member_entry(line))
-            .count();
-        if member_users > 0 {
-            removed_per_licence.push((lines[index + 1].trim_end(), member_users));
+        let section = &lines[start..end];
+        let (kept, removed) = without_member_users(section, members);
+        if removed > 0 {
+            removed_per_licence.push((section[1].trim_end(), removed));
         }
-        if member_users != users.len() {
-            for (position, line) in lines[index..section_end].iter().enumerate() {
-                let is_member_user = users.contains(&(index + position)) && is_member_entry(line);
-                if !is_member_user {
-                    kept.push(line);
-                }
-            }
-        }
-        index = section_end;
+        sections.extend(kept);
     }
-    let header_end = header_end.unwrap_or(kept.len());
+
     let mut result = String::with_capacity(generated.len());
-    for (position, line) in kept.iter().enumerate() {
-        let reduced = reduced_count_line(line, &removed_per_licence);
-        match reduced {
-            Some(count_line) if position < header_end => result.push_str(&count_line),
-            _ => result.push_str(line),
+    for line in &lines[..header_end] {
+        match reduced_count_line(line, &removed_per_licence) {
+            Some(count_line) => result.push_str(&count_line),
+            None => result.push_str(line),
         }
     }
+    result.push_str(&sections);
     result
+}
+
+/// The lines of one licence section without its workspace-member users, and how many users that removed. A
+/// section left with no user at all is dropped whole.
+fn without_member_users<'a>(section: &[&'a str], members: &[String]) -> (Vec<&'a str>, usize) {
+    const FIRST_USER: usize = 4;
+    let user_count = section[FIRST_USER..]
+        .iter()
+        .take_while(|line| line.starts_with("  "))
+        .count();
+    let users = FIRST_USER..FIRST_USER + user_count;
+    let is_member = |line: &str| members.iter().any(|name| is_entry_of(line, name));
+    let removed = section[users.clone()]
+        .iter()
+        .filter(|line| is_member(line))
+        .count();
+    if removed == user_count {
+        return (Vec::new(), removed);
+    }
+    let kept = section
+        .iter()
+        .enumerate()
+        .filter(|(offset, line)| !(users.contains(offset) && is_member(line)))
+        .map(|(_, line)| *line)
+        .collect();
+    (kept, removed)
+}
+
+/// Whether `line` is the `  <name> <version>` entry of the crate `name`.
+fn is_entry_of(line: &str, name: &str) -> bool {
+    line.strip_prefix("  ")
+        .and_then(|rest| rest.strip_prefix(name))
+        .and_then(|rest| rest.strip_prefix(' '))
+        .is_some_and(|version| version.starts_with(|c: char| c.is_ascii_digit()))
 }
 
 /// A licence section starts with a line of dashes, then the licence name, a blank line and `Used by:`.
@@ -256,7 +264,7 @@ mod tests {
         let dashes = "-".repeat(80);
         format!(
             "Third-party software\n\nMIT License (2 crates)\nThe Unlicense (2 crates)\n\n\
-             {dashes}\nMIT License\n\nUsed by:\n  aurora-asset 0.1.0\n  serde 1.0.0 (https://x)\n\nMIT text\n\n\
+             {dashes}\nMIT License\n\nUsed by:\n  aurora-asset 0.1.0\n  serde 1.0.0 (https://x)\n\nMIT text\nMIT License (2 crates)\n\n\
              {dashes}\nThe Unlicense\n\nUsed by:\n  aurora-asset 0.1.0\n  aurora-asset-editor {app_version}\n\nUnlicense text\n"
         )
     }
@@ -281,7 +289,7 @@ mod tests {
         let result = without_workspace_crates(&generated("2.0.0"), &members());
         assert!(result.contains("MIT License (1 crates)\n"));
         assert!(result.contains("  serde 1.0.0 (https://x)\n"));
-        assert!(result.contains("MIT text"));
+        assert!(result.contains("MIT text\nMIT License (2 crates)\n"));
         assert!(!result.contains("Unlicense"));
     }
 }
