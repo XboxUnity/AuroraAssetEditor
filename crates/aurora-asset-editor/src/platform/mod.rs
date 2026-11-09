@@ -1,3 +1,5 @@
+#[cfg(target_os = "macos")]
+pub mod app_menu;
 mod clipboard;
 mod clipboard_error;
 mod clock;

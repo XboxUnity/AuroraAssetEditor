@@ -35,6 +35,11 @@ slint = { version = "=1.18.1", default-features = false, features = [
 ] }
 tempfile = "3.27.0"
 
+[target.'cfg(target_os = "macos")'.dependencies]
+# The backend Slint selects, built without its default menu bar, and the app menu that replaces it.
+i-slint-backend-winit = { version = "=1.18.1", default-features = false, features = ["muda"] }
+muda = { version = "0.19.3", default-features = false }
+
 [build-dependencies]
 chrono = { version = "0.4.45", default-features = false, features = ["clock", "std"] }
 flate2 = { version = "1.1.11", default-features = false, features = ["rust_backend"] }

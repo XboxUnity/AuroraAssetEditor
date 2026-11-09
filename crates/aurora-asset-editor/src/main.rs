@@ -19,6 +19,8 @@ use aurora_asset_editor::app::{
 };
 use aurora_asset_editor::jobs::{FailedJob, JobOutcome, JobWorkers, ThreadRunner};
 use aurora_asset_editor::logging::{ErrorLog, LogBridge, error_chain, install_panic_hook};
+#[cfg(target_os = "macos")]
+use aurora_asset_editor::platform::app_menu::{self, AppMenu};
 use aurora_asset_editor::platform::{
     DropSignal, FileDropCollector, NativeFileDialogs, SystemClipboard, SystemClock,
     SystemFolderOpener, SystemTheme, window_placement,
@@ -52,6 +54,8 @@ const WINDOW_SETUP_FAILED: &str = "Could not finish setting up the window";
 const HIDE_FAILED: &str = "Could not close the window";
 const MESSAGE_BOX_FAILED: &str = "Could not show the error in a message box";
 const NO_CONSOLE_FOR_VERSION: &str = "There is no console to print the version to";
+#[cfg(target_os = "macos")]
+const APP_MENU_FAILED: &str = "Could not set up the app menu";
 
 /// Everything the window needs once it exists on screen.
 struct WindowSetup {
@@ -95,6 +99,8 @@ fn run(
     let icon = app_icon(&mut problems);
     let geometry = startup.settings.window;
 
+    #[cfg(target_os = "macos")]
+    app_menu::use_backend_without_default_menu()?;
     let window = MainWindow::new()?;
     let (outcomes, outcome_receiver) = async_channel::unbounded();
     let outcomes_after_close = outcome_receiver.clone();
@@ -132,6 +138,8 @@ fn run(
         paths,
     };
     finish_window_setup(&app, &view, setup)?;
+    #[cfg(target_os = "macos")]
+    let _app_menu = install_app_menu(&app, &view);
     slint::run_event_loop()?;
     // A bulk run would otherwise keep the closed app running until its last game.
     app.borrow_mut().stop_bulk();
@@ -315,6 +323,30 @@ fn watch_window_events(app: &Rc<RefCell<App>>, view: &Rc<MainWindowView>) {
             }
             EventResult::Propagate
         });
+}
+
+/// The macOS app menu; without it the app still runs, and the window's close button still asks.
+#[cfg(target_os = "macos")]
+fn install_app_menu(app: &Rc<RefCell<App>>, view: &Rc<MainWindowView>) -> Option<AppMenu> {
+    let about_app = Rc::downgrade(app);
+    let about_view = Rc::downgrade(view);
+    let about = move || {
+        let view = about_view.clone();
+        run_when_app_free(about_app.clone(), move |app| {
+            app.show_about();
+            if let Some(view) = view.upgrade() {
+                view.render(app);
+            }
+        });
+    };
+    match AppMenu::install(view.window().as_weak(), about) {
+        Ok(menu) => Some(menu),
+        Err(error) => {
+            app.borrow_mut()
+                .report_startup_problem(startup_problem(APP_MENU_FAILED, error));
+            None
+        }
+    }
 }
 
 fn save_geometry(app: &mut App, window: &slint::Window) {
