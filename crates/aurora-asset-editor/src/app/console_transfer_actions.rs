@@ -15,7 +15,7 @@ use crate::status::{ConsoleActivity, STATUS_SEPARATOR, StatusLine};
 
 use super::console_actions::NO_CONSOLE_TEXT;
 use super::file_actions::{ASSET_TYPE_COUNT, BUSY_TEXT};
-use super::{App, KindChoice, Page};
+use super::{App, KindChoice, Page, Replacement};
 
 pub const NO_CONSOLE_SET_UP_REASON: &str = "No console set up";
 pub const SELECT_A_GAME_REASON: &str = "Select a game first";
@@ -119,6 +119,7 @@ impl App {
             text,
             confirm_label: REMOVE_CONFIRM_LABEL.to_owned(),
             danger: true,
+            cancel_is_default: false,
             action: ConfirmedAction::RemoveFromConsole { ids, kinds },
         });
     }
@@ -186,6 +187,8 @@ impl App {
             ConfirmedAction::UploadWithEmpty { ids, files } => {
                 self.start_upload(ids, files, UploadPurpose::UploadCurrent);
             }
+            ConfirmedAction::DiscardChanges => self.discard_changes(),
+            ConfirmedAction::CloseWindow => self.approve_close(),
         }
     }
 
@@ -239,6 +242,7 @@ impl App {
             text,
             confirm_label: EMPTY_UPLOAD_CONFIRM_LABEL.to_owned(),
             danger: false,
+            cancel_is_default: false,
             action: ConfirmedAction::UploadWithEmpty { ids, files },
         });
     }
@@ -289,14 +293,34 @@ impl App {
         self.submit_console_job(settings, job, JobPriority::User);
     }
 
+    /// When pages the download replaces hold unsaved changes, the user is asked first.
     pub(super) fn apply_downloaded(
+        &mut self,
+        ids: GameIds,
+        scope: DownloadScope,
+        after: AfterDownload,
+        results: Vec<KindDownload>,
+    ) {
+        self.active_work.console = None;
+        // The download is over: its progress leaves the status line, also while the question waits.
+        self.status.progress = None;
+        let replaced = replaced_by_download(scope, &results);
+        let download = Replacement::Download {
+            ids,
+            scope,
+            after,
+            results,
+        };
+        self.replace_pages(&replaced, download);
+    }
+
+    pub(super) fn put_downloaded(
         &mut self,
         ids: &GameIds,
         scope: DownloadScope,
         after: AfterDownload,
         results: Vec<KindDownload>,
     ) {
-        self.active_work.console = None;
         match scope {
             DownloadScope::OneKind(_) => self.apply_kind_download(ids, after, results),
             DownloadScope::FullSet => self.apply_full_set(ids, after, results),
@@ -459,6 +483,22 @@ impl App {
             }
             None => self.report_done(success),
         }
+    }
+}
+
+/// The pages a download replaces: one kind's when it arrived; with the full set every page, unless a kind
+/// failed, which changes none.
+fn replaced_by_download(scope: DownloadScope, results: &[KindDownload]) -> Vec<AssetKind> {
+    match scope {
+        DownloadScope::OneKind(_) => results
+            .iter()
+            .filter(|download| matches!(download.result, Ok(Some(_))))
+            .map(|download| download.kind)
+            .collect(),
+        DownloadScope::FullSet if results.iter().any(|download| download.result.is_err()) => {
+            Vec::new()
+        }
+        DownloadScope::FullSet => AssetKind::ALL.to_vec(),
     }
 }
 

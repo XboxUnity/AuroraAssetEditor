@@ -8,6 +8,8 @@ export global DialogModel {
     in property <string> text;
     in property <string> confirm-label;
     in property <bool> danger;
+    // Return answers Cancel, and Cancel has the focus when the dialog opens.
+    in property <bool> cancel-is-default;
     in property <[ChoiceView]> choices;
     // The form's boxes in the order the dialog draws them; each edit comes back through `edit-field`.
     in property <[string]> fields;

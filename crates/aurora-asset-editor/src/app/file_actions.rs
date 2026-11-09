@@ -16,7 +16,7 @@ use crate::logging::error_chain;
 use crate::platform::OpenRequest;
 use crate::status::{STATUS_SEPARATOR, StatusLine};
 
-use super::{App, Page};
+use super::{App, Page, Replacement};
 
 pub const OPEN_DIALOG_TITLE: &str = "Select Asset(s) to load";
 pub const LOAD_PROBLEMS_TITLE: &str = "Could not load files";
@@ -93,6 +93,10 @@ impl App {
         if self.refuse_while_busy() {
             return;
         }
+        self.replace_pages(&AssetKind::ALL, Replacement::NewAssetSet);
+    }
+
+    pub(super) fn empty_pages(&mut self) {
         self.pages.reset();
         self.status = StatusLine::ready();
     }
@@ -106,8 +110,14 @@ impl App {
         true
     }
 
+    /// When pages the files replace hold unsaved changes, the user is asked first.
     pub(super) fn apply_loaded(&mut self, loaded: LoadedFiles) {
         self.active_work.loading = self.active_work.loading.saturating_sub(1);
+        let replaced = replaced_by_load(&loaded);
+        self.replace_pages(&replaced, Replacement::Load(loaded));
+    }
+
+    pub(super) fn put_loaded(&mut self, loaded: LoadedFiles) {
         let mut unread_images = Vec::new();
         let mut last_loaded = None;
         for file in loaded.files {
@@ -238,7 +248,7 @@ impl App {
     }
 
     /// Every problem is logged and listed in one dialog. A single empty file gets the "No assets" dialog instead.
-    fn report_load_problems(&mut self, problems: Vec<FileProblem>) {
+    pub(super) fn report_load_problems(&mut self, problems: Vec<FileProblem>) {
         let only_problem = problems.len() == 1;
         let mut lines = Vec::new();
         for FileProblem { path, problem } in problems {
@@ -298,6 +308,29 @@ impl FsdReceived {
             .find(|kind| self.kinds.contains(kind))
             .map(Page::of_kind)
     }
+}
+
+/// The pages the files replace: an `.asset` file's page, and the pages an FSD file puts an image over. An FSD
+/// file's screenshots only fill free positions, so they replace nothing.
+fn replaced_by_load(loaded: &LoadedFiles) -> Vec<AssetKind> {
+    let mut kinds = Vec::new();
+    for file in &loaded.files {
+        match file {
+            LoadedFile::Asset { decoded, .. } => kinds.push(decoded.kind),
+            LoadedFile::Fsd { images, .. } => {
+                if images.cover.is_some() {
+                    kinds.push(AssetKind::Cover);
+                }
+                if images.background.is_some() {
+                    kinds.push(AssetKind::Background);
+                }
+                if images.icon.is_some() || images.banner.is_some() {
+                    kinds.push(AssetKind::IconBanner);
+                }
+            }
+        }
+    }
+    kinds
 }
 
 /// Whether a dropped file is left for the image rules: not an `.asset` or FSD file, not a folder, and readable.

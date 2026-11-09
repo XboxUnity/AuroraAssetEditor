@@ -11,6 +11,7 @@ mod console_actions;
 mod console_transfer_actions;
 mod current_game;
 mod current_game_actions;
+mod discard_actions;
 mod file_actions;
 mod game_picker_actions;
 mod image_actions;
@@ -23,6 +24,7 @@ mod online_actions;
 mod page;
 mod pending_import_status;
 mod picker_content;
+mod replacement;
 mod save_actions;
 mod settings_actions;
 mod shutdown_actions;
@@ -42,6 +44,7 @@ pub use console_transfer_actions::{
     SELECT_A_GAME_REASON, UPLOAD_TARGET_TITLE,
 };
 pub use current_game::CurrentGame;
+pub use discard_actions::{DISCARD_LABEL, DISCARD_TITLE};
 pub use file_actions::{BUSY_TEXT, DROP_DURING_QUESTION_TEXT};
 pub use job_failure_actions::JOB_STOPPED_TEXT;
 pub use kind_choice::KindChoice;
@@ -54,5 +57,6 @@ pub use online_actions::{
 pub use page::Page;
 pub use pending_import_status::PendingImportStatus;
 pub use picker_content::PickerContent;
+use replacement::Replacement;
 pub use settings_actions::SETTINGS_SAVE_FAILED;
 pub use startup_settings::{SETTINGS_LOAD_FAILED, StartupSettings};

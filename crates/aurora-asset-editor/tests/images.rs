@@ -805,6 +805,14 @@ fn asset_files_dropped_on_any_page_load() {
 
         drop_files(&mut harness, &[asset.clone(), image.clone()]);
         harness.run_jobs();
+        // After the first round the removed cover is an unsaved change, which the load asks to discard.
+        if page != Page::Online {
+            assert!(
+                matches!(harness.app().modal(), Some(Modal::Confirm { .. })),
+                "{page:?}"
+            );
+            harness.app().answer_modal(ModalAnswer::Accept);
+        }
 
         let app = &mut *harness.app();
         assert!(!is_empty(app, AssetSlot::Cover), "{page:?}");

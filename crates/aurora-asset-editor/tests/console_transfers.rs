@@ -6,12 +6,12 @@ use aurora_asset::{
 };
 use aurora_asset_editor::app::Page;
 use aurora_asset_editor::app::{
-    BUSY_TEXT, CONNECTION_FAILED_TITLE, CurrentGame, EMPTY_UPLOAD_TITLE, KindChoice,
+    BUSY_TEXT, CONNECTION_FAILED_TITLE, CurrentGame, DISCARD_TITLE, EMPTY_UPLOAD_TITLE, KindChoice,
     NO_CONSOLE_SET_UP_REASON, NOTHING_TO_UPLOAD_TEXT, REMOVE_CONFIRM_TITLE, SELECT_A_GAME_REASON,
     UPLOAD_TARGET_TITLE,
 };
 use aurora_asset_editor::console::PresenceCell;
-use aurora_asset_editor::dialogs::{Modal, ModalAnswer, ModalField};
+use aurora_asset_editor::dialogs::{ConfirmedAction, Modal, ModalAnswer, ModalField};
 use aurora_asset_editor::editor::SlotPreview;
 use aurora_asset_editor::jobs::{ConsoleOutcome, JobOutcome, Progress};
 use aurora_asset_editor::status::Severity;
@@ -1132,4 +1132,168 @@ fn per_type_download_of_a_missing_kind_keeps_its_page() {
     assert_eq!(every_page_bytes(&mut harness), before);
     assert_eq!(harness.app().status().text, "No cover asset on console");
     assert_eq!(harness.app().page(), Page::Console);
+}
+
+fn discard_text(harness: &mut AppHarness) -> String {
+    match harness.app().modal() {
+        Some(Modal::Confirm {
+            title,
+            text,
+            action: ConfirmedAction::DiscardChanges,
+            ..
+        }) => {
+            assert_eq!(title, DISCARD_TITLE);
+            text.clone()
+        }
+        other => panic!("expected the Discard question, got {other:?}"),
+    }
+}
+
+#[test]
+fn a_download_over_unsaved_changes_asks_first() {
+    let (mut harness, console) = harness_with_empty_console();
+    let mut on_console = cover_file(10);
+    put_on_console(&console, AssetKind::Cover, &mut on_console);
+    load_every_page(&mut harness);
+    replace_with_art(&mut harness, AssetSlot::Cover);
+    replace_with_art(&mut harness, AssetSlot::Background);
+    select_halo(&mut harness);
+    harness.app().show_page(Page::Console);
+    let before = every_page_bytes(&mut harness);
+
+    harness.app().download(KindChoice::One(AssetKind::Cover));
+    harness.run_jobs();
+    assert_eq!(
+        discard_text(&mut harness),
+        "Discard unsaved changes to Cover?"
+    );
+    assert_eq!(
+        harness.app().status().progress,
+        None,
+        "the download is over"
+    );
+    harness.app().answer_modal(ModalAnswer::Cancel);
+
+    assert_eq!(every_page_bytes(&mut harness), before);
+    assert_eq!(
+        unsaved(&mut harness),
+        vec![AssetKind::Cover, AssetKind::Background]
+    );
+    assert_eq!(harness.app().page(), Page::Console);
+    assert_eq!(harness.app().toasts().iter().count(), 0);
+
+    harness.app().download(KindChoice::One(AssetKind::Cover));
+    harness.run_jobs();
+    harness.app().answer_modal(ModalAnswer::Accept);
+
+    assert_eq!(unsaved(&mut harness), vec![AssetKind::Background]);
+    assert_eq!(
+        harness.app().page_bytes(AssetKind::Cover),
+        on_console.to_bytes()
+    );
+    assert_eq!(harness.app().page(), Page::Cover);
+    assert_eq!(
+        harness.app().status().text,
+        "Downloaded cover from the console"
+    );
+}
+
+#[test]
+fn download_all_and_open_in_editor_ask_about_every_unsaved_page() {
+    let (mut harness, console) = harness_with_empty_console();
+    put_on_console(&console, AssetKind::Cover, &mut cover_file(10));
+    load_every_page(&mut harness);
+    replace_with_art(&mut harness, AssetSlot::Background);
+    replace_with_art(&mut harness, screenshot_slot(2));
+    select_halo(&mut harness);
+    harness.app().show_page(Page::Console);
+    let before = every_page_bytes(&mut harness);
+
+    harness.app().download(KindChoice::All);
+    harness.run_jobs();
+    assert_eq!(
+        discard_text(&mut harness),
+        "Discard unsaved changes to Background and Screenshots?"
+    );
+    harness.app().answer_modal(ModalAnswer::Cancel);
+    assert_eq!(every_page_bytes(&mut harness), before);
+    assert_eq!(harness.app().page(), Page::Console);
+
+    harness.app().open_in_editor();
+    harness.run_jobs();
+    assert_eq!(
+        discard_text(&mut harness),
+        "Discard unsaved changes to Background and Screenshots?"
+    );
+    harness.app().answer_modal(ModalAnswer::Accept);
+
+    assert_eq!(pages_with_content(&mut harness), vec![AssetKind::Cover]);
+    assert_eq!(unsaved(&mut harness), Vec::new());
+    assert_eq!(harness.app().page(), Page::Cover);
+    assert_eq!(
+        harness.app().status().text,
+        "Loaded Halo (4D5307E6) from the console · 1 of 5 asset types present"
+    );
+}
+
+#[test]
+fn a_download_that_replaces_no_page_does_not_ask() {
+    let (mut harness, console) = harness_with_empty_console();
+    put_on_console(&console, AssetKind::Cover, &mut cover_file(10));
+    put_on_console(&console, AssetKind::Background, &mut background_file());
+    console.truncate_download(&console_path(&halo(), AssetKind::Background), 10);
+    load_every_page(&mut harness);
+    replace_with_art(&mut harness, AssetSlot::Cover);
+    replace_with_art(&mut harness, AssetSlot::Icon);
+    select_halo(&mut harness);
+    harness.app().show_page(Page::Console);
+
+    harness
+        .app()
+        .download(KindChoice::One(AssetKind::IconBanner));
+    harness.run_jobs();
+    assert_eq!(
+        harness.app().modal(),
+        None,
+        "the console has no icon & banner"
+    );
+    assert_eq!(
+        harness.app().status().text,
+        "No icon & banner asset on console"
+    );
+
+    harness.app().download(KindChoice::All);
+    harness.run_jobs();
+    assert_eq!(
+        harness.app().modal(),
+        None,
+        "a failed full set changes no page"
+    );
+    assert!(
+        harness
+            .app()
+            .status()
+            .text
+            .starts_with("Could not download background: "),
+        "{}",
+        harness.app().status().text
+    );
+    assert_eq!(
+        unsaved(&mut harness),
+        vec![AssetKind::Cover, AssetKind::IconBanner]
+    );
+}
+
+#[test]
+fn a_download_leaves_its_page_saved() {
+    let (mut harness, console) = harness_with_empty_console();
+    put_on_console(&console, AssetKind::Cover, &mut cover_file(10));
+    select_halo(&mut harness);
+
+    harness.app().download(KindChoice::One(AssetKind::Cover));
+    harness.run_jobs();
+
+    assert_eq!(harness.app().modal(), None);
+    assert!(harness.app().pages().cover.has_content());
+    assert_eq!(unsaved(&mut harness), Vec::new());
 }

@@ -1,8 +1,8 @@
 import { Theme } from "../theme/theme.slint";
 import { DialogModel } from "../model/dialog_model.slint";
 
-// The dimmed backdrop and the card every dialog sits on. Return accepts while the dialog allows it and Escape
-// cancels, wherever the focus is inside the card. Tab and Shift+Tab wrap around inside the card, so the page
+// The dimmed backdrop and the card every dialog sits on. Return accepts while the dialog allows it, or cancels
+// when Cancel is the default, and Escape cancels, wherever the focus is inside the card. Tab and Shift+Tab wrap around inside the card, so the page
 // below never gets the focus: each dialog names its first and last focusable element.
 export component DialogFrame inherits Rectangle {
     in property <string> title;
@@ -21,7 +21,9 @@ export component DialogFrame inherits Rectangle {
 
     // A box's Return ends here, since the box keeps the key to itself.
     public function submit() {
-        if DialogModel.accept-enabled {
+        if DialogModel.cancel-is-default {
+            DialogModel.cancel();
+        } else if DialogModel.accept-enabled {
             DialogModel.accept();
         }
     }

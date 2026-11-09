@@ -23,7 +23,7 @@ use aurora_console::{
     asset_folder, read_content_db,
 };
 use aurora_online::{CoverSource, Endpoints};
-use aurora_ui::{ConsoleModel, GameRowView, MainWindow, OnlineModel, ShellModel};
+use aurora_ui::{ConsoleModel, DialogModel, GameRowView, MainWindow, OnlineModel, ShellModel};
 use editor_test_support::{AppHarness, HeadlessUi, PreviewJobs, asset_file_with};
 use i_slint_backend_testing::ElementHandle;
 use image::RgbaImage;
@@ -1388,6 +1388,60 @@ fn double_clicking_a_row_opens_its_game_in_the_editor() {
     });
     assert_eq!(harness.app().page(), Page::Cover);
     assert!(harness.app().pages().cover.has_content());
+}
+
+#[test]
+fn double_clicking_a_row_over_unsaved_changes_asks_before_the_download_replaces_them() {
+    let mut harness = console_harness(ThemeChoice::Dark);
+    let ui = ui_with_mixed_games(&mut harness);
+    let cover = asset_file_with(&[(
+        AssetSlot::Cover,
+        RgbaImage::from_pixel(8, 8, image::Rgba([10, 40, 90, 255])),
+        Compression::None,
+    )]);
+    let opened = decode_kind(&cover, AssetKind::Cover);
+    ui.act(|app| {
+        app.on_job_outcome(JobOutcome::Console(ConsoleOutcome::Downloaded {
+            ids: mixed_games()[0].ids.clone(),
+            scope: DownloadScope::OneKind(AssetKind::Cover),
+            after: AfterDownload::StayOnConsole,
+            results: vec![KindDownload {
+                kind: AssetKind::Cover,
+                result: Ok(Some(Box::new(opened.clone()))),
+            }],
+        }));
+        app.remove_image(AssetSlot::Cover);
+    });
+
+    double_click_row(&ui, "Apple");
+    let (ids, scope, after) = next_download(&mut harness);
+    let results = AssetKind::ALL
+        .into_iter()
+        .map(|kind| KindDownload {
+            kind,
+            result: Ok((kind == AssetKind::Cover).then(|| Box::new(opened.clone()))),
+        })
+        .collect();
+    ui.act(|app| {
+        app.on_job_outcome(JobOutcome::Console(ConsoleOutcome::Downloaded {
+            ids,
+            scope,
+            after,
+            results,
+        }));
+    });
+
+    assert_eq!(
+        ui.view.window().global::<DialogModel>().get_text(),
+        "Discard unsaved changes to Cover?"
+    );
+    ui.act(|app| app.answer_modal(ModalAnswer::Cancel));
+    assert_eq!(harness.app().page(), Page::Console);
+    assert!(!harness.app().pages().cover.has_content());
+    assert_eq!(
+        harness.app().pages().unsaved_among(&AssetKind::ALL),
+        vec![AssetKind::Cover]
+    );
 }
 
 #[test]

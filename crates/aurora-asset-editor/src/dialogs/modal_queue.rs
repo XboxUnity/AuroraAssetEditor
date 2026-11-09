@@ -25,6 +25,11 @@ impl ModalQueue {
         self.waiting.front_mut()
     }
 
+    /// Whether a modal on screen or waiting matches.
+    pub fn any(&self, matches: impl Fn(&Modal) -> bool) -> bool {
+        self.waiting.iter().any(matches)
+    }
+
     /// The connection form, wherever it waits in the queue.
     pub fn connection_form_mut(&mut self) -> Option<&mut ConnectionForm> {
         self.waiting.iter_mut().find_map(|modal| match modal {

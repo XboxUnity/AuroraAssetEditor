@@ -10,9 +10,27 @@ pub fn kind_name(kind: AssetKind) -> &'static str {
     }
 }
 
+/// How a question names a kind's page: as the sidebar does.
+pub fn page_name(kind: AssetKind) -> &'static str {
+    match kind {
+        AssetKind::Cover => "Cover",
+        AssetKind::Background => "Background",
+        AssetKind::IconBanner => "Icon & Banner",
+        AssetKind::Screenshots => "Screenshots",
+    }
+}
+
 /// "cover", "cover and background", "cover, background and screenshots".
 pub fn kind_list(kinds: &[AssetKind]) -> String {
-    let names: Vec<&str> = kinds.iter().map(|kind| kind_name(*kind)).collect();
+    name_list(kinds.iter().map(|kind| kind_name(*kind)).collect())
+}
+
+/// "Cover", "Cover and Screenshots", "Cover, Background and Screenshots".
+pub fn page_list(kinds: &[AssetKind]) -> String {
+    name_list(kinds.iter().map(|kind| page_name(*kind)).collect())
+}
+
+fn name_list(names: Vec<&str>) -> String {
     match names.split_last() {
         None => String::new(),
         Some((only, [])) => (*only).to_owned(),

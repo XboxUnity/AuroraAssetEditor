@@ -4,7 +4,8 @@ use std::rc::Rc;
 use aurora_ui::{
     ConsoleModel, DialogModel, EditorModel, MainWindow, OnlineModel, PreviewArea, ShellModel,
 };
-use slint::{ComponentHandle, Timer};
+use slint::platform::WindowEvent;
+use slint::{CloseRequestResponse, ComponentHandle, Timer};
 
 use crate::app::App;
 use crate::jobs::{JobRunner, ResizedPreview};
@@ -18,8 +19,8 @@ use super::preview_view::connect_previews;
 use super::shell_view::{Refresh, connect_shell, render_shell};
 use super::toast_view::{connect_toasts, render_toasts};
 use super::{
-    GameRows, ImageCache, OnlineImageCache, PickerRows, PictureId, PlaceholderArt, Previews,
-    ResultTiles, ScreenshotTiles, ToastRows, ToastTimers,
+    APP_BUSY_RETRY, GameRows, ImageCache, OnlineImageCache, PickerRows, PictureId, PlaceholderArt,
+    Previews, ResultTiles, ScreenshotTiles, ToastRows, ToastTimers,
 };
 
 /// The window: it shows what `App` holds and turns the window's callbacks into `App` calls.
@@ -146,6 +147,38 @@ impl MainWindowView {
             &self.previews,
             &self.space_settle_timer,
         );
+    }
+
+    /// Asks the app before the window closes, however the system asks to close it. `before_close` runs once
+    /// the window does close.
+    pub fn connect_close(
+        self: &Rc<Self>,
+        app: &Rc<RefCell<App>>,
+        before_close: impl Fn(&mut App, &slint::Window) + 'static,
+    ) {
+        let view = Rc::downgrade(self);
+        let app = Rc::clone(app);
+        self.window.window().on_close_requested(move || {
+            let Some(view) = view.upgrade() else {
+                return CloseRequestResponse::HideWindow;
+            };
+            let Ok(mut app) = app.try_borrow_mut() else {
+                log::debug!("A close request found the app busy and tries again");
+                let window = view.window.as_weak();
+                Timer::single_shot(APP_BUSY_RETRY, move || {
+                    if let Some(window) = window.upgrade() {
+                        window.window().dispatch_event(WindowEvent::CloseRequested);
+                    }
+                });
+                return CloseRequestResponse::KeepWindowShown;
+            };
+            if app.request_close() {
+                before_close(&mut app, view.window.window());
+                return CloseRequestResponse::HideWindow;
+            }
+            view.render(&app);
+            CloseRequestResponse::KeepWindowShown
+        });
     }
 
     pub fn render(&self, app: &App) {

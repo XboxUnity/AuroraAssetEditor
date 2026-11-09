@@ -4,7 +4,8 @@ use std::rc::Rc;
 use aurora_console::Game;
 use aurora_online::CoverSource;
 use aurora_ui::{ChoiceView, DialogKind, DialogModel, MainWindow, PickerGameView};
-use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
+use slint::platform::WindowEvent;
+use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel, Weak};
 
 use crate::about::{BuildInfo, notices_text};
 use crate::app::{ABOUT_TITLE, App, BULK_TITLE, PickerContent, REFRESHING_TEXT, source_name};
@@ -37,7 +38,12 @@ pub(super) fn connect_dialogs(window: &MainWindow, app: &Rc<RefCell<App>>, refre
     let dialog = window.global::<DialogModel>();
 
     let act = action_runner(app, refresh);
-    dialog.on_accept(move || act(&mut |app| app.answer_modal(ModalAnswer::Accept)));
+    let closing_app = Rc::clone(app);
+    let closing_window = window.as_weak();
+    dialog.on_accept(move || {
+        act(&mut |app| app.answer_modal(ModalAnswer::Accept));
+        close_when_approved(&closing_app, &closing_window);
+    });
 
     let act = action_runner(app, refresh);
     dialog.on_cancel(move || act(&mut |app| app.answer_modal(ModalAnswer::Cancel)));
@@ -108,6 +114,16 @@ pub(super) fn connect_dialogs(window: &MainWindow, app: &Rc<RefCell<App>>, refre
     dialog.on_open_log_folder(move || act(&mut |app| app.open_log_folder()));
 }
 
+/// After Discard on the close question, the window is asked to close again, the way the system asks.
+fn close_when_approved(app: &Rc<RefCell<App>>, window: &Weak<MainWindow>) {
+    if !app.borrow().close_approved() {
+        return;
+    }
+    if let Some(window) = window.upgrade() {
+        window.window().dispatch_event(WindowEvent::CloseRequested);
+    }
+}
+
 pub(super) fn render_dialogs(window: &MainWindow, app: &App, picker_rows: &mut PickerRows) {
     let content = DialogContent::of(app.modal(), app.build_info());
     let dialog = window.global::<DialogModel>();
@@ -116,6 +132,7 @@ pub(super) fn render_dialogs(window: &MainWindow, app: &App, picker_rows: &mut P
     dialog.set_text(content.text.into());
     dialog.set_confirm_label(content.confirm_label.into());
     dialog.set_danger(content.danger);
+    dialog.set_cancel_is_default(content.cancel_is_default);
     // A new model on every render is safe here: the dialogs read choices and fields by index, never with
     // `for`, so their buttons and boxes stay in place, with any press, caret or focus they hold.
     dialog.set_choices(ModelRc::new(VecModel::from(content.choices)));
@@ -196,6 +213,7 @@ struct DialogContent {
     text: String,
     confirm_label: String,
     danger: bool,
+    cancel_is_default: bool,
     choices: Vec<ChoiceView>,
     fields: Vec<SharedString>,
     accept_enabled: bool,
@@ -274,6 +292,7 @@ impl DialogContent {
                 text,
                 confirm_label,
                 danger,
+                cancel_is_default,
                 ..
             } => DialogContent {
                 kind: DialogKind::Confirm,
@@ -281,6 +300,7 @@ impl DialogContent {
                 text: text.clone(),
                 confirm_label: confirm_label.clone(),
                 danger: *danger,
+                cancel_is_default: *cancel_is_default,
                 ..shown
             },
             Modal::Connection { form } => DialogContent::connection(form, shown),

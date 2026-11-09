@@ -35,7 +35,7 @@ use slint::winit_030::winit::event::WindowEvent;
 use slint::winit_030::winit::platform::windows::WindowExtWindows;
 use slint::winit_030::winit::window::{Icon, Theme};
 use slint::winit_030::{EventResult, WinitWindowAccessor};
-use slint::{CloseRequestResponse, ComponentHandle, Timer};
+use slint::{ComponentHandle, Timer};
 
 const VERSION_FLAG: &str = "--version";
 const APP_ICON: &[u8] = include_bytes!("../../aurora-ui/ui/app_icon.ico");
@@ -122,7 +122,7 @@ fn run(
     view.connect(Rc::clone(&app));
     receive_outcomes(outcome_receiver, &app, &view)?;
     watch_window_events(&app, &view);
-    save_geometry_on_close(&app, &view);
+    view.connect_close(&app, save_geometry);
 
     window_placement::restore_size(view.window().window(), geometry.as_ref());
     view.window().show()?;
@@ -317,15 +317,10 @@ fn watch_window_events(app: &Rc<RefCell<App>>, view: &Rc<MainWindowView>) {
         });
 }
 
-fn save_geometry_on_close(app: &Rc<RefCell<App>>, view: &Rc<MainWindowView>) {
-    let app = Rc::clone(app);
-    let close_view = Rc::clone(view);
-    view.window().window().on_close_requested(move || {
-        let saved = app.borrow().settings().window;
-        let geometry = window_placement::capture(close_view.window().window(), saved.as_ref());
-        app.borrow_mut().save_window_geometry(geometry);
-        CloseRequestResponse::HideWindow
-    });
+fn save_geometry(app: &mut App, window: &slint::Window) {
+    let saved = app.settings().window;
+    let geometry = window_placement::capture(window, saved.as_ref());
+    app.save_window_geometry(geometry);
 }
 
 /// Waits for the system window, which exists only once the event loop runs: the icon and position need it,

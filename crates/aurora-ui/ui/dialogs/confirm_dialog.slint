@@ -18,7 +18,11 @@ export component ConfirmDialog inherits DialogFrame {
     }
 
     init => {
-        self.take-focus();
+        if DialogModel.cancel-is-default {
+            cancel-button.focus();
+        } else {
+            self.take-focus();
+        }
     }
 
     DialogText {

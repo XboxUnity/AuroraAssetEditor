@@ -15,4 +15,8 @@ pub enum ConfirmedAction {
         ids: GameIds,
         files: Vec<AssetUpload>,
     },
+    /// Discards unsaved changes: the work waiting to replace those pages goes ahead.
+    DiscardChanges,
+    /// Discards unsaved changes and closes the window.
+    CloseWindow,
 }

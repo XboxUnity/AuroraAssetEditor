@@ -31,12 +31,13 @@ pub enum Modal {
         form: UploadTargetForm,
     },
     /// A question whose accepted answer runs `action`: a confirm button labelled `confirm_label` (drawn as
-    /// dangerous when `danger`) and Cancel.
+    /// dangerous when `danger`) and Cancel, which Return answers when `cancel_is_default`.
     Confirm {
         title: String,
         text: String,
         confirm_label: String,
         danger: bool,
+        cancel_is_default: bool,
         action: ConfirmedAction,
     },
     /// The console connection: Test Connection, Save and Cancel.

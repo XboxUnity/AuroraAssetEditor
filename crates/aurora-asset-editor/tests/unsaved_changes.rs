@@ -3,8 +3,9 @@ use std::io::Cursor;
 use std::path::{Path, PathBuf};
 
 use aurora_asset::{AssetFile, AssetKind, AssetSlot, Compression, RgbaImage, ScreenshotNumber};
-use aurora_asset_editor::app::{App, Page};
-use aurora_asset_editor::dialogs::{ChoiceId, ModalAnswer, ModalField};
+use aurora_asset_editor::app::{App, DISCARD_LABEL, DISCARD_TITLE, Page};
+use aurora_asset_editor::dialogs::{ChoiceId, ConfirmedAction, Modal, ModalAnswer, ModalField};
+use aurora_asset_editor::status::StatusLine;
 use aurora_console::HexId;
 use editor_test_support::{AppHarness, COVER, FsdBuilder, ICON, asset_file_with};
 use image::{ImageFormat, Rgba};
@@ -228,6 +229,7 @@ fn opening_a_file_leaves_its_page_saved() {
     let cover = write(&folder, "GC.asset", &asset_bytes(&[AssetSlot::Cover]));
 
     open(&mut harness, vec![cover]);
+    harness.app().answer_modal(ModalAnswer::Accept);
 
     assert_eq!(unsaved(&harness.app()), vec![AssetKind::Background]);
 }
@@ -338,4 +340,234 @@ fn new_asset_set_leaves_every_page_saved() {
     harness.app().new_asset_set();
 
     assert_eq!(unsaved(&harness.app()), Vec::new());
+}
+
+/// What Cancel must leave exactly as it was.
+#[derive(Debug, PartialEq)]
+struct EditorState {
+    bytes: Vec<Vec<u8>>,
+    unsaved: Vec<AssetKind>,
+    page: Page,
+    status: StatusLine,
+    toasts: usize,
+}
+
+fn editor_state(app: &mut App) -> EditorState {
+    EditorState {
+        bytes: AssetKind::ALL
+            .into_iter()
+            .map(|kind| app.page_bytes(kind))
+            .collect(),
+        unsaved: unsaved(app),
+        page: app.page(),
+        status: app.status().clone(),
+        toasts: app.toasts().iter().count(),
+    }
+}
+
+/// The text of the Discard question on screen, after checking it is drawn as the app's other confirmations.
+fn discard_question(app: &App, expected_action: &ConfirmedAction) -> String {
+    match app.modal() {
+        Some(Modal::Confirm {
+            title,
+            text,
+            confirm_label,
+            danger,
+            cancel_is_default,
+            action,
+        }) => {
+            assert_eq!(title, DISCARD_TITLE);
+            assert_eq!(title, "Unsaved changes");
+            assert_eq!(confirm_label, DISCARD_LABEL);
+            assert_eq!(confirm_label, "Discard");
+            assert!(*danger, "Discard is drawn in the danger colour");
+            assert!(*cancel_is_default, "Cancel is the default");
+            assert_eq!(action, expected_action);
+            text.clone()
+        }
+        other => panic!("expected the Discard question, got {other:?}"),
+    }
+}
+
+/// Cover and Background edited, the other pages as opened.
+fn edited_harness(folder: &TempDir) -> AppHarness {
+    let mut harness = opened_harness(folder);
+    let art = png(folder, "art.png");
+    replace(&mut harness, AssetSlot::Cover, &art);
+    replace(&mut harness, AssetSlot::Background, &art);
+    harness
+}
+
+#[test]
+fn opening_a_file_asks_only_about_the_page_it_replaces() {
+    let folder = TempDir::new().unwrap();
+    let mut harness = edited_harness(&folder);
+    let cover_bytes = asset_bytes(&[AssetSlot::Cover]);
+    let cover = write(&folder, "GC.asset", &cover_bytes);
+    let before = editor_state(&mut harness.app());
+
+    open(&mut harness, vec![cover.clone()]);
+    assert_eq!(
+        discard_question(&harness.app(), &ConfirmedAction::DiscardChanges),
+        "Discard unsaved changes to Cover?"
+    );
+    harness.app().answer_modal(ModalAnswer::Cancel);
+
+    assert_eq!(editor_state(&mut harness.app()), before);
+    assert_eq!(harness.app().modal(), None);
+
+    open(&mut harness, vec![cover]);
+    harness.app().answer_modal(ModalAnswer::Accept);
+
+    let app = &mut *harness.app();
+    assert_eq!(app.modal(), None);
+    assert_eq!(app.page(), Page::Cover);
+    assert_eq!(unsaved(app), vec![AssetKind::Background]);
+    assert_eq!(app.page_bytes(AssetKind::Cover), cover_bytes);
+    assert_eq!(
+        app.status().text,
+        "Loaded GC.asset · 5 of 5 asset types present"
+    );
+}
+
+#[test]
+fn nothing_is_asked_when_the_replaced_pages_are_saved() {
+    let folder = TempDir::new().unwrap();
+    let mut harness = edited_harness(&folder);
+    let screenshots = write(&folder, "SS.asset", &asset_bytes(&[shot(4)]));
+
+    open(&mut harness, vec![screenshots]);
+
+    assert_eq!(harness.app().modal(), None);
+    assert_eq!(harness.app().page(), Page::Screenshots);
+    assert_eq!(
+        unsaved(&harness.app()),
+        vec![AssetKind::Cover, AssetKind::Background]
+    );
+}
+
+#[test]
+fn opening_several_files_asks_once_for_every_page_they_replace() {
+    let folder = TempDir::new().unwrap();
+    let mut harness = edited_harness(&folder);
+    harness.app().move_screenshot(number(1), number(5));
+    let files = page_files(&folder);
+    let before = editor_state(&mut harness.app());
+
+    open(&mut harness, files);
+    assert_eq!(
+        discard_question(&harness.app(), &ConfirmedAction::DiscardChanges),
+        "Discard unsaved changes to Cover, Background and Screenshots?"
+    );
+    harness.app().answer_modal(ModalAnswer::Cancel);
+
+    assert_eq!(editor_state(&mut harness.app()), before);
+    assert_eq!(
+        harness.app().modal(),
+        None,
+        "one question for the whole open"
+    );
+}
+
+#[test]
+fn an_fsd_file_asks_only_about_the_pages_whose_images_it_replaces() {
+    let folder = TempDir::new().unwrap();
+    let mut harness = edited_harness(&folder);
+    harness.app().move_screenshot(number(1), number(5));
+    harness.app().remove_image(AssetSlot::Icon);
+    let fsd = FsdBuilder::new()
+        .entry(COVER, &png_bytes(RED))
+        .screenshot(&png_bytes(RED))
+        .build();
+    let path = write(&folder, "game.assets", &fsd);
+
+    open(&mut harness, vec![path]);
+
+    assert_eq!(
+        discard_question(&harness.app(), &ConfirmedAction::DiscardChanges),
+        "Discard unsaved changes to Cover?",
+        "the FSD screenshots only fill free positions"
+    );
+    harness.app().answer_modal(ModalAnswer::Accept);
+    assert_eq!(harness.app().pages().screenshots.screenshot_count(), 3);
+}
+
+#[test]
+fn cancel_still_reports_the_files_that_could_not_be_read() {
+    let folder = TempDir::new().unwrap();
+    let mut harness = edited_harness(&folder);
+    let cover = write(&folder, "GC.asset", &asset_bytes(&[AssetSlot::Cover]));
+    let missing = folder.path().join("missing.asset");
+    let before = editor_state(&mut harness.app());
+
+    open(&mut harness, vec![cover, missing]);
+    harness.app().answer_modal(ModalAnswer::Cancel);
+
+    match harness.app().modal() {
+        Some(Modal::Message { title, text }) => {
+            assert_eq!(title, "Could not load files");
+            assert!(text.contains("missing.asset: file not found"), "{text}");
+        }
+        other => panic!("expected the load problems, got {other:?}"),
+    }
+    assert_eq!(editor_state(&mut harness.app()), before);
+}
+
+#[test]
+fn new_asset_set_asks_about_every_unsaved_page() {
+    let folder = TempDir::new().unwrap();
+    let mut harness = edited_harness(&folder);
+    harness.app().move_screenshot(number(1), number(5));
+    let before = editor_state(&mut harness.app());
+
+    harness.app().new_asset_set();
+    assert_eq!(
+        discard_question(&harness.app(), &ConfirmedAction::DiscardChanges),
+        "Discard unsaved changes to Cover, Background and Screenshots?"
+    );
+    harness.app().answer_modal(ModalAnswer::Cancel);
+    assert_eq!(editor_state(&mut harness.app()), before);
+
+    harness.app().new_asset_set();
+    harness.app().answer_modal(ModalAnswer::Accept);
+    let app = &mut *harness.app();
+    assert_eq!(app.pages().present_types(), 0);
+    assert_eq!(unsaved(app), Vec::new());
+    assert_eq!(app.status(), &StatusLine::ready());
+}
+
+#[test]
+fn closing_with_unsaved_changes_asks_once_and_discard_lets_it_close() {
+    let folder = TempDir::new().unwrap();
+    let mut harness = edited_harness(&folder);
+
+    assert!(!harness.app().request_close());
+    assert_eq!(
+        discard_question(&harness.app(), &ConfirmedAction::CloseWindow),
+        "Discard unsaved changes to Cover and Background?"
+    );
+    assert!(!harness.app().request_close(), "a second request waits too");
+    harness.app().answer_modal(ModalAnswer::Cancel);
+    assert_eq!(harness.app().modal(), None, "the question was asked once");
+    assert!(!harness.app().close_approved());
+
+    assert!(!harness.app().request_close());
+    harness.app().answer_modal(ModalAnswer::Accept);
+
+    assert!(harness.app().close_approved());
+    assert!(harness.app().request_close());
+    assert_eq!(
+        unsaved(&harness.app()),
+        vec![AssetKind::Cover, AssetKind::Background],
+        "closing touches no page"
+    );
+}
+
+#[test]
+fn closing_without_unsaved_changes_does_not_ask() {
+    let folder = TempDir::new().unwrap();
+    let mut harness = opened_harness(&folder);
+
+    assert!(harness.app().request_close());
+    assert_eq!(harness.app().modal(), None);
 }

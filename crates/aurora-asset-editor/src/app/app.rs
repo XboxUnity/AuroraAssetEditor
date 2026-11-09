@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use std::error::Error;
 use std::path::{Path, PathBuf};
 
@@ -5,7 +6,9 @@ use aurora_asset::{AssetKind, ScreenshotNumber};
 
 use crate::about::BuildInfo;
 use crate::console::ConsoleState;
-use crate::dialogs::{Modal, ModalAnswer, ModalField, ModalQueue, UnofferedChoice};
+use crate::dialogs::{
+    ConfirmedAction, Modal, ModalAnswer, ModalField, ModalQueue, UnofferedChoice,
+};
 use crate::editor::EditorPages;
 use crate::jobs::{JobOutcome, Progress};
 use crate::logging::error_chain;
@@ -14,7 +17,9 @@ use crate::platform::{DialogError, OpenRequest, SaveRequest};
 use crate::settings::AppSettings;
 use crate::status::{ActiveWork, Locks, STATUS_SEPARATOR, StatusLine, Toasts};
 
-use super::{AppEnvironment, CurrentGame, Menu, Page, PendingImportStatus, StartupProblem};
+use super::{
+    AppEnvironment, CurrentGame, Menu, Page, PendingImportStatus, Replacement, StartupProblem,
+};
 
 pub const LOG_WRITE_FAILED: &str = "Could not write error.log";
 pub const DIALOG_FAILED_TITLE: &str = "Could not open the file dialog";
@@ -46,6 +51,10 @@ pub struct App {
     pub(super) about_notices_expanded: bool,
     /// The change count of each page the running upload sends, so a page that reached the console is saved.
     pub(super) upload_change_counts: Vec<(AssetKind, u64)>,
+    /// Work that replaces pages with unsaved changes, oldest first, each waiting for its Discard question.
+    pub(super) pending_replacements: VecDeque<Replacement>,
+    /// The user discarded the unsaved changes to close the window.
+    pub(super) close_approved: bool,
 }
 
 impl App {
@@ -74,6 +83,8 @@ impl App {
             about_copied: false,
             about_notices_expanded: false,
             upload_change_counts: Vec::new(),
+            pending_replacements: VecDeque::new(),
+            close_approved: false,
         };
         app.report_startup_problems(&startup_problems);
         app
@@ -146,6 +157,13 @@ impl App {
                 self.save_all_to_console_for_form(&form);
             }
             (Modal::Confirm { action, .. }, ModalAnswer::Accept) => self.run_confirmed(action),
+            (
+                Modal::Confirm {
+                    action: ConfirmedAction::DiscardChanges,
+                    ..
+                },
+                ModalAnswer::Cancel | ModalAnswer::Choice(_),
+            ) => self.keep_changes(),
             (
                 Modal::UploadTarget { .. } | Modal::Confirm { .. },
                 ModalAnswer::Cancel | ModalAnswer::Choice(_),
