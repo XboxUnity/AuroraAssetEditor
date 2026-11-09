@@ -41,7 +41,7 @@ pub fn run(version: &str) -> Result<()> {
     Ok(())
 }
 
-fn validate_version(text: &str) -> Result<()> {
+pub(crate) fn validate_version(text: &str) -> Result<()> {
     let parts: Vec<&str> = text.split('.').collect();
     let is_number =
         |part: &&str| !part.is_empty() && part.bytes().all(|byte| byte.is_ascii_digit());
@@ -157,7 +157,7 @@ fn path_package_version_line(lines: &[&str], name: &str) -> Option<usize> {
     })
 }
 
-fn read_table(path: &Path) -> Result<toml::Table> {
+pub(crate) fn read_table(path: &Path) -> Result<toml::Table> {
     read(path)?
         .parse()
         .with_context(|| format!("{} is not valid TOML", path.display()))

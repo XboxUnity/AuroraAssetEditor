@@ -1,0 +1,8 @@
+Aurora Asset Editor is not signed by Apple, so macOS blocks it the first time.
+
+1. Drag Aurora Asset Editor to Applications and open it. macOS says it cannot check the app for malicious software.
+2. Open System Settings, then Privacy & Security, scroll down and click Open Anyway, then confirm.
+   On macOS 14 or earlier you can instead right-click the app, choose Open, then Open again.
+
+Or run this in Terminal:
+xattr -d com.apple.quarantine "/Applications/Aurora Asset Editor.app"
