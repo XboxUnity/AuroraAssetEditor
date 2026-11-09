@@ -7,7 +7,7 @@ use std::time::SystemTime;
 use anyhow::{Context, Result, bail};
 
 // These names and the platform rule mirror `editor-test-support`, which xtask does not depend on.
-const BASELINE_VARIABLE: &str = "AURORA_UI_BASELINE";
+pub(crate) const BASELINE_VARIABLE: &str = "AURORA_UI_BASELINE";
 const LABEL_VARIABLE: &str = "AURORA_UI_LABEL";
 const SCREENS_VARIABLE: &str = "AURORA_UI_SCREENS";
 const OUTPUT_FOLDER: &str = "target/ui-screenshots";
@@ -121,11 +121,11 @@ fn written_since(path: &Path, started: SystemTime) -> io::Result<bool> {
     }
 }
 
-fn current_platform() -> String {
+pub(crate) fn current_platform() -> String {
     format!("{}-{}", std::env::consts::OS, std::env::consts::ARCH)
 }
 
-fn repository_root() -> PathBuf {
+pub(crate) fn repository_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .expect("xtask lives one folder below the repository root")

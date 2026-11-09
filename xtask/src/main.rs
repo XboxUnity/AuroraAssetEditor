@@ -15,17 +15,20 @@ mod notices;
 mod prng;
 mod readme_screenshots;
 mod record_online;
+mod release_tags;
 mod set_version;
 mod smoke_test;
 mod srgb_profile;
 mod surface_unit;
 mod synthetic;
+mod ui_baseline;
+mod ui_review_zip;
 mod ui_screenshots;
 
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-const USAGE_LINES: [&str; 9] = [
+const USAGE_LINES: [&str; 13] = [
     "cargo xtask golden <generate [--refresh-inputs] | check>",
     "cargo xtask cross-decode [<image files>...]",
     "cargo xtask cross-samples",
@@ -35,6 +38,10 @@ const USAGE_LINES: [&str; 9] = [
     readme_screenshots::USAGE_LINE,
     set_version::USAGE_LINE,
     smoke_test::USAGE_LINE,
+    release_tags::LATEST_TAG_USAGE_LINE,
+    release_tags::NEXT_VERSION_USAGE_LINE,
+    ui_review_zip::USAGE_LINE,
+    ui_baseline::USAGE_LINE,
 ];
 
 fn main() -> ExitCode {
@@ -53,6 +60,10 @@ fn main() -> ExitCode {
         ["notices"] => notices::run(false),
         ["notices", "--check"] => notices::run(true),
         ["ui-screenshots", options @ ..] => ui_screenshots::run(options),
+        ["latest-v2-tag"] => release_tags::print_latest_tag(),
+        ["next-v2-version"] => release_tags::print_next_version(),
+        ["ui-zip", folder, zip] => ui_review_zip::run(folder, zip),
+        ["ui-baseline", dest, "--env-file", file] => ui_baseline::run(dest, file),
         ["readme-screenshots"] => readme_screenshots::run(),
         ["set-version", version] => set_version::run(version),
         ["smoke-test", command @ ..] => smoke_test::run(command),
