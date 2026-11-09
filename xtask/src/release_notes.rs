@@ -247,6 +247,9 @@ fn parse_options(arguments: &[&str]) -> Result<NotesOptions> {
     let version = required(version, "--version")?;
     validate_version(&version)?;
     let commit = required(commit, "--commit")?;
+    if !is_full_commit(&commit) {
+        bail!("--commit `{commit}` is not a full commit hash: 40 lowercase hex digits");
+    }
     let short_hash = required(short_hash, "--short")?;
     if short_hash.is_empty() || !commit.starts_with(&short_hash) {
         bail!("--short `{short_hash}` is not the start of --commit `{commit}`");
@@ -254,6 +257,11 @@ fn parse_options(arguments: &[&str]) -> Result<NotesOptions> {
     let repository = required(repository, "--repository")?;
     if !is_owner_and_name(&repository) {
         bail!("--repository `{repository}` is not of the form owner/name");
+    }
+    let run_url = required(run_url, "--run-url")?;
+    let run_prefix = format!("https://github.com/{repository}/actions/runs/");
+    if !run_url.strip_prefix(&run_prefix).is_some_and(is_all_digits) {
+        bail!("--run-url `{run_url}` is not a run of the repository: {run_prefix}<digits>");
     }
     let previous = match (previous_tag, generated) {
         (Some(tag), Some(generated)) => Some(PreviousRelease {
@@ -273,12 +281,23 @@ fn parse_options(arguments: &[&str]) -> Result<NotesOptions> {
         commit,
         short_hash,
         repository,
-        run_url: required(run_url, "--run-url")?,
+        run_url,
         commits: PathBuf::from(required(commits, "--commits")?),
         checksums: PathBuf::from(required(checksums, "--checksums")?),
         out: PathBuf::from(required(out, "--out")?),
         previous,
     })
+}
+
+fn is_full_commit(commit: &str) -> bool {
+    commit.len() == 40
+        && commit
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn is_all_digits(text: &str) -> bool {
+    !text.is_empty() && text.bytes().all(|byte| byte.is_ascii_digit())
 }
 
 fn is_owner_and_name(repository: &str) -> bool {
@@ -540,6 +559,42 @@ mod tests {
             })
         );
         assert_eq!(parse_options(&arguments(&[])).unwrap().previous, None);
+    }
+
+    #[test]
+    fn commit_must_be_40_lowercase_hex_digits() {
+        for commit in [
+            "F00DFEEDF00DFEEDF00DFEEDF00DFEEDF00DFEED",
+            "f00dfeedf00dfeedf00dfeedf00dfeedf00dfee",
+            "f00dfeedf00dfeedf00dfeedf00dfeedf00dfeedf",
+            "f00dfeedf00dfeedf00dfeedf00dfeedf00dfeeg",
+        ] {
+            let mut all = arguments(&[]);
+            all[3] = commit;
+            let message = parse_options(&all).unwrap_err().to_string();
+            assert!(message.contains("--commit"), "{message}");
+            assert!(message.contains("40 lowercase hex digits"), "{message}");
+        }
+    }
+
+    #[test]
+    fn run_url_must_be_a_run_of_the_repository() {
+        for run_url in [
+            "https://github.com/o/r/actions/runs/",
+            "https://github.com/o/r/actions/runs/4x2",
+            "https://github.com/o/r/actions/runs/42/attempts/1",
+            "https://github.com/other/r/actions/runs/42",
+            "http://github.com/o/r/actions/runs/42",
+        ] {
+            let mut all = arguments(&[]);
+            all[9] = run_url;
+            let message = parse_options(&all).unwrap_err().to_string();
+            assert!(message.contains("--run-url"), "{message}");
+            assert!(
+                message.contains("https://github.com/o/r/actions/runs/<digits>"),
+                "{message}"
+            );
+        }
     }
 
     #[test]
