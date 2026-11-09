@@ -249,7 +249,16 @@ jobs:
         run: |
           set -euo pipefail
           exe=target/release/aurora-asset-editor.exe
-          vswhere="/c/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe"
+          # Bash cannot expand ${ProgramFiles(x86)}, so the variable is read through printenv.
+          if ! program_files_x86=$(printenv 'ProgramFiles(x86)'); then
+            echo "::error::the ProgramFiles(x86) environment variable is not set"
+            exit 1
+          fi
+          vswhere="$(cygpath -u "$program_files_x86")/Microsoft Visual Studio/Installer/vswhere.exe"
+          if [ ! -f "$vswhere" ]; then
+            echo "::error::vswhere.exe not found at $vswhere"
+            exit 1
+          fi
           installation=$("$vswhere" -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath | tr -d '\r')
           if [ -z "$installation" ]; then
             echo "::error::vswhere found no Visual Studio with the C++ tools"
