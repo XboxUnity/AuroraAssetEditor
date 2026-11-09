@@ -18,6 +18,7 @@ const COMMITS_HEADING: &str = "## Commits";
 const KNOWN_LIMITS_HEADING: &str = "## Known limits";
 const BUILD_HEADING: &str = "## Build";
 const MACOS_TESTING_NOTE: &str = "macOS: tested automatically only";
+const TERMINAL_COMMAND_PREFIX: &str = "xattr ";
 
 /// Everything one release's notes are made of.
 pub struct NotesParts {
@@ -43,7 +44,7 @@ pub struct NotesParts {
 /// The notes in release order. A first release opens with the first-release text and has no
 /// commit list; a later one opens with the generated notes, then the commits since the previous
 /// tag. Every release ends with the known limits and the build section.
-pub fn compose_notes(parts: &NotesParts) -> String {
+pub fn compose_notes(parts: &NotesParts) -> Result<String> {
     let mut sections = Vec::new();
     if parts.previous_tag.is_none() {
         sections.push(parts.first_release.trim_end().to_owned());
@@ -59,8 +60,8 @@ pub fn compose_notes(parts: &NotesParts) -> String {
         "{KNOWN_LIMITS_HEADING}\n\n{}",
         parts.known_limits.trim_end()
     ));
-    sections.push(build_section(parts));
-    sections.join("\n\n") + "\n"
+    sections.push(build_section(parts)?);
+    Ok(sections.join("\n\n") + "\n")
 }
 
 /// One `- <subject> (<short hash>)` line per `%h %s` commit line.
@@ -75,12 +76,12 @@ fn commits_section(commits: &[String]) -> String {
     format!("{COMMITS_HEADING}\n\n{}", lines.join("\n"))
 }
 
-fn build_section(parts: &NotesParts) -> String {
+fn build_section(parts: &NotesParts) -> Result<String> {
     let commit_url = format!(
         "https://github.com/{}/commit/{}",
         parts.repository, parts.commit
     );
-    format!(
+    Ok(format!(
         "{BUILD_HEADING}\n\n\
          - Version: {version} ({short_hash})\n\
          - Commit: [{commit}]({commit_url})\n\
@@ -94,9 +95,38 @@ fn build_section(parts: &NotesParts) -> String {
         short_hash = parts.short_hash,
         commit = parts.commit,
         run_url = parts.run_url,
-        first_launch = parts.macos_first_launch.trim_end(),
+        first_launch = first_launch_markdown(&parts.macos_first_launch)?,
         checksums = parts.checksums.trim_end(),
-    )
+    ))
+}
+
+/// The first-launch text with its Terminal command, the one line starting with `xattr `, in a
+/// code block. The text file stays plain because the disk image carries it as it is.
+fn first_launch_markdown(text: &str) -> Result<String> {
+    let lines: Vec<&str> = text.trim_end().lines().collect();
+    let commands: Vec<usize> = lines
+        .iter()
+        .enumerate()
+        .filter(|(_, line)| line.starts_with(TERMINAL_COMMAND_PREFIX))
+        .map(|(index, _)| index)
+        .collect();
+    let [command] = commands[..] else {
+        bail!(
+            "the macOS first-launch text ({FIRST_LAUNCH_SOURCE}) has {} lines starting with `{TERMINAL_COMMAND_PREFIX}`; the release notes show exactly one as the Terminal command",
+            commands.len()
+        );
+    };
+    let mut blocks = Vec::new();
+    let before = lines[..command].join("\n");
+    if !before.trim().is_empty() {
+        blocks.push(before.trim_end().to_owned());
+    }
+    blocks.push(format!("```\n{}\n```", lines[command]));
+    let after = lines[command + 1..].join("\n");
+    if !after.trim().is_empty() {
+        blocks.push(after.trim().to_owned());
+    }
+    Ok(blocks.join("\n\n"))
 }
 
 /// The `release-notes` command line, checked.
@@ -149,7 +179,7 @@ pub fn run(arguments: &[&str]) -> Result<()> {
             "the macOS first-launch text",
         )?,
     };
-    std::fs::write(&options.out, compose_notes(&parts))
+    std::fs::write(&options.out, compose_notes(&parts)?)
         .with_context(|| format!("could not write {}", options.out.display()))?;
     println!("Wrote {}", options.out.display());
     Ok(())
@@ -284,7 +314,8 @@ mod tests {
             checksums: CHECKSUMS.to_owned(),
             first_release: "First release text.\n\n## Changes from 1.x\n\n- One\n".to_owned(),
             known_limits: "- A limit\n".to_owned(),
-            macos_first_launch: "Open it anyway.\n".to_owned(),
+            macos_first_launch: "Open it anyway.\nOr run this in Terminal:\nxattr -d q app\n"
+                .to_owned(),
         }
     }
 
@@ -331,7 +362,7 @@ mod tests {
 
     #[test]
     fn first_release_has_no_compare_link_and_no_commits() {
-        let notes = compose_notes(&first_release_parts());
+        let notes = compose_notes(&first_release_parts()).unwrap();
         assert!(notes.starts_with("First release text.\n\n## Changes from 1.x\n\n- One\n"));
         assert!(!notes.contains("compare/"), "{notes}");
         assert!(!notes.contains(COMMITS_HEADING), "{notes}");
@@ -343,7 +374,7 @@ mod tests {
 
     #[test]
     fn later_release_keeps_generated_notes_then_commits() {
-        let notes = compose_notes(&later_release_parts());
+        let notes = compose_notes(&later_release_parts()).unwrap();
         assert!(notes.starts_with(GENERATED.trim_end()), "{notes}");
         assert!(!notes.contains("First release text."), "{notes}");
         let ordered = [
@@ -370,7 +401,7 @@ mod tests {
             commits: Vec::new(),
             ..later_release_parts()
         };
-        let notes = compose_notes(&parts);
+        let notes = compose_notes(&parts).unwrap();
         assert!(!notes.contains(COMMITS_HEADING), "{notes}");
         assert!(notes.contains(KNOWN_LIMITS_HEADING), "{notes}");
         assert!(notes.contains(BUILD_HEADING), "{notes}");
@@ -378,7 +409,7 @@ mod tests {
 
     #[test]
     fn build_section_lists_version_commit_run_and_checksums() {
-        let notes = compose_notes(&first_release_parts());
+        let notes = compose_notes(&first_release_parts()).unwrap();
         let build = &notes[position(&notes, BUILD_HEADING)..];
         assert!(build.contains("2.0.7 (a1b2c3d)"), "{build}");
         assert!(
@@ -398,11 +429,48 @@ mod tests {
     #[test]
     fn macos_note_is_in_every_release() {
         for parts in [first_release_parts(), later_release_parts()] {
-            let notes = compose_notes(&parts);
+            let notes = compose_notes(&parts).unwrap();
             let build = &notes[position(&notes, BUILD_HEADING)..];
             assert!(build.contains(MACOS_TESTING_NOTE), "{build}");
             assert!(build.contains("Open it anyway.\n"), "{build}");
+            assert!(build.contains("xattr -d q app"), "{build}");
         }
+    }
+
+    #[test]
+    fn first_launch_command_is_a_code_block() {
+        let text = std::fs::read_to_string(repository_root().join(FIRST_LAUNCH_SOURCE)).unwrap();
+        let parts = NotesParts {
+            macos_first_launch: text,
+            ..first_release_parts()
+        };
+        let notes = compose_notes(&parts).unwrap();
+        let expected = "Or run this in Terminal:\n\n\
+                        ```\n\
+                        xattr -d com.apple.quarantine \"/Applications/Aurora Asset Editor.app\"\n\
+                        ```\n";
+        assert!(notes.contains(expected), "{notes}");
+        assert!(
+            notes.contains("Aurora Asset Editor is not signed by Apple"),
+            "{notes}"
+        );
+    }
+
+    #[test]
+    fn first_launch_text_without_a_command_is_refused() {
+        let parts = NotesParts {
+            macos_first_launch: "Open it anyway.\n".to_owned(),
+            ..first_release_parts()
+        };
+        let message = compose_notes(&parts).unwrap_err().to_string();
+        assert!(message.contains("`xattr `"), "{message}");
+
+        let parts = NotesParts {
+            macos_first_launch: "xattr -d a\nxattr -d b\n".to_owned(),
+            ..first_release_parts()
+        };
+        let message = compose_notes(&parts).unwrap_err().to_string();
+        assert!(message.contains("2 lines"), "{message}");
     }
 
     #[test]
