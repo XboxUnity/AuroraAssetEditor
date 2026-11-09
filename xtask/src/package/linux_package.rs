@@ -111,7 +111,11 @@ pub fn package_linux(root: &Path, inputs: &LinuxInputs) -> Result<Vec<PathBuf>> 
             .expect("linux_commands builds three commands");
 
     let symbols = list_symbols.run()?;
-    check_glibc_floor(&String::from_utf8_lossy(&symbols.stdout))?;
+    let (major, minor) = check_glibc_floor(&String::from_utf8_lossy(&symbols.stdout))?;
+    let (floor_major, floor_minor) = GLIBC_FLOOR;
+    println!(
+        "Highest {GLIBC_PREFIX}x.y required: {major}.{minor}, floor {floor_major}.{floor_minor}"
+    );
 
     stage_tar_folder(root, &paths)?;
     create_tarball.run()?;
@@ -177,10 +181,13 @@ fn leading_version(text: &str) -> Option<(u32, u32)> {
     Some((major, minor))
 }
 
-/// Fails when the binary needs a glibc newer than `GLIBC_FLOOR`, naming the version it needs.
-pub fn check_glibc_floor(objdump_output: &str) -> Result<()> {
+/// The newest glibc version the binary needs. Fails when it is newer than `GLIBC_FLOOR`, naming it, and when
+/// the listing holds no glibc version at all, since the floor was then not checked.
+pub fn check_glibc_floor(objdump_output: &str) -> Result<(u32, u32)> {
     let Some(needed) = highest_glibc(objdump_output) else {
-        return Ok(());
+        bail!(
+            "objdump -T listed no {GLIBC_PREFIX} symbol versions, so the glibc floor could not be checked"
+        );
     };
     if needed > GLIBC_FLOOR {
         let (major, minor) = needed;
@@ -189,7 +196,7 @@ pub fn check_glibc_floor(objdump_output: &str) -> Result<()> {
             "the binary needs {GLIBC_PREFIX}{major}.{minor}, newer than the floor {GLIBC_PREFIX}{floor_major}.{floor_minor}, so it would not start on older Linux systems; build it against glibc {floor_major}.{floor_minor}"
         );
     }
-    Ok(())
+    Ok(needed)
 }
 
 #[cfg(test)]
@@ -229,7 +236,7 @@ DYNAMIC SYMBOL TABLE:
     #[test]
     fn glibc_floor_is_checked_from_objdump_output() {
         assert_eq!(highest_glibc(OBJDUMP_LINES), Some((2, 35)));
-        assert!(check_glibc_floor(OBJDUMP_LINES).is_ok());
+        assert_eq!(check_glibc_floor(OBJDUMP_LINES).unwrap(), (2, 35));
 
         let too_new = format!(
             "{OBJDUMP_LINES}0000000000000000      DF *UND*\t0000000000000000 (GLIBC_2.39) pidfd_spawnp\n"
@@ -240,7 +247,8 @@ DYNAMIC SYMBOL TABLE:
 
         let without_glibc = "DYNAMIC SYMBOL TABLE:\n0000000000000000  w   D  *UND*\t0000000000000000  Base  __gmon_start__\n";
         assert_eq!(highest_glibc(without_glibc), None);
-        assert!(check_glibc_floor(without_glibc).is_ok());
+        let message = check_glibc_floor(without_glibc).unwrap_err().to_string();
+        assert!(message.contains("no GLIBC_ symbol versions"), "{message}");
     }
 
     #[test]
