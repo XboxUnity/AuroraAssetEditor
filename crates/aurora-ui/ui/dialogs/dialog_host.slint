@@ -9,7 +9,6 @@ import { MessageDialog } from "message_dialog.slint";
 import { TitleIdDialog } from "title_id_dialog.slint";
 import { UploadTargetDialog } from "upload_target_dialog.slint";
 
-// The dialog on screen, over the whole window.
 export component DialogHost inherits Rectangle {
     if DialogModel.kind == DialogKind.message: MessageDialog { }
     if DialogModel.kind == DialogKind.confirm: ConfirmDialog { }

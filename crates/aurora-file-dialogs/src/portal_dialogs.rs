@@ -90,7 +90,6 @@ fn picked_paths(
     }
 }
 
-/// The filters with their glob patterns, and the default one.
 fn portal_filters(request: &DialogRequest) -> (Vec<FileFilter>, Option<FileFilter>) {
     let filters: Vec<FileFilter> = request.filters.iter().map(portal_filter).collect();
     let current_filter = request

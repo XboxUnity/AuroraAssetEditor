@@ -4,7 +4,6 @@ use raw_window_handle::{
 
 use super::DialogFilter;
 
-/// What an open or save dialog shows.
 #[derive(Debug, Clone)]
 pub struct DialogRequest<'a> {
     pub title: String,
@@ -15,7 +14,6 @@ pub struct DialogRequest<'a> {
     pub parent: Option<DialogParent<'a>>,
 }
 
-/// The window a dialog is modal to.
 #[derive(Debug, Clone, Copy)]
 pub struct DialogParent<'a> {
     pub window: WindowHandle<'a>,

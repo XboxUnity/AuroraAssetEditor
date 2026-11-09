@@ -1,4 +1,3 @@
-/// One cover a service offers: the text shown for it and where to fetch it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CoverResult {
     /// May span lines: an XboxUnity cover's rating is on a line of its own.

@@ -4,7 +4,6 @@ use crate::online_client::DEFAULT_TIMEOUT;
 
 const DEFAULT_MAX_RESPONSE_BYTES: u64 = 64 * 1024 * 1024;
 
-/// How an `OnlineClient` talks to the network.
 #[derive(Debug, Clone)]
 pub struct ClientOptions {
     pub timeout: Duration,

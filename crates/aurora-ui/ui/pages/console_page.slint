@@ -7,7 +7,6 @@ import { ShellModel } from "../model/shell_model.slint";
 import { Theme } from "../theme/theme.slint";
 import { GameTable } from "game_table.slint";
 
-// The console's games over FTP, and what can be done with the selected one.
 export component ConsolePage inherits VerticalLayout {
     property <bool> game-actions-enabled: ConsoleModel.actions-reason == "" && !ConsoleModel.console-busy;
 

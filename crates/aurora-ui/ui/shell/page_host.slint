@@ -8,7 +8,6 @@ import { IconBannerPage } from "../pages/icon_banner_page.slint";
 import { OnlinePage } from "../pages/online_page.slint";
 import { ScreenshotsPage } from "../pages/screenshots_page.slint";
 
-// The page area: the page the sidebar has selected.
 export component PageHost inherits Rectangle {
     if ShellModel.page == PageId.cover: cover-page := AssetPage {
         width: 100%;

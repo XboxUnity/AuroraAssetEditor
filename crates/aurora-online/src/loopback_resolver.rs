@@ -13,7 +13,6 @@ const LOCALHOST: &str = "localhost";
 #[derive(Debug)]
 pub(crate) struct LoopbackResolver;
 
-/// A request aimed at something other than the machine itself.
 #[derive(Debug)]
 pub(crate) struct NotLoopback {
     host: String,
