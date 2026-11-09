@@ -1,8 +1,14 @@
-//! The arithmetic AuroraAsset.dll's encoder does on the x87 FPU. An expression is evaluated in
-//! double precision and rounded to `f32` only where the DLL stores it, and several of its loops
-//! run with the FPU set to round toward zero, so every operation and store in them truncates.
-//! In round-to-nearest code a single operation on two `f32` values rounds the same as plain
-//! `f32` arithmetic, so only longer expressions there go through [`X87`].
+//! Floating-point maths done the way AuroraAsset.dll's encoder does it on the x87 FPU, so the
+//! encoded blocks match the DLL's byte for byte.
+//!
+//! Two things differ from plain `f32` arithmetic:
+//! - Intermediate results keep double precision. A value is rounded to `f32` only where the DLL
+//!   stores it to memory ([`X87::store`]).
+//! - Some of the DLL's loops switch the FPU to round toward zero ([`Fpu::RoundTowardZero`]), so
+//!   every operation and every store in them truncates instead of rounding to nearest.
+//!
+//! When rounding to nearest, one operation on two `f32` values gives the same result as plain
+//! `f32` arithmetic, so there the code only uses [`X87`] for expressions with several operations.
 
 // Derived from AuroraAsset.dll for interoperability: x87 double precision and rounding control.
 
