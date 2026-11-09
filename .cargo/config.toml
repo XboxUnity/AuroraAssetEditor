@@ -1,2 +1,6 @@
 [alias]
 xtask = "run --package xtask --"
+
+# Link the C runtime statically, so the Windows exe runs without the Visual C++ Redistributable.
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]
