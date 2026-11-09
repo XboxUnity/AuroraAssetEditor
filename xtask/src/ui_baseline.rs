@@ -6,12 +6,10 @@ use std::process::Command;
 use anyhow::{Context, Result, bail};
 
 use crate::release_tags::{latest_v2_tag, repository_tags};
-use crate::ui_review_zip::{UI_SCREENSHOTS_ZIP, extract_zip};
+use crate::ui_review_zip::{MANIFEST_FILE, UI_SCREENSHOTS_ZIP, extract_zip};
 use crate::ui_screenshots::{BASELINE_VARIABLE, current_platform, repository_root};
 
 pub const USAGE_LINE: &str = "cargo xtask ui-baseline <dest> --env-file <file>";
-
-const MANIFEST_FILE: &str = "manifest.txt";
 
 /// The environment line that points the screenshot suite at this platform's earlier run, or
 /// `None` when the unpacked release holds no run of this platform.

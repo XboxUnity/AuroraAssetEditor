@@ -9,7 +9,8 @@ use zip::{CompressionMethod, ZipArchive, ZipWriter};
 pub const UI_SCREENSHOTS_ZIP: &str = "ui-screenshots.zip";
 pub const USAGE_LINE: &str = "cargo xtask ui-zip <folder> <zip>";
 
-const MANIFEST_FILE: &str = "manifest.txt";
+// Mirrors `editor-test-support`, which xtask does not depend on.
+pub(crate) const MANIFEST_FILE: &str = "manifest.txt";
 
 /// Zips every platform subfolder of `folder` as `<platform>/<path>`, and returns the platforms.
 /// A subfolder that is not a finished run (no `manifest.txt`) is an error.
@@ -32,7 +33,10 @@ fn platform_folders(folder: &Path) -> Result<Vec<(String, PathBuf)>> {
     let mut platforms = Vec::new();
     for entry in sorted_entries(folder)? {
         if !entry.is_dir() {
-            continue;
+            bail!(
+                "{} is a file, but the folder holds only platform folders",
+                entry.display()
+            );
         }
         let name = file_name(&entry)?;
         if !entry.join(MANIFEST_FILE).is_file() {
@@ -178,6 +182,29 @@ mod tests {
         let message = write_zip(source.path(), &zip_path).unwrap_err().to_string();
 
         assert!(message.contains("macos-aarch64"), "{message}");
+    }
+
+    #[test]
+    fn folder_without_platforms_is_refused() {
+        let source = tempfile::tempdir().unwrap();
+        let zip_path = source.path().join("out.zip");
+
+        let message = write_zip(source.path(), &zip_path).unwrap_err().to_string();
+
+        assert!(message.contains("no platform folders"), "{message}");
+    }
+
+    #[test]
+    fn stray_file_beside_the_platform_folders_is_refused() {
+        let source = tempfile::tempdir().unwrap();
+        write(source.path(), "windows-x86_64/manifest.txt", b"m");
+        write(source.path(), "stray.txt", b"x");
+        let zip_path = source.path().join("out.zip");
+
+        let message = write_zip(source.path(), &zip_path).unwrap_err().to_string();
+
+        assert!(message.contains("stray.txt"), "{message}");
+        assert!(message.contains("is a file"), "{message}");
     }
 
     #[test]
