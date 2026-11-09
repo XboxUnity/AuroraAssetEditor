@@ -29,7 +29,8 @@ pub fn use_backend_without_default_menu() -> Result<(), PlatformError> {
 }
 
 /// The macOS app menu: About, Hide, Hide Others, Show All and Quit, running `about` and `quit`. The menu works
-/// while this value lives.
+/// while this value lives. Quit from the Dock, logout and shutdown still send `terminate:`, which winit handles
+/// by ending the app, so they skip the unsaved changes question.
 pub struct AppMenu {
     _menu: Menu,
 }
@@ -62,6 +63,10 @@ impl AppMenu {
             about: Box::new(about),
             quit: Box::new(quit),
         }));
+        // This must stay the only menu event handler. muda keeps the first handler set and ignores later ones
+        // without an error. Slint sets its own only for a Slint `MenuBar` or a native context menu
+        // (`ContextMenuArea`, and the std `LineEdit` and `TextEdit`, which contain one); the UI uses none. Adding
+        // one would send its events here, where they are logged and dropped, so it would do nothing on macOS.
         MenuEvent::set_event_handler(Some(hand_over));
         menu.init_for_nsapp();
         Ok(AppMenu { _menu: menu })
