@@ -6,8 +6,9 @@ Test-only. Nothing in this folder is part of a release.
 
 The original `AuroraAsset.dll` (MaesterRowen, 32-bit x86, built against the Xbox 360 XDK) and the
 `msvcr100.dll` it needs. They are the reference the Rust
-codec is tested against: encode and decode goldens are generated with them, and the Windows CI
-cross-decode job runs them against the Rust output.
+codec is tested against: encode and decode goldens are generated with them, and
+`cargo xtask cross-decode` runs them against the Rust output. That check is Windows-only and is run by
+hand; CI does not run it.
 
 ## `spike/`
 
