@@ -7,7 +7,10 @@ work = sys.argv[1]
 exe = os.path.join(work, "bin32", "dllharness.exe")
 out = os.path.join(work, "dll")
 os.makedirs(out, exist_ok=True)
-for argb in sorted(glob.glob(os.path.join(work, "in", "*.argb"))):
+inputs = sorted(glob.glob(os.path.join(work, "in", "*.argb")))
+if not inputs:
+    sys.exit(f"error: no .argb files in {os.path.join(work, 'in')}; run gen_inputs.py first")
+for argb in inputs:
     base = os.path.basename(argb)[:-5]
     w, h = base.rsplit("_", 1)[1].split("x")
     for comp in ("0", "1"):
