@@ -212,16 +212,30 @@ fn panicking_job_fails_and_the_next_job_gets_a_fresh_executor() {
     let (open_gate, gate) = mpsc::channel();
     let gate = Arc::new(Mutex::new(Some(gate)));
     let built = Arc::new(AtomicUsize::new(0));
+    let (report_built, builds) = mpsc::channel();
     let (sender, receiver) = async_channel::unbounded();
     let counter = Arc::clone(&built);
     let mut runner = ThreadRunner::new(
-        move || PanickingExecutor {
-            number: counter.fetch_add(1, Ordering::SeqCst) + 1,
-            gate: Arc::clone(&gate),
+        move || {
+            let number = counter.fetch_add(1, Ordering::SeqCst) + 1;
+            report_built
+                .send(())
+                .expect("the test counts every executor");
+            PanickingExecutor {
+                number,
+                gate: Arc::clone(&gate),
+            }
         },
         sender,
     )
     .expect("the test can start worker threads");
+    // Each thread builds its executor when it starts, and shutdown() does not wait for the online
+    // and preview threads, so the test waits for all of them before counting.
+    for _ in 0..WORKER_THREADS {
+        builds
+            .recv_timeout(SHUTDOWN_LIMIT)
+            .expect("every worker thread builds its executor");
+    }
 
     runner.submit(refresh_job(PANIC_JOB), JobPriority::User);
     runner.submit(refresh_job(AFTER_PANIC_JOB), JobPriority::User);
