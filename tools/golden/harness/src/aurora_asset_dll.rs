@@ -54,15 +54,26 @@ pub struct AuroraAssetDll {
 }
 
 impl AuroraAssetDll {
-    pub fn load(path: &Path) -> Result<Self, libloading::Error> {
-        // The altered search path lets msvcr100.dll resolve from the DLL's own folder.
+    pub fn load(path: &Path) -> Result<Self, String> {
+        // The altered search path resolves msvcr100.dll from the DLL's own folder only for an
+        // absolute path with backslashes. With a `/` in it Windows falls back to a system-wide
+        // msvcr100.dll, and the load fails where none is installed. `absolute` normalises both.
+        let path = std::path::absolute(path)
+            .map_err(|error| format!("cannot make the path absolute: {error}"))?;
         // SAFETY: loading the reference DLL runs its initialisation code, which is the point.
-        let library = unsafe { Library::load_with_flags(path, LOAD_WITH_ALTERED_SEARCH_PATH)? };
+        let library = unsafe { Library::load_with_flags(&path, LOAD_WITH_ALTERED_SEARCH_PATH) }
+            .map_err(describe)?;
         // SAFETY: the symbol types match the DLL's documented cdecl exports.
         unsafe {
-            let image_to_asset = *library.get::<ImageToAssetFn>(b"ConvertImageToAsset\0")?;
-            let asset_to_image = *library.get::<AssetToImageFn>(b"ConvertAssetToImage\0")?;
-            let dds_to_image = *library.get::<DdsToImageFn>(b"ConvertDDSToImage\0")?;
+            let image_to_asset = *library
+                .get::<ImageToAssetFn>(b"ConvertImageToAsset\0")
+                .map_err(describe)?;
+            let asset_to_image = *library
+                .get::<AssetToImageFn>(b"ConvertAssetToImage\0")
+                .map_err(describe)?;
+            let dds_to_image = *library
+                .get::<DdsToImageFn>(b"ConvertDDSToImage\0")
+                .map_err(describe)?;
             Ok(Self {
                 image_to_asset,
                 asset_to_image,
@@ -214,5 +225,13 @@ impl AuroraAssetDll {
         }
         image.truncate(written_len);
         Some((image, width as u32, height as u32, image_len as u32))
+    }
+}
+
+/// libloading's message is only "LoadLibraryExW failed"; the OS error is in its source.
+fn describe(error: libloading::Error) -> String {
+    match std::error::Error::source(&error) {
+        Some(source) => format!("{error}: {source}"),
+        None => error.to_string(),
     }
 }
