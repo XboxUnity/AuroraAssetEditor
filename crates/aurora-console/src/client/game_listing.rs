@@ -108,8 +108,6 @@ pub(crate) fn remove_with_retries(path: &Path, attempts: u32, delay: Duration) -
 
 #[cfg(test)]
 mod tests {
-    use std::time::Instant;
-
     use super::*;
 
     #[test]
@@ -157,6 +155,7 @@ mod tests {
     #[test]
     fn cleanup_gives_up_after_bounded_attempts() {
         use std::os::windows::fs::OpenOptionsExt;
+        use std::time::Instant;
 
         let directory = tempfile::tempdir().expect("a temp dir is created");
         let path = directory.path().join("locked.db");
