@@ -195,6 +195,7 @@ jobs:
           cargo xtask ui-baseline "$RUNNER_TEMP/ui-baseline" --env-file "$GITHUB_ENV"
 
       - name: Tests
+        id: tests
         run: |
           set -euo pipefail
           if [ "$RUNNER_OS" = Linux ]; then
@@ -209,8 +210,10 @@ jobs:
           set -euo pipefail
           cargo test -p golden-harness --target i686-pc-windows-msvc --locked
 
+      # Also after failed tests, so a failing screenshot test still uploads its images. A job
+      # that failed before the tests has no screenshots to upload.
       - name: Upload screenshots
-        if: always()
+        if: ${{ !cancelled() && (steps.tests.outcome == 'success' || steps.tests.outcome == 'failure') }}
         uses: actions/upload-artifact@v7
         with:
           name: ui-screenshots-${{ matrix.platform }}
