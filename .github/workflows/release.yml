@@ -168,8 +168,7 @@ jobs:
           PREVIOUS_TAG: ${{ steps.previous.outputs.tag }}
         run: |
           set -euo pipefail
-          arguments=(--version "$VERSION" --short "$SHORT"
-            --commits "$RUNNER_TEMP/commits.txt"
+          arguments=(--commits "$RUNNER_TEMP/commits.txt"
             --checksums "$RUNNER_TEMP/SHA256SUMS.txt"
             --out "$RUNNER_TEMP/notes.md")
           if [ -n "$PREVIOUS_TAG" ]; then

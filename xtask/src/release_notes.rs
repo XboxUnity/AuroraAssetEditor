@@ -1,5 +1,5 @@
 //! `cargo xtask release-notes`: the body of a draft release, composed from GitHub's generated
-//! notes, the commit list, the copy files under `.github/release-notes` and the build details.
+//! notes, the commit list, the copy files under `.github/release-notes` and the checksum list.
 
 use std::path::{Path, PathBuf};
 
@@ -7,23 +7,20 @@ use anyhow::{Context, Result, bail};
 
 use crate::notices::repository_root;
 use crate::package::FIRST_LAUNCH_SOURCE;
-use crate::set_version::validate_version;
 
-pub const USAGE_LINE: &str = "cargo xtask release-notes --version <v> --short <hash> --commits <file> --checksums <file> --out <file> [--previous-tag <tag> --generated <file>]";
+pub const USAGE_LINE: &str = "cargo xtask release-notes --commits <file> --checksums <file> --out <file> [--previous-tag <tag> --generated <file>]";
 
 const FIRST_RELEASE_SOURCE: &str = ".github/release-notes/first-release.md";
 const KNOWN_LIMITS_SOURCE: &str = ".github/release-notes/known-limits.md";
 
 const COMMITS_HEADING: &str = "## Commits";
 const KNOWN_LIMITS_HEADING: &str = "## Known limits";
-const BUILD_HEADING: &str = "## Build";
+const FIRST_LAUNCH_HEADING: &str = "## macOS first launch";
+const CHECKSUMS_HEADING: &str = "## SHA-256 checksums";
 const TERMINAL_COMMAND_PREFIX: &str = "xattr ";
 
 /// Everything one release's notes are made of.
 pub struct NotesParts {
-    pub version: String,
-    /// The release's one short hash, as the version job printed it.
-    pub short_hash: String,
     /// The newest published v2 tag; `None` for the first release.
     pub previous_tag: Option<String>,
     /// GitHub's generated notes against `previous_tag`.
@@ -38,7 +35,7 @@ pub struct NotesParts {
 
 /// The notes in release order. A first release opens with the first-release text and has no
 /// commit list; a later one opens with the generated notes, then the commits since the previous
-/// tag. Every release ends with the known limits and the build section.
+/// tag. Every release ends with the known limits, the macOS first-launch steps and the checksums.
 pub fn compose_notes(parts: &NotesParts) -> Result<String> {
     let mut sections = Vec::new();
     if parts.previous_tag.is_none() {
@@ -55,7 +52,14 @@ pub fn compose_notes(parts: &NotesParts) -> Result<String> {
         "{KNOWN_LIMITS_HEADING}\n\n{}",
         parts.known_limits.trim_end()
     ));
-    sections.push(build_section(parts)?);
+    sections.push(format!(
+        "{FIRST_LAUNCH_HEADING}\n\n{}",
+        first_launch_markdown(&parts.macos_first_launch)?
+    ));
+    sections.push(format!(
+        "{CHECKSUMS_HEADING}\n\n```text\n{}\n```",
+        parts.checksums.trim_end()
+    ));
     Ok(sections.join("\n\n") + "\n")
 }
 
@@ -92,21 +96,6 @@ fn code_span(text: &str) -> String {
     }
 }
 
-fn build_section(parts: &NotesParts) -> Result<String> {
-    Ok(format!(
-        "{BUILD_HEADING}\n\n\
-         - Version: {version} ({short_hash})\n\n\
-         ### macOS first launch\n\n\
-         {first_launch}\n\n\
-         ### SHA-256 checksums\n\n\
-         ```text\n{checksums}\n```",
-        version = parts.version,
-        short_hash = parts.short_hash,
-        first_launch = first_launch_markdown(&parts.macos_first_launch)?,
-        checksums = parts.checksums.trim_end(),
-    ))
-}
-
 /// The first-launch text with its Terminal command, the one line starting with `xattr `, in a
 /// code block. The text file stays plain because the disk image carries it as it is.
 fn first_launch_markdown(text: &str) -> Result<String> {
@@ -138,8 +127,6 @@ fn first_launch_markdown(text: &str) -> Result<String> {
 
 #[derive(Debug, PartialEq, Eq)]
 struct NotesOptions {
-    version: String,
-    short_hash: String,
     commits: PathBuf,
     checksums: PathBuf,
     out: PathBuf,
@@ -166,8 +153,6 @@ pub fn run(arguments: &[&str]) -> Result<()> {
         None => (None, None),
     };
     let parts = NotesParts {
-        version: options.version,
-        short_hash: options.short_hash,
         previous_tag,
         generated,
         commits: read_commits(&options.commits)?,
@@ -203,8 +188,6 @@ impl CopyTexts {
 }
 
 fn parse_options(arguments: &[&str]) -> Result<NotesOptions> {
-    let mut version = None;
-    let mut short_hash = None;
     let mut commits = None;
     let mut checksums = None;
     let mut out = None;
@@ -216,8 +199,6 @@ fn parse_options(arguments: &[&str]) -> Result<NotesOptions> {
             bail!("{flag} needs a value; usage: {USAGE_LINE}");
         };
         let slot = match flag {
-            "--version" => &mut version,
-            "--short" => &mut short_hash,
             "--commits" => &mut commits,
             "--checksums" => &mut checksums,
             "--out" => &mut out,
@@ -234,12 +215,6 @@ fn parse_options(arguments: &[&str]) -> Result<NotesOptions> {
         Some(value) => Ok(value),
         None => Err(anyhow::anyhow!("{flag} is required; usage: {USAGE_LINE}")),
     };
-    let version = required(version, "--version")?;
-    validate_version(&version)?;
-    let short_hash = required(short_hash, "--short")?;
-    if !is_short_hash(&short_hash) {
-        bail!("--short `{short_hash}` is not a short commit hash: 7 to 40 lowercase hex digits");
-    }
     let previous = match (previous_tag, generated) {
         (Some(tag), Some(generated)) => Some(PreviousRelease {
             tag,
@@ -254,20 +229,11 @@ fn parse_options(arguments: &[&str]) -> Result<NotesOptions> {
         }
     };
     Ok(NotesOptions {
-        version,
-        short_hash,
         commits: PathBuf::from(required(commits, "--commits")?),
         checksums: PathBuf::from(required(checksums, "--checksums")?),
         out: PathBuf::from(required(out, "--out")?),
         previous,
     })
-}
-
-fn is_short_hash(hash: &str) -> bool {
-    (7..=40).contains(&hash.len())
-        && hash
-            .bytes()
-            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
 /// A file the notes need, refused when it holds nothing, since the notes would then miss a part.
@@ -305,8 +271,6 @@ mod tests {
 
     fn first_release_parts() -> NotesParts {
         NotesParts {
-            version: "2.0.7".to_owned(),
-            short_hash: "a1b2c3d".to_owned(),
             previous_tag: None,
             generated: None,
             commits: vec!["abc1234 fix(x): y".to_owned()],
@@ -338,10 +302,6 @@ mod tests {
 
     fn arguments(extra: &[&'static str]) -> Vec<&'static str> {
         let mut all = vec![
-            "--version",
-            "2.0.7",
-            "--short",
-            "f00dfee",
             "--commits",
             "commits.txt",
             "--checksums",
@@ -361,7 +321,7 @@ mod tests {
         assert!(!notes.contains(COMMITS_HEADING), "{notes}");
         assert!(!notes.contains("fix(x): y"), "{notes}");
         assert!(position(&notes, "## Changes from 1.x") < position(&notes, KNOWN_LIMITS_HEADING));
-        assert!(position(&notes, KNOWN_LIMITS_HEADING) < position(&notes, BUILD_HEADING));
+        assert!(position(&notes, KNOWN_LIMITS_HEADING) < position(&notes, FIRST_LAUNCH_HEADING));
         assert!(notes.contains("## Known limits\n\n- A limit\n"), "{notes}");
     }
 
@@ -376,7 +336,8 @@ mod tests {
             "- `fix(x): y` (abc1234)",
             "- `feat(z): w` (def5678)",
             KNOWN_LIMITS_HEADING,
-            BUILD_HEADING,
+            FIRST_LAUNCH_HEADING,
+            CHECKSUMS_HEADING,
         ];
         for pair in ordered.windows(2) {
             assert!(
@@ -397,7 +358,7 @@ mod tests {
         let notes = compose_notes(&parts).unwrap();
         assert!(!notes.contains(COMMITS_HEADING), "{notes}");
         assert!(notes.contains(KNOWN_LIMITS_HEADING), "{notes}");
-        assert!(notes.contains(BUILD_HEADING), "{notes}");
+        assert!(notes.contains(FIRST_LAUNCH_HEADING), "{notes}");
     }
 
     #[test]
@@ -421,26 +382,26 @@ mod tests {
     }
 
     #[test]
-    fn build_section_lists_version_and_checksums() {
+    fn notes_end_with_first_launch_then_checksums() {
         let notes = compose_notes(&first_release_parts()).unwrap();
-        let build = &notes[position(&notes, BUILD_HEADING)..];
-        assert!(
-            build.starts_with("## Build\n\n- Version: 2.0.7 (a1b2c3d)\n\n### macOS first launch\n"),
-            "{build}"
+        let expected = format!(
+            "\n\n- A limit\n\n\
+             ## macOS first launch\n\n\
+             Open it anyway.\nOr run this in Terminal:\n\n```\nxattr -d q app\n```\n\n\
+             ## SHA-256 checksums\n\n```text\n{CHECKSUMS}```\n"
         );
-        assert!(
-            build.contains(&format!("```text\n{CHECKSUMS}```\n")),
-            "{build}"
-        );
+        assert!(notes.ends_with(&expected), "{notes}");
+        assert!(!notes.contains("## Build"), "{notes}");
+        assert!(!notes.contains("Version:"), "{notes}");
     }
 
     #[test]
     fn macos_first_launch_is_in_every_release() {
         for parts in [first_release_parts(), later_release_parts()] {
             let notes = compose_notes(&parts).unwrap();
-            let build = &notes[position(&notes, BUILD_HEADING)..];
-            assert!(build.contains("Open it anyway.\n"), "{build}");
-            assert!(build.contains("xattr -d q app"), "{build}");
+            let first_launch = &notes[position(&notes, FIRST_LAUNCH_HEADING)..];
+            assert!(first_launch.contains("Open it anyway.\n"), "{first_launch}");
+            assert!(first_launch.contains("xattr -d q app"), "{first_launch}");
         }
     }
 
@@ -548,39 +509,9 @@ mod tests {
 
     #[test]
     fn repeated_option_is_refused() {
-        let message = parse_options(&arguments(&["--version", "2.0.8"]))
+        let message = parse_options(&arguments(&["--out", "other.md"]))
             .unwrap_err()
             .to_string();
-        assert!(message.contains("--version is given twice"), "{message}");
-    }
-
-    #[test]
-    fn version_must_have_three_numbers() {
-        let mut all = arguments(&[]);
-        all[1] = "2.0";
-        let message = parse_options(&all).unwrap_err().to_string();
-        assert!(message.contains("major.minor.patch"), "{message}");
-    }
-
-    #[test]
-    fn short_hash_must_be_7_to_40_lowercase_hex_digits() {
-        for short_hash in [
-            "F00DFEE",
-            "f00dfe",
-            "f00dfeg",
-            "f00dfeedf00dfeedf00dfeedf00dfeedf00dfeedf",
-        ] {
-            let mut all = arguments(&[]);
-            all[3] = short_hash;
-            let message = parse_options(&all).unwrap_err().to_string();
-            assert!(message.contains("--short"), "{message}");
-            assert!(
-                message.contains("7 to 40 lowercase hex digits"),
-                "{message}"
-            );
-        }
-        let mut all = arguments(&[]);
-        all[3] = "f00dfeedf00dfeedf00dfeedf00dfeedf00dfeed";
-        assert!(parse_options(&all).is_ok());
+        assert!(message.contains("--out is given twice"), "{message}");
     }
 }
