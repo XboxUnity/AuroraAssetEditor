@@ -1,6 +1,6 @@
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Output};
 
 use anyhow::{Context, Result, bail};
 
@@ -73,6 +73,15 @@ fn generate(root: &Path, notices: &Path, output: &Path) -> Result<()> {
         .with_context(|| format!("could not write {}", output.display()))
 }
 
+/// The error for a `cargo metadata` run that failed, with what cargo printed.
+fn metadata_failure(output: &Output) -> String {
+    format!(
+        "`cargo metadata` failed with {}: {}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr).trim()
+    )
+}
+
 /// The names of the workspace's own crates. They are the app itself, not third-party software, so the notices
 /// leave them out; that also keeps the file the same whatever version a release stamps on the app.
 fn workspace_member_names(root: &Path) -> Result<Vec<String>> {
@@ -88,7 +97,7 @@ fn workspace_member_names(root: &Path) -> Result<Vec<String>> {
         .output()
         .context("could not run `cargo metadata`")?;
     if !metadata.status.success() {
-        bail!("`cargo metadata` failed with {}", metadata.status);
+        bail!(metadata_failure(&metadata));
     }
     let metadata: serde_json::Value = serde_json::from_slice(&metadata.stdout)
         .context("`cargo metadata` printed invalid JSON")?;
@@ -217,7 +226,7 @@ fn check_slint_text(root: &Path, notices: &Path) -> Result<()> {
         .output()
         .context("could not run `cargo metadata`")?;
     if !metadata.status.success() {
-        bail!("`cargo metadata` failed with {}", metadata.status);
+        bail!(metadata_failure(&metadata));
     }
     let metadata: serde_json::Value = serde_json::from_slice(&metadata.stdout)
         .context("`cargo metadata` printed invalid JSON")?;
