@@ -30,11 +30,15 @@ mod ui_screenshots;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-const USAGE_LINES: [&str; 16] = [
+const USAGE_LINES: [&str; 20] = [
     "cargo xtask golden <generate [--refresh-inputs] | check>",
     "cargo xtask cross-decode [<image files>...]",
     "cargo xtask cross-samples",
     "cargo xtask content-db-samples",
+    "cargo xtask closeness-inputs",
+    "cargo xtask gdiplus-report",
+    "cargo xtask gray16-table",
+    "cargo xtask record-online",
     "cargo xtask notices [--check]",
     ui_screenshots::USAGE_LINE,
     readme_screenshots::USAGE_LINE,
