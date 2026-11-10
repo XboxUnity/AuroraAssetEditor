@@ -829,8 +829,15 @@ fn connection_boxes_edit_their_fields_and_save_writes_them() {
     ];
     for (index, (_, text)) in typed.iter().enumerate() {
         if index > 0 {
-            // Tab into the next box selects its text, so typing replaces it.
+            // Tab into the next box selects its text, so typing replaces it. On Apple Slint puts
+            // the caret at the end instead, so the box is emptied first.
             ui.press(Key::Tab);
+            if cfg!(target_vendor = "apple") {
+                let prefill = ui.fields()[index].chars().count();
+                for _ in 0..prefill {
+                    ui.press(Key::Backspace);
+                }
+            }
         }
         ui.type_text(text);
     }
