@@ -22,7 +22,7 @@ pub struct BulkProgress<'a> {
     pub game: &'a Game,
 }
 
-/// Uploads a random cover to each game that has none. A game's error is recorded and the run
+/// Uploads a random cover to each game that has none, or to every game when `replace_existing` is set. A game's error is recorded and the run
 /// goes on. It stops when reconnecting to the console fails, or when `on_progress` returns `Break`,
 /// which is checked before a game is handled so a cover is never half uploaded.
 pub fn run_bulk_covers<P: CoverProvider>(
