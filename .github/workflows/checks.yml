@@ -196,21 +196,22 @@ jobs:
           set -euo pipefail
           cargo xtask ui-baseline "$RUNNER_TEMP/ui-baseline" --env-file "$GITHUB_ENV"
 
+      # --no-fail-fast runs every test binary after a failure, so one run lists every failing test.
       - name: Tests
         id: tests
         run: |
           set -euo pipefail
           if [ "$RUNNER_OS" = Linux ]; then
-            xvfb-run -a cargo test --workspace --locked
+            xvfb-run -a cargo test --workspace --locked --no-fail-fast
           else
-            cargo test --workspace --locked
+            cargo test --workspace --locked --no-fail-fast
           fi
 
       - name: 32-bit harness tests
         if: runner.os == 'Windows'
         run: |
           set -euo pipefail
-          cargo test -p golden-harness --target i686-pc-windows-msvc --locked
+          cargo test -p golden-harness --target i686-pc-windows-msvc --locked --no-fail-fast
 
       # Also after failed tests, so a failing screenshot test still uploads its images. A job
       # that failed before the tests has no screenshots to upload.
