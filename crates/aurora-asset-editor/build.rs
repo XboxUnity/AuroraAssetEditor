@@ -22,9 +22,6 @@ const REF_PREFIX: &str = "ref: ";
 
 const NOTICE_FILES: [&str; 2] = ["notices/handwritten.txt", "notices/third-party.txt"];
 const COMPRESSED_NOTICES: &str = "notices.gz";
-const APP_ICON: &str = "../aurora-ui/ui/app_icon.ico";
-const PRODUCT_NAME: &str = "Aurora Asset Editor";
-const LEGAL_COPYRIGHT: &str = "Public domain (Unlicense)";
 const DIRTY_MARK: &str = ".dirty";
 
 fn main() {
@@ -100,6 +97,10 @@ fn pill_text(version: &str, short_hash: &str, dirty: bool) -> String {
 /// the version and product strings of its file properties.
 #[cfg(windows)]
 fn embed_windows_resources(version: &str, pill: &str) {
+    const APP_ICON: &str = "../aurora-ui/ui/app_icon.ico";
+    const PRODUCT_NAME: &str = "Aurora Asset Editor";
+    const LEGAL_COPYRIGHT: &str = "Public domain (Unlicense)";
+
     println!("cargo:rerun-if-changed={APP_ICON}");
     if !targets_windows() {
         return;
