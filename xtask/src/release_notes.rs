@@ -9,7 +9,7 @@ use crate::notices::repository_root;
 use crate::package::FIRST_LAUNCH_SOURCE;
 use crate::set_version::validate_version;
 
-pub const USAGE_LINE: &str = "cargo xtask release-notes --version <v> --commit <full sha> --short <hash> --repository <owner/name> --run-url <url> --commits <file> --checksums <file> --out <file> [--previous-tag <tag> --generated <file>]";
+pub const USAGE_LINE: &str = "cargo xtask release-notes --version <v> --short <hash> --commits <file> --checksums <file> --out <file> [--previous-tag <tag> --generated <file>]";
 
 const FIRST_RELEASE_SOURCE: &str = ".github/release-notes/first-release.md";
 const KNOWN_LIMITS_SOURCE: &str = ".github/release-notes/known-limits.md";
@@ -17,18 +17,13 @@ const KNOWN_LIMITS_SOURCE: &str = ".github/release-notes/known-limits.md";
 const COMMITS_HEADING: &str = "## Commits";
 const KNOWN_LIMITS_HEADING: &str = "## Known limits";
 const BUILD_HEADING: &str = "## Build";
-const MACOS_TESTING_NOTE: &str = "macOS: tested automatically only";
 const TERMINAL_COMMAND_PREFIX: &str = "xattr ";
 
 /// Everything one release's notes are made of.
 pub struct NotesParts {
     pub version: String,
-    pub commit: String,
-    /// The release's one short hash, as the version job printed it; never cut from `commit`.
+    /// The release's one short hash, as the version job printed it.
     pub short_hash: String,
-    /// `owner/name` on GitHub.
-    pub repository: String,
-    pub run_url: String,
     /// The newest published v2 tag; `None` for the first release.
     pub previous_tag: Option<String>,
     /// GitHub's generated notes against `previous_tag`.
@@ -98,24 +93,15 @@ fn code_span(text: &str) -> String {
 }
 
 fn build_section(parts: &NotesParts) -> Result<String> {
-    let commit_url = format!(
-        "https://github.com/{}/commit/{}",
-        parts.repository, parts.commit
-    );
     Ok(format!(
         "{BUILD_HEADING}\n\n\
-         - Version: {version} ({short_hash})\n\
-         - Commit: [{commit}]({commit_url})\n\
-         - Built by: [GitHub Actions run]({run_url})\n\
-         - {MACOS_TESTING_NOTE}\n\n\
+         - Version: {version} ({short_hash})\n\n\
          ### macOS first launch\n\n\
          {first_launch}\n\n\
          ### SHA-256 checksums\n\n\
          ```text\n{checksums}\n```",
         version = parts.version,
         short_hash = parts.short_hash,
-        commit = parts.commit,
-        run_url = parts.run_url,
         first_launch = first_launch_markdown(&parts.macos_first_launch)?,
         checksums = parts.checksums.trim_end(),
     ))
@@ -153,10 +139,7 @@ fn first_launch_markdown(text: &str) -> Result<String> {
 #[derive(Debug, PartialEq, Eq)]
 struct NotesOptions {
     version: String,
-    commit: String,
     short_hash: String,
-    repository: String,
-    run_url: String,
     commits: PathBuf,
     checksums: PathBuf,
     out: PathBuf,
@@ -184,10 +167,7 @@ pub fn run(arguments: &[&str]) -> Result<()> {
     };
     let parts = NotesParts {
         version: options.version,
-        commit: options.commit,
         short_hash: options.short_hash,
-        repository: options.repository,
-        run_url: options.run_url,
         previous_tag,
         generated,
         commits: read_commits(&options.commits)?,
@@ -224,10 +204,7 @@ impl CopyTexts {
 
 fn parse_options(arguments: &[&str]) -> Result<NotesOptions> {
     let mut version = None;
-    let mut commit = None;
     let mut short_hash = None;
-    let mut repository = None;
-    let mut run_url = None;
     let mut commits = None;
     let mut checksums = None;
     let mut out = None;
@@ -240,10 +217,7 @@ fn parse_options(arguments: &[&str]) -> Result<NotesOptions> {
         };
         let slot = match flag {
             "--version" => &mut version,
-            "--commit" => &mut commit,
             "--short" => &mut short_hash,
-            "--repository" => &mut repository,
-            "--run-url" => &mut run_url,
             "--commits" => &mut commits,
             "--checksums" => &mut checksums,
             "--out" => &mut out,
@@ -262,22 +236,9 @@ fn parse_options(arguments: &[&str]) -> Result<NotesOptions> {
     };
     let version = required(version, "--version")?;
     validate_version(&version)?;
-    let commit = required(commit, "--commit")?;
-    if !is_full_commit(&commit) {
-        bail!("--commit `{commit}` is not a full commit hash: 40 lowercase hex digits");
-    }
     let short_hash = required(short_hash, "--short")?;
-    if short_hash.is_empty() || !commit.starts_with(&short_hash) {
-        bail!("--short `{short_hash}` is not the start of --commit `{commit}`");
-    }
-    let repository = required(repository, "--repository")?;
-    if !is_owner_and_name(&repository) {
-        bail!("--repository `{repository}` is not of the form owner/name");
-    }
-    let run_url = required(run_url, "--run-url")?;
-    let run_prefix = format!("https://github.com/{repository}/actions/runs/");
-    if !run_url.strip_prefix(&run_prefix).is_some_and(is_all_digits) {
-        bail!("--run-url `{run_url}` is not a run of the repository: {run_prefix}<digits>");
+    if !is_short_hash(&short_hash) {
+        bail!("--short `{short_hash}` is not a short commit hash: 7 to 40 lowercase hex digits");
     }
     let previous = match (previous_tag, generated) {
         (Some(tag), Some(generated)) => Some(PreviousRelease {
@@ -294,10 +255,7 @@ fn parse_options(arguments: &[&str]) -> Result<NotesOptions> {
     };
     Ok(NotesOptions {
         version,
-        commit,
         short_hash,
-        repository,
-        run_url,
         commits: PathBuf::from(required(commits, "--commits")?),
         checksums: PathBuf::from(required(checksums, "--checksums")?),
         out: PathBuf::from(required(out, "--out")?),
@@ -305,22 +263,11 @@ fn parse_options(arguments: &[&str]) -> Result<NotesOptions> {
     })
 }
 
-fn is_full_commit(commit: &str) -> bool {
-    commit.len() == 40
-        && commit
+fn is_short_hash(hash: &str) -> bool {
+    (7..=40).contains(&hash.len())
+        && hash
             .bytes()
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-}
-
-fn is_all_digits(text: &str) -> bool {
-    !text.is_empty() && text.bytes().all(|byte| byte.is_ascii_digit())
-}
-
-fn is_owner_and_name(repository: &str) -> bool {
-    match repository.split_once('/') {
-        Some((owner, name)) => !owner.is_empty() && !name.is_empty() && !name.contains('/'),
-        None => false,
-    }
 }
 
 /// A file the notes need, refused when it holds nothing, since the notes would then miss a part.
@@ -355,15 +302,11 @@ mod tests {
 
     const GENERATED: &str = "## What's Changed\n* Nothing from pull requests\n\n**Full Changelog**: https://github.com/o/r/compare/v2.0.6...v2.0.7\n";
     const CHECKSUMS: &str = "0123abcd  AuroraAssetEditor-2.0.7-windows-x86_64.exe\n4567ef01  AuroraAssetEditor-2.0.7-linux-x86_64.AppImage\n";
-    const COMMIT: &str = "f00dfeedf00dfeedf00dfeedf00dfeedf00dfeed";
 
     fn first_release_parts() -> NotesParts {
         NotesParts {
             version: "2.0.7".to_owned(),
-            commit: COMMIT.to_owned(),
             short_hash: "a1b2c3d".to_owned(),
-            repository: "o/r".to_owned(),
-            run_url: "https://github.com/o/r/actions/runs/42".to_owned(),
             previous_tag: None,
             generated: None,
             commits: vec!["abc1234 fix(x): y".to_owned()],
@@ -397,14 +340,8 @@ mod tests {
         let mut all = vec![
             "--version",
             "2.0.7",
-            "--commit",
-            COMMIT,
             "--short",
             "f00dfee",
-            "--repository",
-            "o/r",
-            "--run-url",
-            "https://github.com/o/r/actions/runs/42",
             "--commits",
             "commits.txt",
             "--checksums",
@@ -484,16 +421,11 @@ mod tests {
     }
 
     #[test]
-    fn build_section_lists_version_commit_run_and_checksums() {
+    fn build_section_lists_version_and_checksums() {
         let notes = compose_notes(&first_release_parts()).unwrap();
         let build = &notes[position(&notes, BUILD_HEADING)..];
-        assert!(build.contains("2.0.7 (a1b2c3d)"), "{build}");
         assert!(
-            build.contains(&format!("https://github.com/o/r/commit/{COMMIT}")),
-            "{build}"
-        );
-        assert!(
-            build.contains("https://github.com/o/r/actions/runs/42"),
+            build.starts_with("## Build\n\n- Version: 2.0.7 (a1b2c3d)\n\n### macOS first launch\n"),
             "{build}"
         );
         assert!(
@@ -503,11 +435,10 @@ mod tests {
     }
 
     #[test]
-    fn macos_note_is_in_every_release() {
+    fn macos_first_launch_is_in_every_release() {
         for parts in [first_release_parts(), later_release_parts()] {
             let notes = compose_notes(&parts).unwrap();
             let build = &notes[position(&notes, BUILD_HEADING)..];
-            assert!(build.contains(MACOS_TESTING_NOTE), "{build}");
             assert!(build.contains("Open it anyway.\n"), "{build}");
             assert!(build.contains("xattr -d q app"), "{build}");
         }
@@ -632,46 +563,24 @@ mod tests {
     }
 
     #[test]
-    fn commit_must_be_40_lowercase_hex_digits() {
-        for commit in [
-            "F00DFEEDF00DFEEDF00DFEEDF00DFEEDF00DFEED",
-            "f00dfeedf00dfeedf00dfeedf00dfeedf00dfee",
+    fn short_hash_must_be_7_to_40_lowercase_hex_digits() {
+        for short_hash in [
+            "F00DFEE",
+            "f00dfe",
+            "f00dfeg",
             "f00dfeedf00dfeedf00dfeedf00dfeedf00dfeedf",
-            "f00dfeedf00dfeedf00dfeedf00dfeedf00dfeeg",
         ] {
             let mut all = arguments(&[]);
-            all[3] = commit;
+            all[3] = short_hash;
             let message = parse_options(&all).unwrap_err().to_string();
-            assert!(message.contains("--commit"), "{message}");
-            assert!(message.contains("40 lowercase hex digits"), "{message}");
-        }
-    }
-
-    #[test]
-    fn run_url_must_be_a_run_of_the_repository() {
-        for run_url in [
-            "https://github.com/o/r/actions/runs/",
-            "https://github.com/o/r/actions/runs/4x2",
-            "https://github.com/o/r/actions/runs/42/attempts/1",
-            "https://github.com/other/r/actions/runs/42",
-            "http://github.com/o/r/actions/runs/42",
-        ] {
-            let mut all = arguments(&[]);
-            all[9] = run_url;
-            let message = parse_options(&all).unwrap_err().to_string();
-            assert!(message.contains("--run-url"), "{message}");
+            assert!(message.contains("--short"), "{message}");
             assert!(
-                message.contains("https://github.com/o/r/actions/runs/<digits>"),
+                message.contains("7 to 40 lowercase hex digits"),
                 "{message}"
             );
         }
-    }
-
-    #[test]
-    fn short_hash_must_start_the_commit() {
         let mut all = arguments(&[]);
-        all[5] = "a1b2c3d";
-        let message = parse_options(&all).unwrap_err().to_string();
-        assert!(message.contains("a1b2c3d"), "{message}");
+        all[3] = "f00dfeedf00dfeedf00dfeedf00dfeedf00dfeed";
+        assert!(parse_options(&all).is_ok());
     }
 }

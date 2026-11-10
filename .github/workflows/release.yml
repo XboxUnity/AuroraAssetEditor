@@ -168,9 +168,7 @@ jobs:
           PREVIOUS_TAG: ${{ steps.previous.outputs.tag }}
         run: |
           set -euo pipefail
-          arguments=(--version "$VERSION" --commit "$GITHUB_SHA" --short "$SHORT"
-            --repository "$GITHUB_REPOSITORY"
-            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          arguments=(--version "$VERSION" --short "$SHORT"
             --commits "$RUNNER_TEMP/commits.txt"
             --checksums "$RUNNER_TEMP/SHA256SUMS.txt"
             --out "$RUNNER_TEMP/notes.md")
