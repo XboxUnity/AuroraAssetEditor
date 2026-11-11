@@ -206,4 +206,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh release create "v$VERSION" --draft --target "$GITHUB_SHA" --title "v$VERSION ($SHORT)" --notes-file "$RUNNER_TEMP/notes.md" dist/*
+          gh release create "v$VERSION" --draft --target "$GITHUB_SHA" --title "Aurora Asset Editor v$VERSION ($SHORT)" --notes-file "$RUNNER_TEMP/notes.md" dist/*
