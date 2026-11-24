@@ -49,7 +49,7 @@ const BYTES_PER_PIXEL: usize = 4;
 const PLACEHOLDERS: [(&str, &str, u32, u32); 5] = [
     ("cover", "ph_cover", 900, 600),
     ("background", "ph_background", 1280, 720),
-    ("banner", "ph_banner", 420, 96),
+    ("banner", "ph_banner", 420, 95),
     ("icon", "ph_icon", 64, 64),
     ("screenshot", "ph_screenshot", 1000, 562),
 ];
