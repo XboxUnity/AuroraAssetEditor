@@ -3,7 +3,8 @@ use aurora_asset::{
     ScreenshotNumber, TextureHeader, decode, encode,
 };
 use aurora_asset_editor::editor::{
-    AssetDocument, EditorPages, PreparedImage, SlotPreview, decode_kind, texture_caption,
+    AssetDocument, EditorPages, PreparedImage, SlotPreview, decode_kind, required_size_caption,
+    texture_caption,
 };
 use aurora_image::{ImageTarget, encoder_pixels, fit_to_target};
 use editor_test_support::{asset_file_with, placeholder};
@@ -321,6 +322,16 @@ fn texture_caption_names_format() {
         texture_caption(&tiled_texture().header),
         "8 x 8 · Unsupported texture format (kept as is)"
     );
+}
+
+#[test]
+fn required_size_caption_names_a_differing_actual_size() {
+    let banner = |height| {
+        let texture = encode(&solid(420, height, [1, 2, 3, 255]), Compression::Dxt).unwrap();
+        required_size_caption(&texture.header, (420, 95))
+    };
+    assert_eq!(banner(95), "420 x 95 · DXT");
+    assert_eq!(banner(96), "420 x 95 · DXT · actual 420 x 96");
 }
 
 #[test]

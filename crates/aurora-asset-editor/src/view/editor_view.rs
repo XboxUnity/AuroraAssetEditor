@@ -7,7 +7,7 @@ use aurora_ui::{EditorModel, MainWindow, PreviewArea, ScreenshotTile, SlotView};
 use slint::ComponentHandle;
 
 use crate::app::App;
-use crate::editor::{AssetDocument, SlotPreview, texture_caption};
+use crate::editor::{AssetDocument, SlotPreview, required_size_caption, texture_caption};
 
 use super::shell_view::{Refresh, action_runner, slint_int};
 use super::{
@@ -243,13 +243,18 @@ fn slot_title(slot: AssetSlot) -> String {
     }
 }
 
-/// "{w} x {h} · {format}" of the stored texture, or the target size and "empty".
+/// The target size and "empty" for an empty slot. A stored texture shows the size Aurora requires
+/// where it requires one, otherwise the texture's own size, then its format.
 fn slot_caption(slot: AssetSlot, header: Option<&TextureHeader>) -> String {
-    if let Some(header) = header {
-        return texture_caption(header);
+    let target = ImageTarget::for_slot(slot);
+    let Some(header) = header else {
+        let (width, height) = target.map_or((0, 0), ImageTarget::size);
+        return format!("{width} x {height} · empty");
+    };
+    match target.filter(|target| target.aurora_requires_size()) {
+        Some(target) => required_size_caption(header, target.size()),
+        None => texture_caption(header),
     }
-    let (width, height) = ImageTarget::for_slot(slot).map_or((0, 0), ImageTarget::size);
-    format!("{width} x {height} · empty")
 }
 
 fn slot_index(slot: AssetSlot) -> i32 {

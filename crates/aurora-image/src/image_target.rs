@@ -21,6 +21,15 @@ impl ImageTarget {
         }
     }
 
+    /// Whether Aurora's importer refuses any other size. It takes backgrounds and screenshots at
+    /// any size; theirs are only the sizes the app resizes to.
+    pub fn aurora_requires_size(self) -> bool {
+        match self {
+            ImageTarget::Cover | ImageTarget::Icon | ImageTarget::Banner => true,
+            ImageTarget::Background | ImageTarget::Screenshot => false,
+        }
+    }
+
     /// `None` for the unused fourth entry, which holds no picture.
     pub fn for_slot(slot: AssetSlot) -> Option<ImageTarget> {
         match slot {

@@ -388,7 +388,7 @@ fn unsupported_entry_shows_label() {
     assert!(cover.unsupported && !cover.has_image);
     assert_eq!(
         cover.caption,
-        "8 x 8 · Unsupported texture format (kept as is)"
+        "900 x 600 · Unsupported texture format (kept as is) · actual 8 x 8"
     );
     assert!(!cover.can_export && cover.can_remove);
     assert_eq!(
@@ -419,6 +419,44 @@ fn export_and_remove_disabled_when_empty() {
         assert_eq!(view.caption, caption);
         assert!(!view.can_export && !view.can_remove);
     }
+}
+
+#[test]
+fn captions_lead_with_the_size_aurora_requires() {
+    let mut harness = harness_with_theme(ThemeChoice::Dark);
+    load_entries(
+        &mut harness,
+        "GL4D5307E6.asset",
+        &[
+            (
+                AssetSlot::Icon,
+                RgbaImage::from_pixel(64, 64, BLUE),
+                Compression::None,
+            ),
+            (
+                AssetSlot::Banner,
+                RgbaImage::from_pixel(420, 96, RED),
+                Compression::Dxt,
+            ),
+        ],
+    );
+    load_entries(
+        &mut harness,
+        "BK4D5307E6.asset",
+        &[(AssetSlot::Background, solid(GREEN), Compression::None)],
+    );
+    let ui = Ui::start(&mut harness);
+
+    assert_eq!(ui.model().get_icon().caption, "64 x 64 · ARGB");
+    assert_eq!(
+        ui.model().get_banner().caption,
+        "420 x 95 · DXT · actual 420 x 96"
+    );
+    assert_eq!(
+        ui.model().get_background().caption,
+        "8 x 8 · ARGB",
+        "Aurora takes a background at any size"
+    );
 }
 
 #[test]

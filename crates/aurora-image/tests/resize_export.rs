@@ -35,6 +35,15 @@ fn targets_have_aurora_sizes() {
 }
 
 #[test]
+fn aurora_requires_only_cover_icon_and_banner_sizes() {
+    assert!(ImageTarget::Cover.aurora_requires_size());
+    assert!(ImageTarget::Icon.aurora_requires_size());
+    assert!(ImageTarget::Banner.aurora_requires_size());
+    assert!(!ImageTarget::Background.aurora_requires_size());
+    assert!(!ImageTarget::Screenshot.aurora_requires_size());
+}
+
+#[test]
 fn targets_map_to_slots() {
     assert_eq!(
         ImageTarget::for_slot(AssetSlot::Cover),
