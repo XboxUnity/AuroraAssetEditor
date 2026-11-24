@@ -1,5 +1,6 @@
 //! `cargo xtask release-notes`: the body of a draft release, composed from GitHub's generated
-//! notes, the commit list, the copy files under `.github/release-notes` and the checksum list.
+//! notes, the new features and fixes among the commits, the copy files under
+//! `.github/release-notes` and the checksum list.
 
 use std::path::{Path, PathBuf};
 
@@ -13,7 +14,10 @@ pub const USAGE_LINE: &str = "cargo xtask release-notes --commits <file> --check
 const FIRST_RELEASE_SOURCE: &str = ".github/release-notes/first-release.md";
 const KNOWN_LIMITS_SOURCE: &str = ".github/release-notes/known-limits.md";
 
-const COMMITS_HEADING: &str = "## Commits";
+const NEW_HEADING: &str = "## New";
+const FIXES_HEADING: &str = "## Fixes";
+/// Characters Markdown can act on inside a line of text, so a subject keeps every one as typed.
+const MARKDOWN_SPECIAL: &[char] = &['\\', '`', '*', '_', '[', ']', '<', '>', '~', '&'];
 const KNOWN_LIMITS_HEADING: &str = "## Known limits";
 const FIRST_LAUNCH_HEADING: &str = "## macOS first launch";
 const CHECKSUMS_HEADING: &str = "## SHA-256 checksums";
@@ -33,9 +37,10 @@ pub struct NotesParts {
     pub macos_first_launch: String,
 }
 
-/// The notes in release order. A first release opens with the first-release text and has no
-/// commit list; a later one opens with the generated notes, then the commits since the previous
-/// tag. Every release ends with the known limits, the macOS first-launch steps and the checksums.
+/// The notes in release order. A first release opens with the first-release text and lists no
+/// commits; a later one opens with the generated notes, then the `feat` and `fix` commits since the
+/// previous tag under "New" and "Fixes". Every release ends with the known limits, the macOS
+/// first-launch steps and the checksums.
 pub fn compose_notes(parts: &NotesParts) -> Result<String> {
     let mut sections = Vec::new();
     if parts.previous_tag.is_none() {
@@ -44,9 +49,7 @@ pub fn compose_notes(parts: &NotesParts) -> Result<String> {
         if let Some(generated) = &parts.generated {
             sections.push(generated.trim_end().to_owned());
         }
-        if !parts.commits.is_empty() {
-            sections.push(commits_section(&parts.commits));
-        }
+        sections.extend(change_sections(&parts.commits));
     }
     sections.push(format!(
         "{KNOWN_LIMITS_HEADING}\n\n{}",
@@ -63,21 +66,80 @@ pub fn compose_notes(parts: &NotesParts) -> Result<String> {
     Ok(sections.join("\n\n") + "\n")
 }
 
-/// One `- <subject> (<short hash>)` line per `%h %s` commit line. The subject is code, so an
-/// `@name` or `#123` in it does not become a mention or a link on GitHub.
-fn commits_section(commits: &[String]) -> String {
-    let lines: Vec<String> = commits
-        .iter()
-        .map(|line| {
-            let (hash, subject) = line.split_once(' ').unwrap_or((line.as_str(), ""));
-            if subject.is_empty() {
-                format!("- ({hash})")
-            } else {
-                format!("- {} ({hash})", code_span(subject))
+/// "New" with the `feat` commits and "Fixes" with the `fix` commits among the `%h %s` lines, one
+/// `- <description> (<short hash>)` line each in `git log` order; a heading without commits is left
+/// out, as is every other commit.
+fn change_sections(commits: &[String]) -> Vec<String> {
+    let mut new = Vec::new();
+    let mut fixes = Vec::new();
+    for line in commits {
+        let (hash, subject) = line.split_once(' ').unwrap_or((line.as_str(), ""));
+        let Some((kind, description)) = conventional_subject(subject) else {
+            continue;
+        };
+        let item = format!("- {} ({hash})", plain_markdown(description));
+        match kind {
+            "feat" => new.push(item),
+            "fix" => fixes.push(item),
+            _ => {}
+        }
+    }
+    [(NEW_HEADING, new), (FIXES_HEADING, fixes)]
+        .into_iter()
+        .filter(|(_, items)| !items.is_empty())
+        .map(|(heading, items)| format!("{heading}\n\n{}", items.join("\n")))
+        .collect()
+}
+
+/// The type and description of a `type(scope)!: description` subject; the scope and `!` are
+/// optional. `None` for a subject in any other form.
+fn conventional_subject(subject: &str) -> Option<(&str, &str)> {
+    let (head, description) = subject.split_once(": ")?;
+    let head = head.strip_suffix('!').unwrap_or(head);
+    let kind = match head.split_once('(') {
+        Some((kind, scope)) => {
+            let scope = scope.strip_suffix(')')?;
+            if scope.is_empty() || scope.contains(['(', ')']) {
+                return None;
             }
-        })
-        .collect();
-    format!("{COMMITS_HEADING}\n\n{}", lines.join("\n"))
+            kind
+        }
+        None => head,
+    };
+    let description = description.trim();
+    let is_kind = !kind.is_empty() && kind.chars().all(|character| character.is_ascii_lowercase());
+    (is_kind && !description.is_empty()).then_some((kind, description))
+}
+
+/// `text` as Markdown that shows it as typed: Markdown's special characters are escaped, and each
+/// `@name` is a code span, since GitHub turns an escaped `@name` into a mention as well. A `#123`
+/// stays a link to that issue.
+fn plain_markdown(text: &str) -> String {
+    let mut markdown = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(character) = rest.chars().next() {
+        if character == '@' {
+            let name_length = rest[1..]
+                .find(|character: char| !is_mention_character(character))
+                .unwrap_or(rest.len() - 1);
+            if name_length > 0 {
+                markdown.push_str(&code_span(&rest[..=name_length]));
+                rest = &rest[name_length + 1..];
+                continue;
+            }
+        }
+        if MARKDOWN_SPECIAL.contains(&character) {
+            markdown.push('\\');
+        }
+        markdown.push(character);
+        rest = &rest[character.len_utf8()..];
+    }
+    markdown
+}
+
+/// A character GitHub reads as part of an `@user` or `@org/team` mention.
+fn is_mention_character(character: char) -> bool {
+    character.is_ascii_alphanumeric() || matches!(character, '-' | '_' | '/')
 }
 
 /// `text` as a Markdown code span: fenced by one backtick more than its longest backtick run,
@@ -318,23 +380,23 @@ mod tests {
         let notes = compose_notes(&first_release_parts()).unwrap();
         assert!(notes.starts_with("First release text.\n\n## Changes from 1.x\n\n- One\n"));
         assert!(!notes.contains("compare/"), "{notes}");
-        assert!(!notes.contains(COMMITS_HEADING), "{notes}");
-        assert!(!notes.contains("fix(x): y"), "{notes}");
+        assert!(!notes.contains(NEW_HEADING), "{notes}");
+        assert!(!notes.contains(FIXES_HEADING), "{notes}");
+        assert!(!notes.contains("(abc1234)"), "{notes}");
         assert!(position(&notes, "## Changes from 1.x") < position(&notes, KNOWN_LIMITS_HEADING));
         assert!(position(&notes, KNOWN_LIMITS_HEADING) < position(&notes, FIRST_LAUNCH_HEADING));
         assert!(notes.contains("## Known limits\n\n- A limit\n"), "{notes}");
     }
 
     #[test]
-    fn later_release_keeps_generated_notes_then_commits() {
+    fn later_release_keeps_generated_notes_then_new_then_fixes() {
         let notes = compose_notes(&later_release_parts()).unwrap();
         assert!(notes.starts_with(GENERATED.trim_end()), "{notes}");
         assert!(!notes.contains("First release text."), "{notes}");
         let ordered = [
             "**Full Changelog**: https://github.com/o/r/compare/v2.0.6...v2.0.7",
-            COMMITS_HEADING,
-            "- `fix(x): y` (abc1234)",
-            "- `feat(z): w` (def5678)",
+            "## New\n\n- w (def5678)\n\n",
+            "## Fixes\n\n- y (abc1234)\n\n",
             KNOWN_LIMITS_HEADING,
             FIRST_LAUNCH_HEADING,
             CHECKSUMS_HEADING,
@@ -350,35 +412,72 @@ mod tests {
     }
 
     #[test]
-    fn empty_commit_list_leaves_out_the_section() {
-        let parts = NotesParts {
-            commits: Vec::new(),
-            ..later_release_parts()
-        };
-        let notes = compose_notes(&parts).unwrap();
-        assert!(!notes.contains(COMMITS_HEADING), "{notes}");
-        assert!(notes.contains(KNOWN_LIMITS_HEADING), "{notes}");
-        assert!(notes.contains(FIRST_LAUNCH_HEADING), "{notes}");
+    fn release_without_features_or_fixes_leaves_out_both_headings() {
+        for commits in [
+            Vec::new(),
+            vec!["abc1234 test(x): y".to_owned(), "def5678 ci: z".to_owned()],
+        ] {
+            let parts = NotesParts {
+                commits,
+                ..later_release_parts()
+            };
+            let notes = compose_notes(&parts).unwrap();
+            assert!(!notes.contains(NEW_HEADING), "{notes}");
+            assert!(!notes.contains(FIXES_HEADING), "{notes}");
+            assert!(notes.contains(KNOWN_LIMITS_HEADING), "{notes}");
+            assert!(notes.contains(FIRST_LAUNCH_HEADING), "{notes}");
+        }
     }
 
     #[test]
-    fn commit_subjects_cannot_mention_or_link() {
+    fn only_features_and_fixes_are_listed_without_their_prefix() {
         let parts = NotesParts {
             commits: vec![
-                "abc1234 fix: thanks @someone for #123".to_owned(),
-                "def5678 docs: quote `code` here".to_owned(),
-                "aaa1111 `tick` first".to_owned(),
-                "bbb2222 ".to_owned(),
+                "aaa0001 fix(image): resize banners".to_owned(),
+                "aaa0002 test(golden): keep the placeholder".to_owned(),
+                "aaa0003 feat!: drop the old format".to_owned(),
+                "aaa0004 fix: plain fix".to_owned(),
+                "aaa0005 refactor(ui): move things".to_owned(),
+                "aaa0006 Merge branch 'other'".to_owned(),
+                "aaa0007 feat(editor): lead captions".to_owned(),
+                "aaa0008 fix(): empty scope".to_owned(),
+                "aaa0009 Fix: capitalised type".to_owned(),
+                "aaa0010 fix:no space".to_owned(),
+                "aaa0011 ".to_owned(),
             ],
             ..later_release_parts()
         };
         let notes = compose_notes(&parts).unwrap();
-        let expected = "## Commits\n\n\
-                        - `fix: thanks @someone for #123` (abc1234)\n\
-                        - ``docs: quote `code` here`` (def5678)\n\
-                        - `` `tick` first `` (aaa1111)\n\
-                        - (bbb2222)\n";
+        let expected = "## New\n\n\
+                        - drop the old format (aaa0003)\n\
+                        - lead captions (aaa0007)\n\n\
+                        ## Fixes\n\n\
+                        - resize banners (aaa0001)\n\
+                        - plain fix (aaa0004)\n\n\
+                        ## Known limits";
         assert!(notes.contains(expected), "{notes}");
+    }
+
+    #[test]
+    fn descriptions_show_as_typed_without_mentions() {
+        let cases = [
+            ("thanks @someone for #123", "thanks `@someone` for #123"),
+            ("bump @types/node.", "bump `@types/node`."),
+            ("a lone @ sign", "a lone @ sign"),
+            (
+                "title \"v<version> (<sha>)\"",
+                "title \"v\\<version\\> (\\<sha\\>)\"",
+            ),
+            (
+                "quote `code` and *stars* [x]",
+                "quote \\`code\\` and \\*stars\\* \\[x\\]",
+            ),
+            ("snake_case & a\\b ~x~", "snake\\_case \\& a\\\\b \\~x\\~"),
+            ("åäö @é", "åäö @é"),
+        ];
+        for (text, expected) in cases {
+            assert_eq!(plain_markdown(text), expected, "{text}");
+        }
     }
 
     #[test]
