@@ -24,9 +24,7 @@ use tempfile::TempDir;
 const COVER_SIZE: (u32, u32) = (900, 600);
 /// Smaller than its slot, so it is shown larger.
 const ICON_SIZE: (u32, u32) = (64, 64);
-const BANNER_SIZE: (u32, u32) = (420, 96);
-/// The old app's banner placeholder art is a pixel shorter than a banner.
-const PLACEHOLDER_BANNER_SIZE: (u32, u32) = (420, 95);
+const BANNER_SIZE: (u32, u32) = (420, 95);
 /// Steps of a drag on the window's edge, each shorter than the wait for a space to settle.
 const DRAG_SIZES: [(f32, f32); 4] = [
     (980.0, 660.0),
@@ -257,7 +255,7 @@ fn placeholder_art_reaches_the_window_at_the_size_it_is_shown() {
     let banner_art = size_of(&ui.model().get_banner().placeholder);
     assert_eq!(
         banner_art,
-        preview_size(PLACEHOLDER_BANNER_SIZE, ui.placeholder_space(1))
+        preview_size(BANNER_SIZE, ui.placeholder_space(1))
     );
     assert_eq!(
         ui.drawn_placeholder_sizes(),

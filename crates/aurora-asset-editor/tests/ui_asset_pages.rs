@@ -414,7 +414,7 @@ fn export_and_remove_disabled_when_empty() {
     for (view, caption) in [
         (ui.model().get_background(), "1280 x 720 · empty"),
         (ui.model().get_icon(), "64 x 64 · empty"),
-        (ui.model().get_banner(), "420 x 96 · empty"),
+        (ui.model().get_banner(), "420 x 95 · empty"),
     ] {
         assert_eq!(view.caption, caption);
         assert!(!view.can_export && !view.can_remove);

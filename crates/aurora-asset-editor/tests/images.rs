@@ -458,7 +458,7 @@ fn banner_answer_imports_the_file_as_banner() {
     let folder = TempDir::new().unwrap();
     let mut harness = harness_with_resize(true);
     harness.app().show_page(Page::IconBanner);
-    let path = png(&folder, "wide.png", 420, 96, GREEN);
+    let path = png(&folder, "wide.png", 420, 95, GREEN);
 
     drop_files(&mut harness, &[path]);
     harness
@@ -467,7 +467,7 @@ fn banner_answer_imports_the_file_as_banner() {
     harness.run_jobs();
 
     let app = &mut *harness.app();
-    assert_eq!(pixels(app, AssetSlot::Banner), solid(420, 96, GREEN));
+    assert_eq!(pixels(app, AssetSlot::Banner), solid(420, 95, GREEN));
     assert!(is_empty(app, AssetSlot::Icon));
 }
 
@@ -600,7 +600,7 @@ fn dropping_on_icon_banner_asks_per_file() {
     let mut harness = harness_with_resize(true);
     harness.app().show_page(Page::IconBanner);
     let first = png(&folder, "first.png", 64, 64, RED);
-    let second = png(&folder, "second.png", 420, 96, GREEN);
+    let second = png(&folder, "second.png", 420, 95, GREEN);
 
     drop_files(&mut harness, &[first.clone(), second.clone()]);
 

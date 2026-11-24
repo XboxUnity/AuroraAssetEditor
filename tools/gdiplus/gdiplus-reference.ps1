@@ -14,7 +14,7 @@ is written at every target, as <name>.<width>x<height>.argb in the output folder
 param(
     [Parameter(Mandatory = $true)][string]$InputDir,
     [Parameter(Mandatory = $true)][string]$OutputDir,
-    [string]$Targets = "900x600,1280x720,64x64,420x96,1000x562"
+    [string]$Targets = "900x600,1280x720,64x64,420x95,1000x562"
 )
 
 $ErrorActionPreference = "Stop"

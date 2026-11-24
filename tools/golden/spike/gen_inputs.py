@@ -15,7 +15,7 @@ def save(name, rgba):
         f.write(argb.tobytes())
 
 # Real content: the app's own placeholder images, at the sizes the app resizes to.
-sizes = {"cover": (900, 600), "background": (1280, 720), "banner": (420, 96), "icon": (64, 64), "screenshot": (1000, 562)}
+sizes = {"cover": (900, 600), "background": (1280, 720), "banner": (420, 95), "icon": (64, 64), "screenshot": (1000, 562)}
 for n, (w, h) in sizes.items():
     img = Image.open(os.path.join(placeholders, f"{n}.png")).convert("RGBA").resize((w, h), Image.LANCZOS)
     save(f"ph_{n}", np.array(img))

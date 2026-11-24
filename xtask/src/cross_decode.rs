@@ -52,9 +52,9 @@ const CROSS_SAMPLES: [CrossSample; 9] = [
     },
     CrossSample {
         source: "alphanoise",
-        file: "bmp_32_420x96.bmp",
+        file: "bmp_32_420x95.bmp",
         width: 420,
-        height: 96,
+        height: 95,
         target: ImageTarget::Banner,
     },
     CrossSample {

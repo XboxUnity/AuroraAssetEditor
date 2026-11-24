@@ -136,8 +136,8 @@ mod tests {
         let table = [
             (64, 64, Compression::Dxt, 16_384),
             (64, 64, Compression::None, 16_384),
-            (420, 96, Compression::Dxt, 65_536),
-            (420, 96, Compression::None, 172_032),
+            (420, 95, Compression::Dxt, 65_536),
+            (420, 95, Compression::None, 172_032),
             (900, 600, Compression::Dxt, 655_360),
             (900, 600, Compression::None, 2_334_720),
             (1000, 562, Compression::Dxt, 655_360),

@@ -30,7 +30,7 @@ fn targets_have_aurora_sizes() {
     assert_eq!(ImageTarget::Cover.size(), (900, 600));
     assert_eq!(ImageTarget::Background.size(), (1280, 720));
     assert_eq!(ImageTarget::Icon.size(), (64, 64));
-    assert_eq!(ImageTarget::Banner.size(), (420, 96));
+    assert_eq!(ImageTarget::Banner.size(), (420, 95));
     assert_eq!(ImageTarget::Screenshot.size(), (1000, 562));
 }
 

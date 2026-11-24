@@ -16,7 +16,7 @@ impl ImageTarget {
             ImageTarget::Cover => (900, 600),
             ImageTarget::Background => (1280, 720),
             ImageTarget::Icon => (64, 64),
-            ImageTarget::Banner => (420, 96),
+            ImageTarget::Banner => (420, 95),
             ImageTarget::Screenshot => (1000, 562),
         }
     }
